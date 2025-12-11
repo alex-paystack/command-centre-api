@@ -29,8 +29,11 @@ function getDatabaseConfig(): DatabaseConfig {
     defaults: {
       type: 'mongodb' as const,
       port: 27017,
-      entities: [path.join(__dirname, '../database/entities/*.entity{.ts,.js}')],
-      migrations: [path.join(__dirname, '../database/migrations/*.ts')],
+      entities: [
+        path.join(__dirname, '../database/entities/*.entity{.ts,.js}'),
+        path.join(__dirname, '../modules/**/entities/*.entity{.ts,.js}'),
+      ],
+      migrations: [path.join(__dirname, '../database/migrations/*{.ts,.js}')],
       synchronize: false,
       logging: false,
     },

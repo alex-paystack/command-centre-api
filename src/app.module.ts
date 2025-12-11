@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthModule } from './modules/health/health.module';
 import { DummyModule } from './modules/dummy/dummy.module';
+import { ChatModule } from './modules/chat/chat.module';
 import { Environment } from './config/helpers';
 import databaseConfig from './config/database.config';
 import { DatabaseModule } from './database/database.module';
@@ -16,17 +17,15 @@ import { DatabaseModule } from './database/database.module';
       cache: true,
       // Ignore .env file in test environments to allow config overrides to work
       ignoreEnvFile: process.env.NODE_ENV === Environment.TEST || process.env.NODE_ENV === Environment.E2E,
-      load: [databaseConfig,
-      ],
+      load: [databaseConfig],
     }),
     DatabaseModule,
     HealthModule,
     DummyModule,
+    ChatModule,
     ObservabilityModule.forRoot(),
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-  ],
+  providers: [AppService],
 })
 export class AppModule {}
