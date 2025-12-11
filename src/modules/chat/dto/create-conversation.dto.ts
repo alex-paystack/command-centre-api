@@ -1,5 +1,5 @@
-import { IsString, IsNotEmpty, IsUUID } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsUUID, IsOptional } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateConversationDto {
   @ApiProperty({
@@ -18,11 +18,11 @@ export class CreateConversationDto {
   @IsNotEmpty()
   title: string;
 
-  @ApiProperty({
-    description: 'User ID who owns the conversation',
+  @ApiPropertyOptional({
+    description: 'User ID who owns the conversation (automatically set from authenticated user)',
     example: 'user_12345',
   })
   @IsString()
-  @IsNotEmpty()
-  userId: string;
+  @IsOptional()
+  userId?: string;
 }

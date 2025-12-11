@@ -1,13 +1,17 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { ObservabilityModule } from '@paystackhq/nestjs-observability';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthModule } from './modules/health/health.module';
 import { DummyModule } from './modules/dummy/dummy.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { Environment } from './config/helpers';
 import databaseConfig from './config/database.config';
+import jwtConfig from './config/jwt.config';
 import { DatabaseModule } from './database/database.module';
 
 @Module({
@@ -17,15 +21,22 @@ import { DatabaseModule } from './database/database.module';
       cache: true,
       // Ignore .env file in test environments to allow config overrides to work
       ignoreEnvFile: process.env.NODE_ENV === Environment.TEST || process.env.NODE_ENV === Environment.E2E,
-      load: [databaseConfig],
+      load: [databaseConfig, jwtConfig],
     }),
     DatabaseModule,
+    AuthModule,
     HealthModule,
     DummyModule,
     ChatModule,
     ObservabilityModule.forRoot(),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+  ],
 })
 export class AppModule {}

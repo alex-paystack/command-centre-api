@@ -110,10 +110,10 @@ export class ChatService {
     }
   }
 
-  async handleStreamingChat(dto: ChatRequestDto) {
+  async handleStreamingChat(dto: ChatRequestDto, userId: string) {
     const { conversationId, message } = dto;
 
-    await this.checkUserEntitlement('test-user-id');
+    await this.checkUserEntitlement(userId);
 
     let conversation = await this.conversationRepository.findById(conversationId);
 
@@ -124,7 +124,7 @@ export class ChatService {
         conversation = await this.conversationRepository.createConversation({
           id: conversationId,
           title,
-          userId: 'test-user-id',
+          userId,
         });
       } catch (error) {
         // eslint-disable-next-line no-console
