@@ -25,6 +25,7 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     const token = this.extractTokenFromHeader(request);
+
     if (!token) {
       throw new APIError(
         'Missing authentication token',
@@ -35,7 +36,15 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
+      // TODO: Remove this once we have a proper JWT secret
+      if (!process.env.JWT_SECRET) {
+        request.user = { userId: 'test-user-id' };
+
+        return true;
+      }
+
       const { userId } = await this.authService.validateToken(token);
+
       request.user = { userId };
 
       return true;
