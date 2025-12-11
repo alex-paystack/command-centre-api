@@ -21,9 +21,9 @@ describe('ChatController', () => {
 
   const mockMessageResponse: MessageResponseDto = {
     id: '987fcdeb-51a2-43e7-b890-123456789abc',
-    chatId: '123e4567-e89b-12d3-a456-426614174000',
+    conversationId: '123e4567-e89b-12d3-a456-426614174000',
     role: MessageRole.USER,
-    parts: { text: 'Hello' },
+    parts: [{ type: 'text', text: 'Hello' }],
     createdAt: new Date('2024-01-01'),
   };
 
@@ -34,8 +34,8 @@ describe('ChatController', () => {
       getConversationsByUserId: jest.fn(),
       deleteConversationById: jest.fn(),
       deleteAllConversationsByUserId: jest.fn(),
-      saveMessage: jest.fn(),
-      getMessagesByChatId: jest.fn(),
+      saveMessages: jest.fn(),
+      getMessagesByConversationId: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -116,30 +116,32 @@ describe('ChatController', () => {
     });
   });
 
-  describe('createMessage', () => {
-    it('should create a message', async () => {
-      const dto: CreateMessageDto = {
-        chatId: mockMessageResponse.chatId,
-        role: MessageRole.USER,
-        parts: { text: 'Hello' },
-      };
+  describe('createMessages', () => {
+    it('should create messages', async () => {
+      const dtos: CreateMessageDto[] = [
+        {
+          conversationId: mockMessageResponse.conversationId,
+          role: MessageRole.USER,
+          parts: [{ type: 'text', text: 'Hello' }],
+        },
+      ];
 
-      jest.spyOn(service, 'saveMessage').mockResolvedValue(mockMessageResponse);
+      jest.spyOn(service, 'saveMessages').mockResolvedValue([mockMessageResponse]);
 
-      const result = await controller.createMessage(dto);
+      const result = await controller.createMessages(dtos);
 
-      expect(service.saveMessage).toHaveBeenCalledWith(dto);
-      expect(result).toEqual(mockMessageResponse);
+      expect(service.saveMessages).toHaveBeenCalledWith(dtos);
+      expect(result).toEqual([mockMessageResponse]);
     });
   });
 
-  describe('getMessagesByChatId', () => {
+  describe('getMessagesByConversationId', () => {
     it('should get messages by chat id', async () => {
-      jest.spyOn(service, 'getMessagesByChatId').mockResolvedValue([mockMessageResponse]);
+      jest.spyOn(service, 'getMessagesByConversationId').mockResolvedValue([mockMessageResponse]);
 
-      const result = await controller.getMessagesByChatId(mockConversationResponse.id);
+      const result = await controller.getMessagesByConversationId(mockConversationResponse.id);
 
-      expect(service.getMessagesByChatId).toHaveBeenCalledWith(mockConversationResponse.id);
+      expect(service.getMessagesByConversationId).toHaveBeenCalledWith(mockConversationResponse.id);
       expect(result).toEqual([mockMessageResponse]);
     });
   });

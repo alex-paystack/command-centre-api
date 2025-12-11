@@ -7,6 +7,7 @@ import { UIMessage } from 'ai';
 export enum MessageRole {
   USER = 'user',
   ASSISTANT = 'assistant',
+  SYSTEM = 'system',
 }
 
 @Entity('messages')
@@ -20,7 +21,7 @@ export class Message {
 
   @Column()
   @Index()
-  chatId: string; // UUID reference to conversation
+  conversationId: string; // UUID reference to conversation
 
   @Column({
     type: 'enum',

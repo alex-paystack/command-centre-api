@@ -8,8 +8,8 @@ export class MessageRepository extends MongoRepository<Message> {
     super(Message, dataSource.createEntityManager());
   }
 
-  async findByChatId(chatId: string): Promise<Message[]> {
-    return this.findBy({ chatId });
+  async findByConversationId(conversationId: string): Promise<Message[]> {
+    return this.findBy({ conversationId });
   }
 
   async createMessage(data: Partial<Message>): Promise<Message> {
@@ -17,8 +17,13 @@ export class MessageRepository extends MongoRepository<Message> {
     return this.save(message);
   }
 
-  async deleteAllByChatId(chatId: string): Promise<number> {
-    const result = await this.deleteMany({ chatId });
+  async createMessages(data: Partial<Message>[]): Promise<Message[]> {
+    const messages = this.create(data);
+    return this.save(messages);
+  }
+
+  async deleteAllByConversationId(conversationId: string): Promise<number> {
+    const result = await this.deleteMany({ conversationId });
     return result.deletedCount ?? 0;
   }
 }

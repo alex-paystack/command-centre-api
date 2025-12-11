@@ -7,6 +7,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
+import { MessageRole } from './entities/message.entity';
 
 @ApiTags('chat')
 @Controller('chat')
@@ -83,29 +84,29 @@ export class ChatController {
 
   @Post('messages')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new message in a conversation' })
-  @ApiBody({ type: CreateMessageDto })
+  @ApiOperation({ summary: 'Create messages in a conversation' })
+  @ApiBody({ type: [CreateMessageDto] })
   @ApiResponse({
     status: 201,
-    description: 'Message created successfully',
-    type: MessageResponseDto,
+    description: 'Messages created successfully',
+    type: [MessageResponseDto],
   })
   @ApiResponse({ status: 400, description: 'Bad request - invalid input' })
   @ApiResponse({ status: 404, description: 'Conversation not found' })
-  async createMessage(@Body() dto: CreateMessageDto): Promise<MessageResponseDto> {
-    return this.chatService.saveMessage(dto);
+  async createMessages(@Body() dtos: CreateMessageDto[]): Promise<MessageResponseDto[]> {
+    return this.chatService.saveMessages(dtos);
   }
 
-  @Get('messages/:chatId')
+  @Get('messages/:conversationId')
   @ApiOperation({ summary: 'Get all messages in a conversation' })
-  @ApiParam({ name: 'chatId', description: 'Conversation UUID', type: String })
+  @ApiParam({ name: 'conversationId', description: 'Conversation UUID', type: String })
   @ApiResponse({
     status: 200,
     description: 'List of messages',
     type: [MessageResponseDto],
   })
-  async getMessagesByChatId(@Param('chatId') chatId: string): Promise<MessageResponseDto[]> {
-    return this.chatService.getMessagesByChatId(chatId);
+  async getMessagesByConversationId(@Param('conversationId') conversationId: string): Promise<MessageResponseDto[]> {
+    return this.chatService.getMessagesByConversationId(conversationId);
   }
 
   @Post('stream')
@@ -123,6 +124,15 @@ export class ChatController {
 
     const response = result.toUIMessageStreamResponse({
       sendReasoning: true,
+      onFinish: async ({ messages }) => {
+        const formattedMessages = messages.map((message) => ({
+          conversationId: dto.conversationId,
+          role: message.role as MessageRole,
+          parts: message.parts,
+        }));
+
+        await this.chatService.saveMessages(formattedMessages);
+      },
     });
 
     response.headers.forEach((value, key) => {

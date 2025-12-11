@@ -1,12 +1,6 @@
-<h1 align="center">
-  Command Centre API
-</h1>
+# Command Centre API
 
-<p align="center">
-  AI-powered merchant dashboard API built with NestJS, MongoDB, and OpenAI
-</p>
-
----
+AI-powered merchant dashboard API built with NestJS, MongoDB, and OpenAI
 
 ## 📖 Overview
 
@@ -21,8 +15,6 @@ Command Centre API is a NestJS-based backend service that powers an AI-driven me
 - 📊 **Multi-Modal Messages**: Support for text, images, and rich content via UIMessage format
 - 🔄 **Real-time Streaming**: Server-sent events for streaming AI responses
 - 🗄️ **MongoDB Storage**: Scalable conversation and message storage
-
----
 
 ## 🚀 Quick Start
 
@@ -72,44 +64,43 @@ Command Centre API is a NestJS-based backend service that powers an AI-driven me
    ```
 
 4. **Start the development server**
+
    ```bash
    pnpm run start:dev
    ```
 
 The API will be available at `http://localhost:3000`
 
----
-
 ## 🏗️ Architecture
 
 ### Project Structure
 
-```
+```md
 src/
 ├── common/
-│   ├── ai/                    # AI utilities and integrations
-│   │   ├── actions.ts         # AI action functions (title generation)
-│   │   ├── prompts.ts         # AI system prompts
-│   │   ├── tools.ts           # AI tools definitions
-│   │   ├── utils.ts           # Helper functions for AI
-│   │   └── index.ts
-│   ├── exceptions/            # Custom exceptions and filters
-│   └── helpers/               # Shared utilities
-├── config/                    # Configuration modules
+│ ├── ai/ # AI utilities and integrations
+│ │ ├── actions.ts # AI action functions (title generation)
+│ │ ├── prompts.ts # AI system prompts
+│ │ ├── tools.ts # AI tools definitions
+│ │ ├── utils.ts # Helper functions for AI
+│ │ └── index.ts
+│ ├── exceptions/ # Custom exceptions and filters
+│ └── helpers/ # Shared utilities
+├── config/ # Configuration modules
 ├── database/
-│   ├── migrations/            # TypeORM migrations
-│   └── database.module.ts
+│ ├── migrations/ # TypeORM migrations
+│ └── database.module.ts
 ├── modules/
-│   ├── chat/                  # Chat & conversation module
-│   │   ├── dto/               # Data transfer objects
-│   │   ├── entities/          # TypeORM entities
-│   │   ├── repositories/      # Database repositories
-│   │   ├── chat.controller.ts
-│   │   ├── chat.service.ts
-│   │   └── chat.module.ts
-│   └── health/                # Health check endpoints
-├── app.module.ts              # Root module
-└── main.ts                    # Application entry point
+│ ├── chat/ # Chat & conversation module
+│ │ ├── dto/ # Data transfer objects
+│ │ ├── entities/ # TypeORM entities
+│ │ ├── repositories/ # Database repositories
+│ │ ├── chat.controller.ts
+│ │ ├── chat.service.ts
+│ │ └── chat.module.ts
+│ └── health/ # Health check endpoints
+├── app.module.ts # Root module
+└── main.ts # Application entry point
 ```
 
 ### Technology Stack
@@ -120,8 +111,6 @@ src/
 - **Language**: TypeScript v5.7
 - **Validation**: class-validator & class-transformer
 - **Documentation**: Swagger/OpenAPI
-
----
 
 ## 🤖 AI Features
 
@@ -190,6 +179,7 @@ AI tools allow the model to interact with backend services. Current tools:
    ```
 
 2. Add to the tools export:
+
    ```typescript
    export const tools: Record<string, Tool<unknown, unknown>> = {
      getTransactionsTool,
@@ -207,8 +197,6 @@ import { generateConversationTitle } from './common/ai';
 const title = await generateConversationTitle(message);
 // Returns: "Payment API Integration" (or similar)
 ```
-
----
 
 ## 📡 API Endpoints
 
@@ -236,8 +224,6 @@ Streams AI responses for a conversation.
 
 **Response:** Server-sent events stream with UIMessage format
 
----
-
 #### Create Conversation
 
 ```http
@@ -255,8 +241,6 @@ Creates a new conversation.
   "userId": "user_123"
 }
 ```
-
----
 
 #### Get Conversation
 
@@ -277,8 +261,6 @@ Retrieves a conversation by ID.
 }
 ```
 
----
-
 #### Get User Conversations
 
 ```http
@@ -287,8 +269,6 @@ GET /chat/conversations/user/:userId
 
 Retrieves all conversations for a user.
 
----
-
 #### Delete Conversation
 
 ```http
@@ -296,8 +276,6 @@ DELETE /chat/conversations/:id
 ```
 
 Deletes a conversation and all its messages.
-
----
 
 #### Create Message
 
@@ -311,7 +289,7 @@ Manually creates a message in a conversation.
 
 ```json
 {
-  "chatId": "550e8400-e29b-41d4-a716-446655440000",
+  "conversationId": "550e8400-e29b-41d4-a716-446655440000",
   "role": "user",
   "parts": {
     "text": "How do I integrate payments?"
@@ -319,17 +297,13 @@ Manually creates a message in a conversation.
 }
 ```
 
----
-
 #### Get Messages
 
 ```http
-GET /chat/messages/:chatId
+GET /chat/messages/:conversationId
 ```
 
 Retrieves all messages in a conversation.
-
----
 
 ### Health Check
 
@@ -338,8 +312,6 @@ GET /health
 ```
 
 Returns application health status.
-
----
 
 ## 🗄️ Database
 
@@ -363,7 +335,7 @@ Returns application health status.
 {
   _id: ObjectId,
   id: string,           // UUID
-  chatId: string,       // Reference to conversation
+  conversationId: string,       // Reference to conversation
   role: 'user' | 'assistant',
   parts: {              // Flexible JSON for multi-modal content
     text?: string,
@@ -388,8 +360,6 @@ pnpm run migration:run
 # Revert last migration
 pnpm run migration:revert
 ```
-
----
 
 ## 🔧 Available Scripts
 
@@ -420,8 +390,6 @@ pnpm run migration:run      # Run pending migrations
 pnpm run migration:revert   # Revert last migration
 ```
 
----
-
 ## 🧪 Testing
 
 The project includes comprehensive test coverage:
@@ -444,8 +412,6 @@ pnpm run test:e2e       # Run end-to-end tests
 - `chat.controller.spec.ts` - Controller tests
 - `chat.service.spec.ts` - Service layer tests
 - Each module includes its own test suite
-
----
 
 ## 🔒 Environment Configuration
 
@@ -484,8 +450,6 @@ OTEL_METRICS_EXPORTER=console
 
 See `.env.example` for the complete list of available environment variables.
 
----
-
 ## 🐳 Docker Support
 
 ### Development with Docker
@@ -508,14 +472,12 @@ docker build -t command-centre-api .
 docker run -p 3000:3000 --env-file .env command-centre-api
 ```
 
----
-
 ## 📊 API Documentation
 
 When the application is running, visit:
 
-- **Swagger UI**: `http://localhost:3000/api`
-- **OpenAPI JSON**: `http://localhost:3000/api-json`
+- **Swagger UI**: `http://localhost:3000/swagger`
+- **OpenAPI JSON**: `http://localhost:3000/swagger-json`
 
 The Swagger documentation provides:
 
@@ -523,8 +485,6 @@ The Swagger documentation provides:
 - Request/response schemas
 - Authentication details
 - Example payloads
-
----
 
 ## 🚀 Deployment
 
@@ -549,8 +509,6 @@ The project includes GitHub Actions workflows for:
 - Building Docker images
 - Security vulnerability scanning
 
----
-
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -566,8 +524,6 @@ The project includes GitHub Actions workflows for:
 - Write meaningful commit messages
 - Add tests for new features
 - Update documentation as needed
-
----
 
 ## 🔧 Troubleshooting
 
@@ -593,8 +549,6 @@ The project includes GitHub Actions workflows for:
 - Run `pnpm install` to ensure all dependencies are installed
 - Clear build cache: `rm -rf dist && pnpm run build`
 
----
-
 ## 📚 Additional Resources
 
 - [NestJS Documentation](https://docs.nestjs.com/)
@@ -602,13 +556,3 @@ The project includes GitHub Actions workflows for:
 - [OpenAI API Documentation](https://platform.openai.com/docs)
 - [MongoDB Documentation](https://docs.mongodb.com/)
 - [TypeORM Documentation](https://typeorm.io/)
-
----
-
-## 📄 License
-
-This project is licensed under the UNLICENSED license.
-
----
-
-**Built with ❤️ by Paystack**

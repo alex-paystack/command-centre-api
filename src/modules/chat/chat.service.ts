@@ -18,25 +18,37 @@ export class ChatService {
     private readonly messageRepository: MessageRepository,
   ) {}
 
-  async getMessagesByChatId(chatId: string): Promise<MessageResponseDto[]> {
-    const messages = await this.messageRepository.findByChatId(chatId);
+  async getMessagesByConversationId(conversationId: string): Promise<MessageResponseDto[]> {
+    const messages = await this.messageRepository.findByConversationId(conversationId);
     return MessageResponseDto.fromEntities(messages);
   }
 
-  async saveMessage(dto: CreateMessageDto): Promise<MessageResponseDto> {
-    const conversation = await this.conversationRepository.findById(dto.chatId);
-
-    if (!conversation) {
-      throw new NotFoundException(`Conversation with ID ${dto.chatId} not found`);
+  async saveMessages(dtos: CreateMessageDto[]): Promise<MessageResponseDto[]> {
+    if (dtos.length === 0) {
+      return [];
     }
 
-    const message = await this.messageRepository.createMessage({
-      chatId: dto.chatId,
+    const conversationId = dtos[0].conversationId;
+    const allSameConversation = dtos.every((dto) => dto.conversationId === conversationId);
+
+    if (!allSameConversation) {
+      throw new Error('All messages must belong to the same conversation');
+    }
+
+    const conversation = await this.conversationRepository.findById(conversationId);
+    if (!conversation) {
+      throw new NotFoundException(`Conversation with ID ${conversationId} not found`);
+    }
+
+    const messagesToCreate = dtos.map((dto) => ({
+      conversationId: dto.conversationId,
       role: dto.role,
       parts: dto.parts,
-    });
+    }));
 
-    return MessageResponseDto.fromEntity(message);
+    const savedMessages = await this.messageRepository.createMessages(messagesToCreate);
+
+    return MessageResponseDto.fromEntities(savedMessages);
   }
 
   async getConversationById(id: string): Promise<ConversationResponseDto> {
@@ -66,7 +78,7 @@ export class ChatService {
   }
 
   async deleteConversationById(id: string): Promise<void> {
-    await this.messageRepository.deleteAllByChatId(id);
+    await this.messageRepository.deleteAllByConversationId(id);
 
     const deleted = await this.conversationRepository.deleteById(id);
     if (!deleted) {
@@ -78,7 +90,7 @@ export class ChatService {
     const conversations = await this.conversationRepository.findByUserId(userId);
 
     for (const conversation of conversations) {
-      await this.messageRepository.deleteAllByChatId(conversation.id);
+      await this.messageRepository.deleteAllByConversationId(conversation.id);
     }
 
     return this.conversationRepository.deleteAllByUserId(userId);
@@ -105,11 +117,11 @@ export class ChatService {
       }
     }
 
-    const allMessages = await this.getMessagesByChatId(conversationId);
+    const allMessages = await this.getMessagesByConversationId(conversationId);
     const uiMessages = [...convertToUIMessages(allMessages), message];
 
     await this.messageRepository.createMessage({
-      chatId: conversationId,
+      conversationId,
       role: MessageRole.USER,
       parts: message.parts,
     });

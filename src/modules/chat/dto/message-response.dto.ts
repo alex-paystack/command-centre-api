@@ -17,7 +17,7 @@ export class MessageResponseDto {
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @Expose()
-  chatId: string;
+  conversationId: string;
 
   @ApiProperty({
     description: 'Message role',
@@ -47,7 +47,7 @@ export class MessageResponseDto {
   static fromEntity(message: Message): MessageResponseDto {
     const dto = new MessageResponseDto();
     dto.id = message.id;
-    dto.chatId = message.chatId;
+    dto.conversationId = message.conversationId;
     dto.role = message.role;
     dto.parts = message.parts;
     dto.createdAt = message.createdAt;

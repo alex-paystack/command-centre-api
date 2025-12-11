@@ -10,7 +10,7 @@ export class CreateMessageDto {
   })
   @IsUUID()
   @IsNotEmpty()
-  chatId: string;
+  conversationId: string;
 
   @ApiProperty({
     description: 'Message role',
