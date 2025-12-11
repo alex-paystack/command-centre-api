@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { convertToModelMessages, streamText } from 'ai';
+import { convertToModelMessages, stepCountIs, streamText } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { ConversationRepository } from './repositories/conversation.repository';
 import { MessageRepository } from './repositories/message.repository';
@@ -10,7 +10,8 @@ import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { MessageRole } from './entities/message.entity';
-import { generateConversationTitle, convertToUIMessages, tools } from '../../common/ai';
+import { generateConversationTitle, convertToUIMessages, createTools, CHAT_AGENT_SYSTEM_PROMPT } from '../../common/ai';
+import { PaystackApiService } from '../../common/services/paystack-api.service';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
 
 @Injectable()
@@ -19,6 +20,7 @@ export class ChatService {
     private readonly conversationRepository: ConversationRepository,
     private readonly messageRepository: MessageRepository,
     private readonly configService: ConfigService,
+    private readonly paystackApiService: PaystackApiService,
   ) {}
 
   async getMessagesByConversationId(conversationId: string, userId: string) {
@@ -122,7 +124,7 @@ export class ChatService {
     }
   }
 
-  async handleStreamingChat(dto: ChatRequestDto, userId: string) {
+  async handleStreamingChat(dto: ChatRequestDto, userId: string, jwtToken: string) {
     const { conversationId, message } = dto;
 
     await this.checkUserEntitlement(userId);
@@ -158,9 +160,15 @@ export class ChatService {
       parts: message.parts,
     });
 
+    const getJwtToken = () => jwtToken;
+
+    const tools = createTools(this.paystackApiService, getJwtToken);
+
     const result = streamText({
       model: openai('gpt-4o-mini'),
+      system: CHAT_AGENT_SYSTEM_PROMPT,
       messages: convertToModelMessages(uiMessages),
+      stopWhen: stepCountIs(10),
       tools,
     });
 

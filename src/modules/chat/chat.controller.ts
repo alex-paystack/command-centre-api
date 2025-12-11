@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Delete, Body, Param, HttpCode, HttpStatus, Res, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Body,
+  Param,
+  HttpCode,
+  HttpStatus,
+  Res,
+  Req,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { ChatService } from './chat.service';
@@ -105,7 +117,14 @@ export class ChatController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    const result = await this.chatService.handleStreamingChat(dto, userId);
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new UnauthorizedException('Authorization header missing or malformed');
+    }
+
+    const jwtToken = authHeader.split(' ')[1];
+
+    const result = await this.chatService.handleStreamingChat(dto, userId, jwtToken);
 
     const response = result.toUIMessageStreamResponse({
       sendReasoning: true,

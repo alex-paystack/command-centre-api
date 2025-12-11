@@ -10,6 +10,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { Conversation } from './entities/conversation.entity';
 import { Message, MessageRole } from './entities/message.entity';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
+import { PaystackApiService } from '../../common/services/paystack-api.service';
 
 describe('ChatService', () => {
   let service: ChatService;
@@ -63,6 +64,13 @@ describe('ChatService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ChatService,
+        {
+          provide: PaystackApiService,
+          useValue: {
+            get: jest.fn(),
+            post: jest.fn(),
+          },
+        },
         {
           provide: ConversationRepository,
           useValue: mockConversationRepository,
@@ -362,6 +370,7 @@ describe('ChatService', () => {
             message: { id: '123', role: MessageRole.USER, parts: [{ type: 'text', text: 'hi' }] },
           },
           mockConversation.userId,
+          'mock-jwt-token',
         ),
       ).rejects.toThrow(NotFoundException);
     });

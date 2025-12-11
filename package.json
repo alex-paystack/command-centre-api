@@ -11,7 +11,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "start": "node -r @paystackhq/nestjs-observability/register dist/main.js",
-    "start:dev": "NODE_OPTIONS=\"-r dotenv/config -r @paystackhq/nestjs-observability/register\" nest start --watch",
+    "start:dev": "OTEL_TRACES_EXPORTER=none OTEL_METRICS_EXPORTER=none OTEL_LOGS_EXPORTER=none OTEL_LOG_LEVEL=ERROR NODE_OPTIONS=\"-r dotenv/config -r @paystackhq/nestjs-observability/register\" nest start --watch",
     "start:debug": "NODE_OPTIONS=\"-r @paystackhq/nestjs-observability/register\" nest start --debug --watch",
     "start:prod": "node -r @paystackhq/nestjs-observability/register dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix --max-warnings=0",

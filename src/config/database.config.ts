@@ -17,6 +17,11 @@ const databaseConfigSchema = z.object({
   synchronize: z.boolean(),
   logging: z.boolean(),
   autoLoadEntities: z.boolean().default(true),
+  extra: z
+    .object({
+      ignoreUndefined: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 export type DatabaseConfig = z.infer<typeof databaseConfigSchema> & DataSourceOptions;
@@ -29,6 +34,10 @@ function getDatabaseConfig(): DatabaseConfig {
     defaults: {
       type: 'mongodb' as const,
       port: 27017,
+      // Pass through Mongo client options
+      extra: {
+        ignoreUndefined: true,
+      },
       entities: [
         path.join(__dirname, '../database/entities/*.entity{.ts,.js}'),
         path.join(__dirname, '../modules/**/entities/*.entity{.ts,.js}'),
