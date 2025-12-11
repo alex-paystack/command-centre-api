@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, MongoRepository } from 'typeorm';
 import { Message } from '../entities/message.entity';
+import { MessageRole } from '../entities/message.entity';
 
 @Injectable()
 export class MessageRepository extends MongoRepository<Message> {
@@ -8,22 +9,58 @@ export class MessageRepository extends MongoRepository<Message> {
     super(Message, dataSource.createEntityManager());
   }
 
-  async findByConversationId(conversationId: string): Promise<Message[]> {
+  async findByConversationId(conversationId: string) {
     return this.findBy({ conversationId });
   }
 
-  async createMessage(data: Partial<Message>): Promise<Message> {
+  async createMessage(data: Partial<Message>) {
     const message = this.create(data);
     return this.save(message);
   }
 
-  async createMessages(data: Partial<Message>[]): Promise<Message[]> {
+  async createMessages(data: Partial<Message>[]) {
     const messages = this.create(data);
     return this.save(messages);
   }
 
-  async deleteAllByConversationId(conversationId: string): Promise<number> {
+  async deleteAllByConversationId(conversationId: string) {
     const result = await this.deleteMany({ conversationId });
     return result.deletedCount ?? 0;
+  }
+
+  async countUserMessagesInPeriod(userId: string, hours: number) {
+    const cutoffDate = new Date();
+    cutoffDate.setHours(cutoffDate.getHours() - hours);
+
+    // Use MongoDB aggregation to join with conversations collection
+    const result: { total: number }[] = await this.aggregate<{ total: number }>([
+      {
+        $match: {
+          role: MessageRole.USER,
+          createdAt: { $gte: cutoffDate },
+        },
+      },
+      {
+        $lookup: {
+          from: 'conversations',
+          localField: 'conversationId',
+          foreignField: 'id',
+          as: 'conversation',
+        },
+      },
+      {
+        $unwind: '$conversation',
+      },
+      {
+        $match: {
+          'conversation.userId': userId,
+        },
+      },
+      {
+        $count: 'total',
+      },
+    ]).toArray();
+
+    return result.length > 0 && result[0] ? result[0].total : 0;
   }
 }

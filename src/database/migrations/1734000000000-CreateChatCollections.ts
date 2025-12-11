@@ -16,7 +16,7 @@ import { MongoClient } from 'mongodb';
 export class CreateChatCollections1734000000000 implements MigrationInterface {
   name = 'CreateChatCollections1734000000000';
 
-  public async up(queryRunner: QueryRunner): Promise<void> {
+  public async up(queryRunner: QueryRunner) {
     // Access MongoDB native driver
     // Note: TypeORM's MongoDB support requires accessing the native driver directly
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
@@ -46,7 +46,7 @@ export class CreateChatCollections1734000000000 implements MigrationInterface {
     console.log('✅ Created conversations and messages collections with indexes');
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
+  public async down(queryRunner: QueryRunner) {
     // Access MongoDB native driver
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
     const mongoClient = (queryRunner.connection.driver as any).queryRunner.databaseConnection as MongoClient;

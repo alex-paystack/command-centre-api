@@ -4,10 +4,9 @@ import { Response } from 'express';
 import { ChatService } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
-import { ConversationResponseDto } from './dto/conversation-response.dto';
-import { MessageResponseDto } from './dto/message-response.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { MessageRole } from './entities/message.entity';
+import { PaystackResponse } from '../../common';
 
 @ApiTags('chat')
 @Controller('chat')
@@ -21,11 +20,19 @@ export class ChatController {
   @ApiResponse({
     status: 201,
     description: 'Conversation created successfully',
-    type: ConversationResponseDto,
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Conversation created successfully' },
+        data: { $ref: '#/components/schemas/ConversationResponseDto' },
+      },
+    },
   })
   @ApiResponse({ status: 400, description: 'Bad request - invalid input' })
-  async createConversation(@Body() dto: CreateConversationDto): Promise<ConversationResponseDto> {
-    return this.chatService.saveConversation(dto);
+  async createConversation(@Body() dto: CreateConversationDto) {
+    const conversation = await this.chatService.saveConversation(dto);
+    return PaystackResponse.success(conversation, 'Conversation created successfully');
   }
 
   @Get('conversations/:id')
@@ -34,11 +41,19 @@ export class ChatController {
   @ApiResponse({
     status: 200,
     description: 'Conversation found',
-    type: ConversationResponseDto,
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Conversation retrieved successfully' },
+        data: { $ref: '#/components/schemas/ConversationResponseDto' },
+      },
+    },
   })
   @ApiResponse({ status: 404, description: 'Conversation not found' })
-  async getConversation(@Param('id') id: string): Promise<ConversationResponseDto> {
-    return this.chatService.getConversationById(id);
+  async getConversation(@Param('id') id: string) {
+    const conversation = await this.chatService.getConversationById(id);
+    return PaystackResponse.success(conversation, 'Conversation retrieved successfully');
   }
 
   @Get('conversations/user/:userId')
@@ -47,20 +62,43 @@ export class ChatController {
   @ApiResponse({
     status: 200,
     description: 'List of conversations',
-    type: [ConversationResponseDto],
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Conversations retrieved successfully' },
+        data: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/ConversationResponseDto' },
+        },
+      },
+    },
   })
-  async getConversationsByUserId(@Param('userId') userId: string): Promise<ConversationResponseDto[]> {
-    return this.chatService.getConversationsByUserId(userId);
+  async getConversationsByUserId(@Param('userId') userId: string) {
+    const conversations = await this.chatService.getConversationsByUserId(userId);
+    return PaystackResponse.success(conversations, 'Conversations retrieved successfully');
   }
 
   @Delete('conversations/:id')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete a conversation by ID' })
   @ApiParam({ name: 'id', description: 'Conversation UUID', type: String })
-  @ApiResponse({ status: 204, description: 'Conversation deleted successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Conversation deleted successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Conversation deleted successfully' },
+        data: { type: 'object', nullable: true, example: null },
+      },
+    },
+  })
   @ApiResponse({ status: 404, description: 'Conversation not found' })
-  async deleteConversation(@Param('id') id: string): Promise<void> {
-    return this.chatService.deleteConversationById(id);
+  async deleteConversation(@Param('id') id: string) {
+    await this.chatService.deleteConversationById(id);
+    return PaystackResponse.success(null, 'Conversation deleted successfully');
   }
 
   @Delete('conversations/user/:userId')
@@ -73,13 +111,20 @@ export class ChatController {
     schema: {
       type: 'object',
       properties: {
-        deleted: { type: 'number', description: 'Number of conversations deleted' },
+        status: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Conversations deleted successfully' },
+        data: {
+          type: 'object',
+          properties: {
+            deleted: { type: 'number', description: 'Number of conversations deleted' },
+          },
+        },
       },
     },
   })
-  async deleteAllConversationsByUserId(@Param('userId') userId: string): Promise<{ deleted: number }> {
+  async deleteAllConversationsByUserId(@Param('userId') userId: string) {
     const deleted = await this.chatService.deleteAllConversationsByUserId(userId);
-    return { deleted };
+    return PaystackResponse.success({ deleted }, 'Conversations deleted successfully');
   }
 
   @Post('messages')
@@ -89,12 +134,23 @@ export class ChatController {
   @ApiResponse({
     status: 201,
     description: 'Messages created successfully',
-    type: [MessageResponseDto],
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Messages created successfully' },
+        data: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/MessageResponseDto' },
+        },
+      },
+    },
   })
   @ApiResponse({ status: 400, description: 'Bad request - invalid input' })
   @ApiResponse({ status: 404, description: 'Conversation not found' })
-  async createMessages(@Body() dtos: CreateMessageDto[]): Promise<MessageResponseDto[]> {
-    return this.chatService.saveMessages(dtos);
+  async createMessages(@Body() dtos: CreateMessageDto[]) {
+    const messages = await this.chatService.saveMessages(dtos);
+    return PaystackResponse.success(messages, 'Messages created successfully');
   }
 
   @Get('messages/:conversationId')
@@ -103,10 +159,21 @@ export class ChatController {
   @ApiResponse({
     status: 200,
     description: 'List of messages',
-    type: [MessageResponseDto],
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Messages retrieved successfully' },
+        data: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/MessageResponseDto' },
+        },
+      },
+    },
   })
-  async getMessagesByConversationId(@Param('conversationId') conversationId: string): Promise<MessageResponseDto[]> {
-    return this.chatService.getMessagesByConversationId(conversationId);
+  async getMessagesByConversationId(@Param('conversationId') conversationId: string) {
+    const messages = await this.chatService.getMessagesByConversationId(conversationId);
+    return PaystackResponse.success(messages, 'Messages retrieved successfully');
   }
 
   @Post('stream')
@@ -119,7 +186,32 @@ export class ChatController {
   })
   @ApiResponse({ status: 400, description: 'Bad request - invalid input' })
   @ApiResponse({ status: 404, description: 'Conversation not found' })
-  async streamChat(@Body() dto: ChatRequestDto, @Res() res: Response): Promise<void> {
+  @ApiResponse({
+    status: 429,
+    description: 'Rate limit exceeded - user has sent too many messages in the current period',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'boolean', example: false },
+        type: { type: 'string', example: 'api_error' },
+        code: { type: 'string', example: 'rate_limited' },
+        message: {
+          type: 'string',
+          example:
+            'Rate limit exceeded. You have sent 100 messages in the last 24 hour(s). The limit is 100 messages per 24 hour(s).',
+        },
+        data: {
+          type: 'object',
+          properties: {
+            limit: { type: 'number', example: 100 },
+            periodHours: { type: 'number', example: 24 },
+            currentCount: { type: 'number', example: 100 },
+          },
+        },
+      },
+    },
+  })
+  async streamChat(@Body() dto: ChatRequestDto, @Res() res: Response) {
     const result = await this.chatService.handleStreamingChat(dto);
 
     const response = result.toUIMessageStreamResponse({

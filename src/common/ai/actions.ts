@@ -10,7 +10,7 @@ import { getTextFromMessage } from './utils';
  * @param message - The first user message in the conversation
  * @returns A generated title or a fallback if generation fails
  */
-export async function generateConversationTitle(message: UIMessage): Promise<string> {
+export async function generateConversationTitle(message: UIMessage) {
   try {
     const { text } = await generateText({
       model: openai('gpt-3.5-turbo'),

@@ -1,7 +1,7 @@
 import { type UIMessage } from 'ai';
 import { MessageResponseDto } from 'src/modules/chat/dto/message-response.dto';
 
-export function getTextFromMessage(message: UIMessage): string {
+export function getTextFromMessage(message: UIMessage) {
   return message.parts
     .filter((part) => part.type === 'text')
     .map((part) => (part as { type: 'text'; text: string }).text)

@@ -69,7 +69,11 @@ describe('ChatController', () => {
       const result = await controller.createConversation(dto);
 
       expect(service.saveConversation).toHaveBeenCalledWith(dto);
-      expect(result).toEqual(mockConversationResponse);
+      expect(result).toEqual({
+        status: true,
+        message: 'Conversation created successfully',
+        data: mockConversationResponse,
+      });
     });
   });
 
@@ -80,7 +84,11 @@ describe('ChatController', () => {
       const result = await controller.getConversation(mockConversationResponse.id);
 
       expect(service.getConversationById).toHaveBeenCalledWith(mockConversationResponse.id);
-      expect(result).toEqual(mockConversationResponse);
+      expect(result).toEqual({
+        status: true,
+        message: 'Conversation retrieved successfully',
+        data: mockConversationResponse,
+      });
     });
   });
 
@@ -91,7 +99,11 @@ describe('ChatController', () => {
       const result = await controller.getConversationsByUserId('user_123');
 
       expect(service.getConversationsByUserId).toHaveBeenCalledWith('user_123');
-      expect(result).toEqual([mockConversationResponse]);
+      expect(result).toEqual({
+        status: true,
+        message: 'Conversations retrieved successfully',
+        data: [mockConversationResponse],
+      });
     });
   });
 
@@ -99,9 +111,14 @@ describe('ChatController', () => {
     it('should delete a conversation', async () => {
       jest.spyOn(service, 'deleteConversationById').mockResolvedValue(undefined);
 
-      await controller.deleteConversation(mockConversationResponse.id);
+      const result = await controller.deleteConversation(mockConversationResponse.id);
 
       expect(service.deleteConversationById).toHaveBeenCalledWith(mockConversationResponse.id);
+      expect(result).toEqual({
+        status: true,
+        message: 'Conversation deleted successfully',
+        data: null,
+      });
     });
   });
 
@@ -112,7 +129,11 @@ describe('ChatController', () => {
       const result = await controller.deleteAllConversationsByUserId('user_123');
 
       expect(service.deleteAllConversationsByUserId).toHaveBeenCalledWith('user_123');
-      expect(result).toEqual({ deleted: 3 });
+      expect(result).toEqual({
+        status: true,
+        message: 'Conversations deleted successfully',
+        data: { deleted: 3 },
+      });
     });
   });
 
@@ -131,7 +152,11 @@ describe('ChatController', () => {
       const result = await controller.createMessages(dtos);
 
       expect(service.saveMessages).toHaveBeenCalledWith(dtos);
-      expect(result).toEqual([mockMessageResponse]);
+      expect(result).toEqual({
+        status: true,
+        message: 'Messages created successfully',
+        data: [mockMessageResponse],
+      });
     });
   });
 
@@ -142,7 +167,11 @@ describe('ChatController', () => {
       const result = await controller.getMessagesByConversationId(mockConversationResponse.id);
 
       expect(service.getMessagesByConversationId).toHaveBeenCalledWith(mockConversationResponse.id);
-      expect(result).toEqual([mockMessageResponse]);
+      expect(result).toEqual({
+        status: true,
+        message: 'Messages retrieved successfully',
+        data: [mockMessageResponse],
+      });
     });
   });
 });

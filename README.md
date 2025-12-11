@@ -15,6 +15,7 @@ Command Centre API is a NestJS-based backend service that powers an AI-driven me
 - 📊 **Multi-Modal Messages**: Support for text, images, and rich content via UIMessage format
 - 🔄 **Real-time Streaming**: Server-sent events for streaming AI responses
 - 🗄️ **MongoDB Storage**: Scalable conversation and message storage
+- 🛡️ **Rate Limiting**: Configurable message entitlement with sliding window rate limiting
 
 ## 🚀 Quick Start
 
@@ -57,6 +58,10 @@ Command Centre API is a NestJS-based backend service that powers an AI-driven me
 
    # OpenAI
    OPENAI_API_KEY=sk-your-openai-api-key
+
+   # Rate Limiting (Optional)
+   MESSAGE_LIMIT=100
+   RATE_LIMIT_PERIOD_HOURS=24
 
    # Service
    NODE_ENV=development
@@ -224,6 +229,24 @@ Streams AI responses for a conversation.
 
 **Response:** Server-sent events stream with UIMessage format
 
+**Error Responses:**
+
+- `429 Too Many Requests` - Rate limit exceeded
+
+```json
+{
+  "status": false,
+  "type": "api_error",
+  "code": "rate_limited",
+  "message": "Rate limit exceeded. You have sent 100 messages in the last 24 hour(s). The limit is 100 messages per 24 hour(s).",
+  "data": {
+    "limit": 100,
+    "periodHours": 24,
+    "currentCount": 100
+  }
+}
+```
+
 #### Create Conversation
 
 ```http
@@ -361,6 +384,74 @@ pnpm run migration:run
 pnpm run migration:revert
 ```
 
+## 🛡️ Rate Limiting
+
+The API implements a sliding window rate limiting mechanism to prevent abuse and ensure fair usage across all users.
+
+### How It Works
+
+- **Sliding Window**: The rate limit uses a sliding time window, not a fixed period
+- **User-Based**: Limits are applied per user ID
+- **Message Count**: Only user messages count toward the limit (assistant responses are excluded)
+- **Automatic Enforcement**: Rate limiting is checked before processing any streaming chat request
+
+### Configuration
+
+Rate limiting is controlled via environment variables:
+
+```env
+MESSAGE_LIMIT=100              # Maximum messages allowed per period (default: 100)
+RATE_LIMIT_PERIOD_HOURS=24    # Time window in hours (default: 24)
+```
+
+### Example Scenarios
+
+**Scenario 1: Within Limits**
+
+- User sends 50 messages in 12 hours
+- User can still send 50 more messages before hitting the limit
+
+**Scenario 2: Limit Exceeded**
+
+- User sends 100 messages in 24 hours
+- Next request returns HTTP 429 with details:
+  - Current count
+  - Time period
+  - Maximum allowed
+
+**Scenario 3: Sliding Window**
+
+- User sends 100 messages starting at 12:00 PM on Day 1
+- At 1:00 PM on Day 2 (25 hours later), messages from 12:00 PM on Day 1 have expired
+- User can send new messages as the oldest ones drop out of the 24-hour window
+
+### Error Response
+
+When rate limit is exceeded, the API returns:
+
+```json
+{
+  "status": false,
+  "type": "api_error",
+  "code": "rate_limited",
+  "message": "Rate limit exceeded. You have sent 100 messages in the last 24 hour(s). The limit is 100 messages per 24 hour(s).",
+  "data": {
+    "limit": 100,
+    "periodHours": 24,
+    "currentCount": 100
+  }
+}
+```
+
+### Implementation Details
+
+The rate limiting is implemented at the service layer with the following components:
+
+- **Exception**: `RateLimitExceededException` - Custom HTTP 429 exception
+- **Repository Method**: `countUserMessagesInPeriod()` - Counts user messages within time window
+- **Service Method**: `checkUserEntitlement()` - Validates user against limits
+- **Integration**: Automatic check in `handleStreamingChat()` before processing requests
+
 ## 🔧 Available Scripts
 
 ```bash
@@ -437,6 +528,10 @@ OTEL_SERVICE_NAME=command-centre-api
 ### Optional Variables
 
 ```env
+# Rate Limiting
+MESSAGE_LIMIT=100
+RATE_LIMIT_PERIOD_HOURS=24
+
 # Logging
 LOG_LEVEL=info
 USE_JSON_LOGGER=true
