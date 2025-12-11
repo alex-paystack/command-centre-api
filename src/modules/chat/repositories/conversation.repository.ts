@@ -12,6 +12,10 @@ export class ConversationRepository extends MongoRepository<Conversation> {
     return this.findOneBy({ id });
   }
 
+  async findByIdAndUserId(id: string, userId: string) {
+    return this.findOneBy({ id, userId });
+  }
+
   async findByUserId(userId: string) {
     return this.findBy({ userId });
   }
@@ -23,6 +27,11 @@ export class ConversationRepository extends MongoRepository<Conversation> {
 
   async deleteById(id: string) {
     const result = await this.deleteMany({ id });
+    return (result.deletedCount ?? 0) > 0;
+  }
+
+  async deleteByIdForUser(id: string, userId: string) {
+    const result = await this.deleteMany({ id, userId });
     return (result.deletedCount ?? 0) > 0;
   }
 

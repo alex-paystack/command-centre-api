@@ -27,6 +27,7 @@ async function bootstrap() {
     .setDescription('The Command Centre API description')
     .setVersion('1.0')
     .addTag('command-centre-api')
+    .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('swagger', app, document);
