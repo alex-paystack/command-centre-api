@@ -1,10 +1,4 @@
-import {
-  ExceptionFilter,
-  Catch,
-  ArgumentsHost,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
+import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
 import type { Response } from 'express';
 import { ResponseCode, ResponseType } from '@paystackhq/pkg-response-code';
 import { PaystackErrorResponse } from './types';
@@ -59,7 +53,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     // Handle NestJS HttpException (e.g., BadRequestException, NotFoundException, etc.)
     if (exception instanceof HttpException) {
       const response = exception.getResponse();
-      const message = typeof response === 'string' ? response : (response as { message?: string }).message ?? 'HTTP Exception';
+      const message =
+        typeof response === 'string' ? response : ((response as { message?: string }).message ?? 'HTTP Exception');
 
       return {
         status: false,

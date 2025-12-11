@@ -1,10 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { convertToModelMessages, streamText } from 'ai';
+import { openai } from '@ai-sdk/openai';
 import { ConversationRepository } from './repositories/conversation.repository';
 import { MessageRepository } from './repositories/message.repository';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
+import { ChatRequestDto } from './dto/chat-request.dto';
+import { MessageRole } from './entities/message.entity';
+import { generateConversationTitle, convertToUIMessages, tools } from '../../common/ai';
 
 @Injectable()
 export class ChatService {
@@ -19,8 +24,8 @@ export class ChatService {
   }
 
   async saveMessage(dto: CreateMessageDto): Promise<MessageResponseDto> {
-    // Verify that the conversation exists
     const conversation = await this.conversationRepository.findById(dto.chatId);
+
     if (!conversation) {
       throw new NotFoundException(`Conversation with ID ${dto.chatId} not found`);
     }
@@ -36,14 +41,17 @@ export class ChatService {
 
   async getConversationById(id: string): Promise<ConversationResponseDto> {
     const conversation = await this.conversationRepository.findById(id);
+
     if (!conversation) {
       throw new NotFoundException(`Conversation with ID ${id} not found`);
     }
+
     return ConversationResponseDto.fromEntity(conversation);
   }
 
   async getConversationsByUserId(userId: string): Promise<ConversationResponseDto[]> {
     const conversations = await this.conversationRepository.findByUserId(userId);
+
     return ConversationResponseDto.fromEntities(conversations);
   }
 
@@ -58,10 +66,8 @@ export class ChatService {
   }
 
   async deleteConversationById(id: string): Promise<void> {
-    // First, delete all messages associated with this conversation
     await this.messageRepository.deleteAllByChatId(id);
 
-    // Then delete the conversation
     const deleted = await this.conversationRepository.deleteById(id);
     if (!deleted) {
       throw new NotFoundException(`Conversation with ID ${id} not found`);
@@ -69,15 +75,51 @@ export class ChatService {
   }
 
   async deleteAllConversationsByUserId(userId: string): Promise<number> {
-    // Get all conversations for the user
     const conversations = await this.conversationRepository.findByUserId(userId);
 
-    // Delete all messages for each conversation
     for (const conversation of conversations) {
       await this.messageRepository.deleteAllByChatId(conversation.id);
     }
 
-    // Delete all conversations for the user
     return this.conversationRepository.deleteAllByUserId(userId);
+  }
+
+  async handleStreamingChat(dto: ChatRequestDto) {
+    const { conversationId, message } = dto;
+
+    let conversation = await this.conversationRepository.findById(conversationId);
+
+    if (!conversation) {
+      try {
+        const title = await generateConversationTitle(message);
+
+        conversation = await this.conversationRepository.createConversation({
+          id: conversationId,
+          title,
+          userId: 'test-user-id',
+        });
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Error creating conversation:', error);
+        throw new Error('Failed to create conversation');
+      }
+    }
+
+    const allMessages = await this.getMessagesByChatId(conversationId);
+    const uiMessages = [...convertToUIMessages(allMessages), message];
+
+    await this.messageRepository.createMessage({
+      chatId: conversationId,
+      role: MessageRole.USER,
+      parts: message.parts,
+    });
+
+    const result = streamText({
+      model: openai('gpt-4o-mini'),
+      messages: convertToModelMessages(uiMessages),
+      tools,
+    });
+
+    return result;
   }
 }

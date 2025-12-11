@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { createTestApp } from '../../utils/app'
+import { createTestApp } from '../../utils/app';
 import { INestApplication } from '@nestjs/common';
 import { HealthDetails } from 'src/modules/health/health.controller';
 
@@ -19,8 +19,7 @@ describe('HealthController (e2e)', () => {
 
   describe('Application Health', () => {
     it('should return appropriate status when application is healthy', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/health');
+      const response = await request(app.getHttpServer()).get('/health');
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const healthDetails = response.body.data as HealthDetails;
@@ -37,8 +36,7 @@ describe('HealthController (e2e)', () => {
     it('should include timestamp in application health message', async () => {
       const beforeRequest = new Date();
 
-      const response = await request(app.getHttpServer())
-        .get('/health');
+      const response = await request(app.getHttpServer()).get('/health');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const healthDetails = response.body.data as HealthDetails;
 

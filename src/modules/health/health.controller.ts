@@ -6,7 +6,7 @@ import { PaystackResponse, APIError } from '../../common';
 
 export type HealthDetails = {
   application: { status: 'up'; message: string };
-  'mongodb'?: { status: 'up' | 'down'; message: string };
+  mongodb?: { status: 'up' | 'down'; message: string };
 };
 
 @ApiTags('health')
@@ -43,12 +43,12 @@ export class HealthController {
         });
         details['mongodb'] = {
           status: 'up',
-          message: 'Mongodb connectivity is working as expected'
+          message: 'Mongodb connectivity is working as expected',
         };
       } catch (error) {
         details['mongodb'] = {
           status: 'down',
-          message: (error instanceof Error ? error.message : String(error))
+          message: error instanceof Error ? error.message : String(error),
         };
         state.unhealthy = true;
         state.issueCode = state.issueCode ?? 'mongodb_unavailable';
@@ -58,12 +58,7 @@ export class HealthController {
 
     if (state.unhealthy) {
       const message = state.issueMessage ?? 'One or more health checks failed';
-      throw new APIError(
-        message,
-        'HEALTH_CHECK_FAILED',
-        details,
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
+      throw new APIError(message, 'HEALTH_CHECK_FAILED', details, HttpStatus.SERVICE_UNAVAILABLE);
     }
 
     return PaystackResponse.success(details, 'Service is healthy');

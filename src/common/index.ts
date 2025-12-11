@@ -7,3 +7,6 @@ export * from './exceptions/response.dto';
 // Error handling
 export * from './helpers/paystack.error';
 export * from './interfaces/error.interface';
+
+// AI utilities
+export * from './ai';

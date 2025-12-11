@@ -1,4 +1,3 @@
-
 name: CI
 
 on:
@@ -13,8 +12,8 @@ concurrency:
 
 # Explicit permissions following principle of least privilege
 permissions:
-  contents: read      # Required for actions/checkout
-  checks: write      # Required for publishing test results  
+  contents: read # Required for actions/checkout
+  checks: write # Required for publishing test results
   pull-requests: write # Required for commenting on PRs with test results
 
 env:
@@ -35,8 +34,8 @@ jobs:
     name: 'Install dependencies & prime cache'
     runs-on: ubuntu-latest
     permissions:
-      contents: read  # Required for checkout
-      
+      contents: read # Required for checkout
+
     steps:
       - name: Install zstd for faster cache compression
         run: sudo apt-get update -y && sudo apt-get install -y zstd
@@ -84,8 +83,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: deps
     permissions:
-      contents: read  # Required for checkout
-      
+      contents: read # Required for checkout
+
     steps:
       - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
 
@@ -121,10 +120,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: deps
     permissions:
-      contents: read       # Required for checkout
-      checks: write       # Required for test result reporting
+      contents: read # Required for checkout
+      checks: write # Required for test result reporting
       pull-requests: write # Required for PR comments on test results
-      
+
     steps:
       - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
 
@@ -164,10 +163,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: deps
     permissions:
-      contents: read       # Required for checkout
-      checks: write       # Required for test result reporting
+      contents: read # Required for checkout
+      checks: write # Required for test result reporting
       pull-requests: write # Required for PR comments on test results
-      
+
     steps:
       - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
 
@@ -207,8 +206,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint, unit-tests, e2e-tests]
     permissions:
-      contents: read  # Required for checkout
-      
+      contents: read # Required for checkout
+
     steps:
       - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
 
@@ -239,4 +238,3 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
-

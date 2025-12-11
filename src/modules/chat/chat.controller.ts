@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Delete, Body, Param, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, HttpCode, HttpStatus, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
+import { Response } from 'express';
 import { ChatService } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
+import { ChatRequestDto } from './dto/chat-request.dto';
 
 @ApiTags('chat')
 @Controller('chat')
@@ -104,5 +106,45 @@ export class ChatController {
   })
   async getMessagesByChatId(@Param('chatId') chatId: string): Promise<MessageResponseDto[]> {
     return this.chatService.getMessagesByChatId(chatId);
+  }
+
+  @Post('stream')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Stream AI chat response' })
+  @ApiBody({ type: ChatRequestDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Streaming AI response',
+  })
+  @ApiResponse({ status: 400, description: 'Bad request - invalid input' })
+  @ApiResponse({ status: 404, description: 'Conversation not found' })
+  async streamChat(@Body() dto: ChatRequestDto, @Res() res: Response): Promise<void> {
+    const result = await this.chatService.handleStreamingChat(dto);
+
+    const response = result.toUIMessageStreamResponse({
+      sendReasoning: true,
+    });
+
+    response.headers.forEach((value, key) => {
+      res.setHeader(key, value);
+    });
+
+    if (response.body) {
+      const reader = response.body.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
+          res.write(value);
+        }
+        res.end();
+      } catch {
+        res.status(500).end();
+      }
+    } else {
+      res.end();
+    }
   }
 }

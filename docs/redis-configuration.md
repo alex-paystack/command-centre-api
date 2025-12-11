@@ -55,10 +55,10 @@ export class UserService {
 
     // Fetch from database...
     const user = await this.userRepository.findOne(userId);
-    
+
     // Write operation - uses WRITE client
     await this.cacheService.set(`user:${userId}`, user, 3600000);
-    
+
     return user;
   }
 }

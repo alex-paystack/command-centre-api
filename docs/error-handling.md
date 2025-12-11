@@ -105,12 +105,7 @@ Used for validation failures and business rule violations. Automatically sets `t
 import { ResponseCode } from '@paystackhq/pkg-response-code';
 import { ValidationError } from './common';
 
-throw new ValidationError(
-  'Email address is invalid',
-  ResponseCode.INVALID_PARAMS,
-  undefined,
-  { field: 'email' }
-);
+throw new ValidationError('Email address is invalid', ResponseCode.INVALID_PARAMS, undefined, { field: 'email' });
 ```
 
 **Response:**
@@ -178,17 +173,12 @@ Use the `data` parameter to provide context about the error:
 import { ResponseCode } from '@paystackhq/pkg-response-code';
 import { ValidationError } from './common';
 
-throw new ValidationError(
-  'Multiple validation errors',
-  ResponseCode.INVALID_PARAMS,
-  undefined,
-  {
-    errors: [
-      { field: 'email', reason: 'invalid format' },
-      { field: 'phone', reason: 'required' }
-    ]
-  }
-);
+throw new ValidationError('Multiple validation errors', ResponseCode.INVALID_PARAMS, undefined, {
+  errors: [
+    { field: 'email', reason: 'invalid format' },
+    { field: 'phone', reason: 'required' },
+  ],
+});
 ```
 
 ## HTTP Exception Handling
@@ -230,4 +220,3 @@ All exceptions caught by the global filter are automatically logged with the for
 ```
 
 This provides visibility into errors occurring in your application for monitoring and debugging purposes.
-

@@ -1,13 +1,16 @@
 ## Summary
+
 <!-- What does this PR do? Why is it needed? -->
 <!-- Add a Jira link if applicable -->
 
 ## How Has This Been Tested?
+
 - [ ] Added unit tests
 - [ ] Tested locally
 - [ ] Tested on staging
 
 ## Changes
+
 - [ ] Feature
 - [ ] Bug fix
 - [ ] Refactor / code quality improvement
@@ -17,6 +20,7 @@
 ## Screenshots / Visual Changes
 
 ## How to Test
+
 <!-- Steps to test this PR locally or in staging -->
 
 <!-- Comment out to add monitoring information
@@ -29,6 +33,7 @@
 -->
 
 ## Checklist
+
 - [ ] This PR addresses exactly one change
 - [ ] Each individual commit in the pull request is meaningful. (Please rebase, removing useless commits if not)
 - [ ] Tests added or updated where necessary

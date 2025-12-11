@@ -19,11 +19,11 @@ import type { DatabaseConfig } from '../config/database.config';
               url: config.url,
             };
           }
-          
+
           // Otherwise, construct URL from individual components
           const { username, password, host, port, database } = config;
           const url = `mongodb://${username}:${password}@${host}:${port}/${database}?authSource=admin`;
-          
+
           return {
             ...config,
             url,

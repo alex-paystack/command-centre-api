@@ -2,6 +2,7 @@ import { Entity, ObjectIdColumn, Column, CreateDateColumn, Index, ManyToOne, Bef
 import { ObjectId } from 'mongodb';
 import { randomUUID } from 'crypto';
 import { Conversation } from './conversation.entity';
+import { UIMessage } from 'ai';
 
 export enum MessageRole {
   USER = 'user',
@@ -28,7 +29,7 @@ export class Message {
   role: MessageRole;
 
   @Column('json')
-  parts: Record<string, unknown>; // Flexible JSON object for multi-modal content
+  parts: UIMessage['parts'];
 
   @CreateDateColumn()
   createdAt: Date;

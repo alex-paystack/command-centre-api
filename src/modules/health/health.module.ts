@@ -4,10 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { HealthController } from './health.controller';
 
 @Module({
-  imports: [
-    TerminusModule,
-    TypeOrmModule,
-  ],
+  imports: [TerminusModule, TypeOrmModule],
   controllers: [HealthController],
 })
 export class HealthModule {}

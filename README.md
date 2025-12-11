@@ -1,141 +1,406 @@
 <h1 align="center">
-  A Paystack Project
+  Command Centre API
 </h1>
 
-# Command Centre API
+<p align="center">
+  AI-powered merchant dashboard API built with NestJS, MongoDB, and OpenAI
+</p>
 
-API for the AI powered merchant dashboard
+---
+
+## 📖 Overview
+
+Command Centre API is a NestJS-based backend service that powers an AI-driven merchant dashboard. It provides intelligent chat capabilities, conversation management, and AI-powered features to help merchants interact with their data and systems through natural language.
+
+### Key Features
+
+- 🤖 **AI-Powered Chat**: Streaming AI responses using OpenAI GPT-4o-mini
+- 💬 **Conversation Management**: Full CRUD operations for conversations and messages
+- 🎯 **Smart Title Generation**: Automatic conversation title generation from first message
+- 🛠️ **AI Tools Integration**: Extensible tool system for AI to interact with backend services
+- 📊 **Multi-Modal Messages**: Support for text, images, and rich content via UIMessage format
+- 🔄 **Real-time Streaming**: Server-sent events for streaming AI responses
+- 🗄️ **MongoDB Storage**: Scalable conversation and message storage
+
+---
 
 ## 🚀 Quick Start
 
-1. **Install dependencies:**
+### Prerequisites
+
+- Node.js v24.5.0
+- pnpm v10.14.0
+- MongoDB instance
+- OpenAI API key
+
+### Installation
+
+1. **Clone the repository**
+
+   ```bash
+   git clone <repository-url>
+   cd command-centre-api
+   ```
+
+2. **Install dependencies**
+
    ```bash
    pnpm install
    ```
 
-2. **Set up environment:**
+3. **Set up environment variables**
+
    ```bash
    cp .env.example .env
-   # Edit .env with your configuration
    ```
 
-## 🔧 Automatic pnpm Setup
+   Edit `.env` and configure:
 
-This template uses **corepack** (built into Node.js 16.13+) to automatically manage pnpm without requiring global installation.
+   ```env
+   # Database
+   DATABASE_HOST=mongodb
+   DATABASE_USERNAME=root
+   DATABASE_PASSWORD=root
+   DATABASE_NAME=command-centre-api
 
-### How it works:
+   # OpenAI
+   OPENAI_API_KEY=sk-your-openai-api-key
 
-1. **Corepack Integration**: The `package.json` includes `"packageManager": "pnpm@9.15.0"` which tells corepack which version to use
-2. **Automatic Setup**: The initialization script runs `corepack enable` to make pnpm available
-3. **No Global Installation**: pnpm is managed locally per project, ensuring version consistency
+   # Service
+   NODE_ENV=development
+   OTEL_SERVICE_NAME=command-centre-api
+   ```
 
-### Benefits:
+4. **Start the development server**
+   ```bash
+   pnpm run start:dev
+   ```
 
-- ✅ **No global pnpm installation required**
-- ✅ **Version consistency** across team members
-- ✅ **Automatic version management** via corepack
-- ✅ **Works with any Node.js 16.13+ installation**
+The API will be available at `http://localhost:3000`
 
-### Manual Setup (if needed):
+---
 
-If you prefer to set up pnpm manually:
+## 🏗️ Architecture
 
-```bash
-# Enable corepack (Node.js 16.13+)
-corepack enable
-
-# Or install pnpm globally (alternative)
-npm install -g pnpm
-
-# Install dependencies
-pnpm install
-```
-
-## 📁 Project Structure
+### Project Structure
 
 ```
 src/
-├── config/             # Configuration files
-├── database/           # Database module (optional)
-├── modules/            # Feature modules
-├── app.controller.ts   # Main application controller
-├── app.service.ts      # Main application service
-├── app.module.ts       # Root module configuration
-└── main.ts            # Application entry point
+├── common/
+│   ├── ai/                    # AI utilities and integrations
+│   │   ├── actions.ts         # AI action functions (title generation)
+│   │   ├── prompts.ts         # AI system prompts
+│   │   ├── tools.ts           # AI tools definitions
+│   │   ├── utils.ts           # Helper functions for AI
+│   │   └── index.ts
+│   ├── exceptions/            # Custom exceptions and filters
+│   └── helpers/               # Shared utilities
+├── config/                    # Configuration modules
+├── database/
+│   ├── migrations/            # TypeORM migrations
+│   └── database.module.ts
+├── modules/
+│   ├── chat/                  # Chat & conversation module
+│   │   ├── dto/               # Data transfer objects
+│   │   ├── entities/          # TypeORM entities
+│   │   ├── repositories/      # Database repositories
+│   │   ├── chat.controller.ts
+│   │   ├── chat.service.ts
+│   │   └── chat.module.ts
+│   └── health/                # Health check endpoints
+├── app.module.ts              # Root module
+└── main.ts                    # Application entry point
 ```
 
-## 🔧 Configuration
+### Technology Stack
 
-### Environment Variables
+- **Framework**: NestJS v11
+- **Database**: MongoDB with TypeORM
+- **AI**: Vercel AI SDK with OpenAI
+- **Language**: TypeScript v5.7
+- **Validation**: class-validator & class-transformer
+- **Documentation**: Swagger/OpenAPI
 
-Create a `.env` file in the root directory:
+---
 
-```env
-# Application
-NODE_ENV=development
-PORT=3000
+## 🤖 AI Features
 
-# Service Information
-APP_NAME=command-centre-api
-APP_VERSION=1.0.0
+### Chat Streaming
 
-# Observability
-LOG_LEVEL=info
-METRICS_ENABLED=true
-TRACING_ENABLED=true
+The API provides real-time AI chat capabilities with streaming responses:
 
-# Optional: Redis Cache
-REDIS_WRITE_URL=redis://localhost:6379
-REDIS_READ_URL=redis://localhost:6379
-REDIS_PASSWORD=
+```typescript
+POST /chat/stream
+Content-Type: application/json
 
-# Optional: MySQL Database
-MYSQL_HOST=localhost
-MYSQL_PORT=3306
-MYSQL_USER=user
-MYSQL_PASSWORD=password
-MYSQL_DB=nestjs_app
-DB_SYNC=false
-DB_LOGGING=false
-
-# Optional: MongoDB
-MONGO_URI=mongodb://localhost:27017
-MONGO_DB=nestjs_app
-
-# OpenTelemetry (Optional)
-# Service identification
-OTEL_SERVICE_NAME=command-centre-api
-OTEL_SERVICE_VERSION=1.0.0
-OTEL_SERVICE_ENV=local
-
-# OpenTelemetry Exporters (none, console, otlp)
-OTEL_LOGS_EXPORTER=console
-OTEL_TRACES_EXPORTER=console
-OTEL_METRICS_EXPORTER=console
-
-# OTLP Endpoints (only needed if using otlp exporters)
-OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://localhost:4318/v1/logs
-OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
-OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://localhost:4318/v1/metrics
-OTEL_EXPORTER_OTLP_HEADERS=authorization=Bearer your-token
-
-# Tracing
-OTEL_TRACES_SAMPLER=always_on
-OTEL_TRACES_SAMPLER_ARG=1.0
-OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED=true
+{
+  "conversationId": "550e8400-e29b-41d4-a716-446655440000",
+  "message": {
+    "role": "user",
+    "parts": [
+      {
+        "type": "text",
+        "text": "How do I integrate the payment API?"
+      }
+    ]
+  }
+}
 ```
 
-## 🎯 Available Scripts
+**Features:**
+
+- Streams AI responses in real-time using UIMessageStream format
+- Includes reasoning steps in the response
+- Automatically generates conversation titles for new conversations
+- Maintains full conversation history context
+- Supports AI tools for dynamic actions
+
+### AI Tools
+
+AI tools allow the model to interact with backend services. Current tools:
+
+#### Get Transactions
+
+```typescript
+{
+  name: "Get Transactions",
+  description: "Get the transactions for a given integration",
+  parameters: {
+    integrationId: string
+  }
+}
+```
+
+**Adding New Tools:**
+
+1. Define your tool in `src/common/ai/tools.ts`:
+
+   ```typescript
+   export const myCustomTool = tool({
+     name: 'My Custom Tool',
+     description: 'What this tool does',
+     inputSchema: z.object({
+       param: z.string().describe('Parameter description'),
+     }),
+     execute: ({ param }) => {
+       // Your implementation
+       return result;
+     },
+   });
+   ```
+
+2. Add to the tools export:
+   ```typescript
+   export const tools: Record<string, Tool<unknown, unknown>> = {
+     getTransactionsTool,
+     myCustomTool,
+   };
+   ```
+
+### Automatic Title Generation
+
+When a new conversation starts, the first message automatically generates a descriptive title using GPT-3.5-turbo:
+
+```typescript
+import { generateConversationTitle } from './common/ai';
+
+const title = await generateConversationTitle(message);
+// Returns: "Payment API Integration" (or similar)
+```
+
+---
+
+## 📡 API Endpoints
+
+### Chat Module
+
+#### Stream AI Chat
+
+```http
+POST /chat/stream
+```
+
+Streams AI responses for a conversation.
+
+**Request Body:**
+
+```json
+{
+  "conversationId": "uuid",
+  "message": {
+    "role": "user",
+    "parts": [{ "type": "text", "text": "Your message" }]
+  }
+}
+```
+
+**Response:** Server-sent events stream with UIMessage format
+
+---
+
+#### Create Conversation
+
+```http
+POST /chat/conversations
+```
+
+Creates a new conversation.
+
+**Request Body:**
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "title": "Payment Integration Help",
+  "userId": "user_123"
+}
+```
+
+---
+
+#### Get Conversation
+
+```http
+GET /chat/conversations/:id
+```
+
+Retrieves a conversation by ID.
+
+**Response:**
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "title": "Payment Integration Help",
+  "userId": "user_123",
+  "createdAt": "2024-01-01T00:00:00.000Z"
+}
+```
+
+---
+
+#### Get User Conversations
+
+```http
+GET /chat/conversations/user/:userId
+```
+
+Retrieves all conversations for a user.
+
+---
+
+#### Delete Conversation
+
+```http
+DELETE /chat/conversations/:id
+```
+
+Deletes a conversation and all its messages.
+
+---
+
+#### Create Message
+
+```http
+POST /chat/messages
+```
+
+Manually creates a message in a conversation.
+
+**Request Body:**
+
+```json
+{
+  "chatId": "550e8400-e29b-41d4-a716-446655440000",
+  "role": "user",
+  "parts": {
+    "text": "How do I integrate payments?"
+  }
+}
+```
+
+---
+
+#### Get Messages
+
+```http
+GET /chat/messages/:chatId
+```
+
+Retrieves all messages in a conversation.
+
+---
+
+### Health Check
+
+```http
+GET /health
+```
+
+Returns application health status.
+
+---
+
+## 🗄️ Database
+
+### MongoDB Collections
+
+#### Conversations
+
+```typescript
+{
+  _id: ObjectId,
+  id: string,           // UUID
+  title: string,
+  userId: string,
+  createdAt: Date
+}
+```
+
+#### Messages
+
+```typescript
+{
+  _id: ObjectId,
+  id: string,           // UUID
+  chatId: string,       // Reference to conversation
+  role: 'user' | 'assistant',
+  parts: {              // Flexible JSON for multi-modal content
+    text?: string,
+    // ... other content types
+  },
+  createdAt: Date
+}
+```
+
+### Running Migrations
+
+```bash
+# Create a new migration
+pnpm run migration:create
+
+# Generate migration from entities
+pnpm run migration:generate
+
+# Run migrations
+pnpm run migration:run
+
+# Revert last migration
+pnpm run migration:revert
+```
+
+---
+
+## 🔧 Available Scripts
 
 ```bash
 # Development
-pnpm run start:dev      # Start development server with hot reload
-pnpm run start:debug    # Start with debug mode
+pnpm run start:dev      # Start with hot reload
+pnpm run start:debug    # Start with debugger
 pnpm run start:prod     # Start production server
 
 # Building
 pnpm run build          # Build the application
-pnpm run build:watch    # Build with watch mode
 
 # Testing
 pnpm run test           # Run unit tests
@@ -144,366 +409,205 @@ pnpm run test:cov       # Run tests with coverage
 pnpm run test:e2e       # Run end-to-end tests
 
 # Code Quality
-pnpm run lint           # Run ESLint
+pnpm run lint           # Run ESLint and fix issues
+pnpm run lint:check     # Check without fixing
 pnpm run format         # Format code with Prettier
-pnpm run lint:fix       # Fix ESLint issues automatically
+pnpm run format:check   # Check formatting
 
-# Git Hooks
-pnpm run prepare        # Setup Husky hooks
+# Database
+pnpm run migration:create   # Create new migration
+pnpm run migration:run      # Run pending migrations
+pnpm run migration:revert   # Revert last migration
 ```
 
-## 🗄️ Database & Cache Modules
-
-### Enabling Optional Modules
-
-The template includes optional database and cache modules that are commented out by default.
-
-#### Cache Module (Redis)
-
-1. **Configure Redis** in your `.env`:
-
-   ```env
-   REDIS_WRITE_URL=redis://localhost:6379
-   REDIS_READ_URL=redis://localhost:6379
-   REDIS_PASSWORD=
-   REDIS_USERNAME=
-   ```
-
-2. **Usage**:
-
-   ```typescript
-   import { CacheService } from './infrastructure/cache';
-
-   constructor(private cacheService: CacheService) {}
-
-   // Cache a value
-   await this.cacheService.set('key', 'value', 300);
-
-   // Get from cache
-   const value = await this.cacheService.get('key');
-   ```
-
-See [Cache Module Documentation](./src/infrastructure/cache/README.md) for detailed usage.
-
-#### Database Module (MySQL + MongoDB)
-
-1. **Configure databases** in your `.env`:
-
-   ```env
-   # MySQL
-   MYSQL_HOST=localhost
-   MYSQL_PORT=3306
-   MYSQL_USER=user
-   MYSQL_PASSWORD=password
-   MYSQL_DB=nestjs_app
-
-   # MongoDB (optional)
-   MONGO_URI=mongodb://localhost:27017
-   MONGO_DB=nestjs_app
-   ```
-
-2. **Usage**:
-
-   ```typescript
-   import { DatabaseService } from './infrastructure/database';
-
-   constructor(private databaseService: DatabaseService) {}
-
-   // MySQL operations
-   const userRepo = this.databaseService.getRepository(User);
-   const users = await userRepo.find();
-
-   // MongoDB operations
-   const collection = this.databaseService.getMongoCollection('users');
-   const documents = await collection.find().toArray();
-   ```
-
-See [Database Module Documentation](./src/infrastructure/database/README.md) for detailed usage.
-
-## 📊 Observability
-
-The application includes comprehensive observability features:
-
-### Metrics
-
-- **Endpoint**: `/metrics` (Prometheus format)
-- **Default metrics**: CPU, memory, HTTP requests, etc.
-- **Custom metrics**: Add your own business metrics
-
-### Logging
-
-- **Structured logging** with correlation IDs
-- **Console output** for development
-- **OTLP export** for production (optional)
-
-### Tracing
-
-- **Distributed tracing** with OpenTelemetry
-- **Automatic instrumentation** of HTTP requests
-- **Custom spans** for business logic
-
-### Health Checks
-
-- **System health**: `/health`
-- **Database connectivity**: `/health/database`
-- **Cache connectivity**: `/health/cache`
-
-## 🐳 Docker Support
-
-> **Note**: Make sure Docker Desktop is running before using Docker commands. If you see "Cannot connect to the Docker daemon" errors, start Docker Desktop first.
-
-### Development
-
-```bash
-# Option 1: Run only the application locally (recommended for development)
-pnpm run start:dev
-
-# Option 2: Run supporting services with Docker (databases, cache, monitoring)
-docker-compose up --watch
-pnpm run start:dev
-
-# Option 3: Run everything in Docker (full containerized setup)
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
-
-### Production
-
-```bash
-# Build image (with private package authentication)
-docker build --build-arg NPM_TOKEN=your_github_token -t command-centre-api .
-
-# Build image (using public packages)
-cp package.json.public package.json
-docker build -t command-centre-api .
-
-# Run container
-docker run -p 3000:3000 command-centre-api
-```
+---
 
 ## 🧪 Testing
+
+The project includes comprehensive test coverage:
 
 ### Unit Tests
 
 ```bash
-# Run all tests
-pnpm test
-
-# Run with coverage
-pnpm run test:cov
-
-# Run specific test file
-pnpm test app.service.spec.ts
+pnpm run test           # Run all unit tests
+pnpm run test:cov       # Run with coverage report
 ```
 
 ### E2E Tests
 
 ```bash
-# Run E2E tests
-pnpm run test:e2e
-
-# Run E2E tests in watch mode
-pnpm run test:e2e --watch
+pnpm run test:e2e       # Run end-to-end tests
 ```
 
-### Test Structure
+### Test Files
 
+- `chat.controller.spec.ts` - Controller tests
+- `chat.service.spec.ts` - Service layer tests
+- Each module includes its own test suite
+
+---
+
+## 🔒 Environment Configuration
+
+### Required Variables
+
+```env
+# Database Configuration
+DATABASE_HOST=mongodb
+DATABASE_USERNAME=root
+DATABASE_PASSWORD=root
+DATABASE_NAME=command-centre-api
+
+# OpenAI Configuration
+OPENAI_API_KEY=sk-your-openai-api-key
+
+# Service Configuration
+NODE_ENV=development
+APP_NAME=command-centre-api
+APP_VERSION=1.0.0
+OTEL_SERVICE_NAME=command-centre-api
 ```
-test/
-├── app.controller.e2e-spec.ts     # End-to-end tests
-src/
-├── app.controller.spec.ts
-├── app.service.spec.ts
-└── infrastructure/
-    └── system/
-        ├── system.controller.spec.ts
-        └── system.service.spec.ts
+
+### Optional Variables
+
+```env
+# Logging
+LOG_LEVEL=info
+USE_JSON_LOGGER=true
+DEBUG=false
+
+# OpenTelemetry
+OTEL_LOGS_EXPORTER=console
+OTEL_TRACES_EXPORTER=console
+OTEL_METRICS_EXPORTER=console
 ```
 
-## 🔒 Security
+See `.env.example` for the complete list of available environment variables.
 
-### Environment Variables
+---
 
-- Never commit `.env` files
-- Use different configurations for different environments
-- Validate environment variables on startup
+## 🐳 Docker Support
 
-### Dependencies
+### Development with Docker
 
-- Regular security audits: `pnpm audit`
-- Keep dependencies updated
-- Use lock files for reproducible builds
+```bash
+# Start supporting services (MongoDB, etc.)
+docker-compose up -d
+
+# Run the application locally
+pnpm run start:dev
+```
+
+### Production Build
+
+```bash
+# Build Docker image
+docker build -t command-centre-api .
+
+# Run container
+docker run -p 3000:3000 --env-file .env command-centre-api
+```
+
+---
+
+## 📊 API Documentation
+
+When the application is running, visit:
+
+- **Swagger UI**: `http://localhost:3000/api`
+- **OpenAPI JSON**: `http://localhost:3000/api-json`
+
+The Swagger documentation provides:
+
+- Interactive API testing
+- Request/response schemas
+- Authentication details
+- Example payloads
+
+---
 
 ## 🚀 Deployment
-
-### CI/CD Setup
-
-This template includes a production-grade CI/CD pipeline with GitHub Actions. To enable it:
-
-1. **Add GitHub Secrets** (required for private packages):
-
-   ```bash
-   # Go to your GitHub repository → Settings → Secrets and variables → Actions
-   # Add the following secret:
-   PERSONAL_ACCESS_TOKEN=your_github_token_with_read_packages_scope
-   ```
-
-   **Note**: This token is required because the template uses private GitHub packages like `@paystackhq/nestjs-observability`.
-
-2. **Enable the CI/CD Pipeline**:
-   - The pipeline will automatically run on pushes to `main`, `develop`, and `staging` branches
-   - It will also run on pull requests to these branches
-   - The pipeline includes: linting, testing, security audits, and Docker builds
-
-3. **Pipeline Features**:
-   - ✅ Code formatting and linting checks
-   - ✅ Unit tests with 60% coverage threshold
-   - ✅ E2E tests with comprehensive scenarios
-   - ✅ Security vulnerability scanning
-   - ✅ Docker image building with caching
-   - ✅ Coverage reporting to Codecov (optional)
 
 ### Production Checklist
 
 - [ ] Set `NODE_ENV=production`
-- [ ] Configure production database credentials
-- [ ] Set up proper logging and monitoring
-- [ ] Configure reverse proxy (nginx, etc.)
-- [ ] Set up SSL/TLS certificates
-- [ ] Configure backup strategies
-- [ ] Set up CI/CD pipelines
-- [ ] Add `PERSONAL_ACCESS_TOKEN` to GitHub secrets
+- [ ] Configure production MongoDB connection
+- [ ] Set secure `OPENAI_API_KEY`
+- [ ] Configure proper logging (OTLP exporters)
+- [ ] Set up monitoring and alerting
+- [ ] Configure SSL/TLS certificates
+- [ ] Set up backup strategies for MongoDB
+- [ ] Configure rate limiting
+- [ ] Review and secure all environment variables
 
-### Environment-Specific Configs
+### CI/CD
 
-```bash
-# Development
-cp .env.example .env
+The project includes GitHub Actions workflows for:
 
-# Staging
-cp .env.example .env.staging
+- Linting and formatting checks
+- Running test suites
+- Building Docker images
+- Security vulnerability scanning
 
-# Production
-cp .env.example .env.production
-```
+---
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass
-6. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ### Code Style
 
-- Follow ESLint configuration
-- Use Prettier for formatting
+- Follow the existing ESLint configuration
+- Use Prettier for code formatting
 - Write meaningful commit messages
-- Add JSDoc comments for public APIs
+- Add tests for new features
+- Update documentation as needed
+
+---
+
+## 🔧 Troubleshooting
+
+### OpenAI API Errors
+
+**"OPENAI_API_KEY is not configured"**
+
+- Ensure `OPENAI_API_KEY` is set in your `.env` file
+- Verify the API key is valid and has credits
+
+### Database Connection Issues
+
+**"Cannot connect to MongoDB"**
+
+- Verify MongoDB is running: `docker ps`
+- Check connection string in `.env`
+- Ensure database credentials are correct
+
+### Build Errors
+
+**"Module not found"**
+
+- Run `pnpm install` to ensure all dependencies are installed
+- Clear build cache: `rm -rf dist && pnpm run build`
+
+---
 
 ## 📚 Additional Resources
 
 - [NestJS Documentation](https://docs.nestjs.com/)
-- [TypeORM Documentation](https://typeorm.io/)
-- [Redis Documentation](https://redis.io/documentation)
+- [Vercel AI SDK Documentation](https://sdk.vercel.ai/docs)
+- [OpenAI API Documentation](https://platform.openai.com/docs)
 - [MongoDB Documentation](https://docs.mongodb.com/)
-- [OpenTelemetry Documentation](https://opentelemetry.io/docs/)
+- [TypeORM Documentation](https://typeorm.io/)
+
+---
 
 ## 📄 License
 
-This project is licensed under the UNLICENSED license - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-For support and questions:
-
-1. Check the documentation in each module
-2. Review the test examples
-3. Check existing issues
-4. Create a new issue with detailed information
-
-## 🔧 Troubleshooting
-
-### Private Package Issues
-
-**"ERR_PNPM_FETCH_401 Unauthorized" or "Cannot install @paystackhq/nestjs-observability"**
-
-This template uses private GitHub packages that require authentication. You have several options:
-
-#### Option 1: Use GitHub Personal Access Token (Recommended)
-
-```bash
-# For local development
-export NPM_TOKEN=your_github_token_with_read_packages_scope
-pnpm install
-
-# For Docker builds
-docker build --build-arg NPM_TOKEN=your_token -t your-app .
-
-# For CI/CD (GitHub Actions)
-# Add PERSONAL_ACCESS_TOKEN secret in your repository settings
-```
-
-#### Option 2: Create .npmrc file
-
-```bash
-echo '//npm.pkg.github.com/:_authToken=your_token' > .npmrc
-echo '@paystackhq:registry=https://npm.pkg.github.com' >> .npmrc
-pnpm install
-```
-
-#### Option 3: Use public version (Limited functionality)
-
-```bash
-cp package.json.public package.json
-pnpm install
-```
-
-**Note**: The `PERSONAL_ACCESS_TOKEN` is required for the CI/CD pipeline to work properly. Make sure to add it to your GitHub repository secrets.
-
-### Docker Issues
-
-**"Cannot connect to the Docker daemon"**
-
-- Make sure Docker Desktop is running
-- On macOS/Windows: Start Docker Desktop application
-- On Linux: Run `sudo systemctl start docker`
-
-**"Port already in use"**
-
-- Stop existing services: `docker-compose down`
-- Check for running containers: `docker ps`
-- Kill conflicting processes or change ports in docker-compose files
-
-**"Permission denied"**
-
-- On Linux, you might need to run Docker commands with `sudo`
-
-### Application Issues
-
-**"Module not found"**
-
-- Make sure dependencies are installed: `pnpm install`
-- Check if modules are properly imported in `app.module.ts`
-
-**"Database connection failed"**
-
-- Ensure database services are running: `docker-compose -f docker-compose.dev.yml ps`
-- Check environment variables in `.env` file
-- Verify database credentials and connection strings
-
-**"Cache not working"**
-
-- Ensure Redis is running: `docker ps | grep redis`
-- Check Redis configuration in `.env` file
-- Verify cache module is enabled in `app.module.ts`
+This project is licensed under the UNLICENSED license.
 
 ---
 

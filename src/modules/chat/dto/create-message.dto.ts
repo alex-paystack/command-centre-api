@@ -1,6 +1,7 @@
 import { IsNotEmpty, IsEnum, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { MessageRole } from '../entities/message.entity';
+import { UIMessage } from 'ai';
 
 export class CreateMessageDto {
   @ApiProperty({
@@ -28,5 +29,5 @@ export class CreateMessageDto {
     },
   })
   @IsNotEmpty()
-  parts: Record<string, unknown>; // Flexible JSON object
+  parts: UIMessage['parts'];
 }

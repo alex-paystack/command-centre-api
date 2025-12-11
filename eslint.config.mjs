@@ -13,7 +13,6 @@ export default tseslint.config(
   ...tseslint.configs.recommendedTypeChecked,
   eslintConfigPrettier,
   {
-
     languageOptions: {
       globals: {
         ...globals.node,

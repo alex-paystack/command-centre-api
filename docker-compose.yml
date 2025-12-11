@@ -73,10 +73,8 @@ services:
     networks:
       - paystack-net
 
-
 volumes:
   mongodb_data:
-
 
 networks:
   # @TODO: create a network for the project as part of the init script

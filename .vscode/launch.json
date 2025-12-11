@@ -6,18 +6,13 @@
       "request": "launch",
       "name": "Debug NestJS",
       "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "start:debug"
-      ],
+      "runtimeArgs": ["run", "start:debug"],
       "console": "integratedTerminal",
       "restart": true,
       "sourceMaps": true,
       "envFile": "${workspaceFolder}/.env",
       "cwd": "${workspaceRoot}",
-      "skipFiles": [
-        "<node_internals>/**"
-      ]
+      "skipFiles": ["<node_internals>/**"]
     }
   ]
 }

@@ -19,16 +19,14 @@ env:
   RUNNER: paystack-staging-platform-engineering # The namespace for your app
   DOCKERFILE_PATH: . # Update if your Dockerfile is at a different path. Eg: './packages/tps-api'
 
-
 concurrency:
   group: ${{ github.head_ref || github.ref_name }}
   cancel-in-progress: false
 
 # Explicit permissions following principle of least privilege
 permissions:
-  contents: read      # Required for workflow access and reusable workflows
-  actions: read      # Required for reusable workflows
-
+  contents: read # Required for workflow access and reusable workflows
+  actions: read # Required for reusable workflows
 
 jobs:
   # Hack: We can't pass env vars directly to a reusable workflow,
@@ -37,8 +35,8 @@ jobs:
     name: Set up environment variables
     runs-on: paystack-staging-platform-engineering # The namespace for your app
     permissions:
-      contents: read  # Minimal permissions for environment variable setup
-    
+      contents: read # Minimal permissions for environment variable setup
+
     outputs:
       environment: ${{ env.ENVIRONMENT }}
       aws-region: ${{ env.AWS_REGION }}
@@ -48,7 +46,6 @@ jobs:
       argocd-url: ${{ env.ARGOCD_URL }}
       runner: ${{ env.RUNNER }}
       dockerfile-path: ${{ env.DOCKERFILE_PATH }}
-    
 
     steps:
       - name: Exposing env vars as outputs
@@ -100,9 +97,8 @@ jobs:
       - deploy-app
     runs-on: paystack-staging-platform-engineering # The namespace for your app
     permissions:
-      contents: read  # Minimal permissions for notification job
+      contents: read # Minimal permissions for notification job
     steps:
-    
       - name: Send failure notification
         uses: someimportantcompany/github-actions-slack-message@a975b440de2bcef178d451cc70d4c1161b5a30cd # v1
         with:
@@ -110,4 +106,3 @@ jobs:
           color: failure
           text: |
             :x: *Oh no! Something went wrong while deploying `${{ needs.vars.outputs.app-name }}` on `${{ needs.vars.outputs.cluster }}` cluster. Please check the action workflow logs!*
-    

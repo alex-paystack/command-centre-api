@@ -1,6 +1,7 @@
 import { Exclude, Expose } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { Message, MessageRole } from '../entities/message.entity';
+import { UIMessage } from 'ai';
 
 @Exclude()
 export class MessageResponseDto {
@@ -34,7 +35,7 @@ export class MessageResponseDto {
     },
   })
   @Expose()
-  parts: Record<string, unknown>;
+  parts: UIMessage['parts'];
 
   @ApiProperty({
     description: 'Timestamp when the message was created',
