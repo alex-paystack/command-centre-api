@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Delete, Body, Param, HttpCode, HttpStatus, Res } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, HttpCode, HttpStatus, Res, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { ChatService } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
@@ -42,8 +42,8 @@ export class ChatController {
   @ApiParam({ name: 'id', description: 'Conversation UUID', type: String })
   @ApiResponse({ status: 200, description: 'Conversation found', type: ConversationResponseDto })
   @ApiResponse({ status: 404, description: 'Conversation not found' })
-  async getConversation(@Param('id') id: string) {
-    const conversation = await this.chatService.getConversationById(id);
+  async getConversation(@Param('id') id: string, @CurrentUser() userId: string) {
+    const conversation = await this.chatService.getConversationById(id, userId);
     return PaystackResponse.success(conversation, 'Conversation retrieved successfully');
   }
 
@@ -62,8 +62,8 @@ export class ChatController {
   @ApiParam({ name: 'id', description: 'Conversation UUID', type: String })
   @ApiResponse({ status: 200, description: 'Conversation deleted successfully' })
   @ApiResponse({ status: 404, description: 'Conversation not found' })
-  async deleteConversation(@Param('id') id: string) {
-    await this.chatService.deleteConversationById(id);
+  async deleteConversation(@Param('id') id: string, @CurrentUser() userId: string) {
+    await this.chatService.deleteConversationById(id, userId);
     return PaystackResponse.success(null, 'Conversation deleted successfully');
   }
 
@@ -74,8 +74,8 @@ export class ChatController {
   @ApiResponse({ status: 201, description: 'Messages created successfully', type: [MessageResponseDto] })
   @ApiResponse({ status: 400, description: 'Bad request - invalid input' })
   @ApiResponse({ status: 404, description: 'Conversation not found' })
-  async createMessages(@Body() dtos: CreateMessageDto[]) {
-    const messages = await this.chatService.saveMessages(dtos);
+  async createMessages(@Body() dtos: CreateMessageDto[], @CurrentUser() userId: string) {
+    const messages = await this.chatService.saveMessages(dtos, userId);
     return PaystackResponse.success(messages, 'Messages created successfully');
   }
 
@@ -83,8 +83,8 @@ export class ChatController {
   @ApiOperation({ summary: 'Get all messages in a conversation' })
   @ApiParam({ name: 'conversationId', description: 'Conversation UUID', type: String })
   @ApiResponse({ status: 200, description: 'List of messages', type: [MessageResponseDto] })
-  async getMessagesByConversationId(@Param('conversationId') conversationId: string) {
-    const messages = await this.chatService.getMessagesByConversationId(conversationId);
+  async getMessagesByConversationId(@Param('conversationId') conversationId: string, @CurrentUser() userId: string) {
+    const messages = await this.chatService.getMessagesByConversationId(conversationId, userId);
     return PaystackResponse.success(messages, 'Messages retrieved successfully');
   }
 
@@ -99,7 +99,12 @@ export class ChatController {
     status: 429,
     description: 'Rate limit exceeded - user has sent too many messages in the current period',
   })
-  async streamChat(@Body() dto: ChatRequestDto, @CurrentUser() userId: string, @Res() res: Response) {
+  async streamChat(
+    @Body() dto: ChatRequestDto,
+    @CurrentUser() userId: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
     const result = await this.chatService.handleStreamingChat(dto, userId);
 
     const response = result.toUIMessageStreamResponse({
@@ -111,30 +116,44 @@ export class ChatController {
           parts: message.parts,
         }));
 
-        await this.chatService.saveMessages(formattedMessages);
+        await this.chatService.saveMessages(formattedMessages, userId);
       },
     });
+
+    res.status(response.status ?? HttpStatus.OK);
 
     response.headers.forEach((value, key) => {
       res.setHeader(key, value);
     });
 
-    if (response.body) {
-      const reader = response.body.getReader();
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            break;
-          }
-          res.write(value);
+    const { body } = response;
+    if (!body) {
+      return res.end();
+    }
+
+    const reader = body.getReader();
+    let aborted = false;
+
+    req.on('close', () => {
+      aborted = true;
+      reader.cancel().catch(() => undefined);
+    });
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done || aborted) {
+          break;
         }
+        res.write(value);
+      }
+      if (!res.writableEnded) {
         res.end();
-      } catch {
+      }
+    } catch {
+      if (!res.writableEnded) {
         res.status(500).end();
       }
-    } else {
-      res.end();
     }
   }
 }

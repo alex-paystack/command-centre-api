@@ -1,13 +1,8 @@
 import { Injectable, CanActivate, ExecutionContext, HttpStatus } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { ResponseCode } from '@paystackhq/pkg-response-code';
 import { Request } from 'express';
 import { APIError } from '../../../common';
-
-interface JwtPayload {
-  id: string;
-  [key: string]: unknown;
-}
+import { AuthService } from '../auth.service';
 
 interface RequestWithUser extends Request {
   user?: {
@@ -19,7 +14,7 @@ interface RequestWithUser extends Request {
 export class JwtAuthGuard implements CanActivate {
   private readonly excludedPaths = ['/health', '/dummy'];
 
-  constructor(private jwtService: JwtService) {}
+  constructor(private readonly authService: AuthService) {}
 
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<RequestWithUser>();
@@ -40,18 +35,8 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
-
-      if (!payload.id) {
-        throw new APIError(
-          'Invalid token: missing user ID',
-          ResponseCode.ACCESS_DENIED,
-          undefined,
-          HttpStatus.UNAUTHORIZED,
-        );
-      }
-
-      request.user = { userId: payload.id };
+      const { userId } = await this.authService.validateToken(token);
+      request.user = { userId };
 
       return true;
     } catch (error) {

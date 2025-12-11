@@ -21,12 +21,17 @@ export class ChatService {
     private readonly configService: ConfigService,
   ) {}
 
-  async getMessagesByConversationId(conversationId: string) {
+  async getMessagesByConversationId(conversationId: string, userId: string) {
+    const conversation = await this.conversationRepository.findByIdAndUserId(conversationId, userId);
+    if (!conversation) {
+      throw new NotFoundException(`Conversation with ID ${conversationId} not found`);
+    }
+
     const messages = await this.messageRepository.findByConversationId(conversationId);
     return MessageResponseDto.fromEntities(messages);
   }
 
-  async saveMessages(dtos: CreateMessageDto[]) {
+  async saveMessages(dtos: CreateMessageDto[], userId: string) {
     if (dtos.length === 0) {
       return [];
     }
@@ -38,10 +43,12 @@ export class ChatService {
       throw new Error('All messages must belong to the same conversation');
     }
 
-    const conversation = await this.conversationRepository.findById(conversationId);
+    const conversation = await this.conversationRepository.findByIdAndUserId(conversationId, userId);
     if (!conversation) {
       throw new NotFoundException(`Conversation with ID ${conversationId} not found`);
     }
+
+    await this.checkUserEntitlement(userId);
 
     const messagesToCreate = dtos.map((dto) => ({
       conversationId: dto.conversationId,
@@ -54,8 +61,8 @@ export class ChatService {
     return MessageResponseDto.fromEntities(savedMessages);
   }
 
-  async getConversationById(id: string) {
-    const conversation = await this.conversationRepository.findById(id);
+  async getConversationById(id: string, userId: string) {
+    const conversation = await this.conversationRepository.findByIdAndUserId(id, userId);
 
     if (!conversation) {
       throw new NotFoundException(`Conversation with ID ${id} not found`);
@@ -80,10 +87,15 @@ export class ChatService {
     return ConversationResponseDto.fromEntity(conversation);
   }
 
-  async deleteConversationById(id: string) {
+  async deleteConversationById(id: string, userId: string) {
+    const conversation = await this.conversationRepository.findByIdAndUserId(id, userId);
+    if (!conversation) {
+      throw new NotFoundException(`Conversation with ID ${id} not found`);
+    }
+
     await this.messageRepository.deleteAllByConversationId(id);
 
-    const deleted = await this.conversationRepository.deleteById(id);
+    const deleted = await this.conversationRepository.deleteByIdForUser(id, userId);
     if (!deleted) {
       throw new NotFoundException(`Conversation with ID ${id} not found`);
     }
@@ -131,10 +143,14 @@ export class ChatService {
         console.error('Error creating conversation:', error);
         throw new Error('Failed to create conversation');
       }
+    } else if (conversation.userId !== userId) {
+      throw new NotFoundException(`Conversation with ID ${conversationId} not found`);
     }
 
-    const allMessages = await this.getMessagesByConversationId(conversationId);
-    const uiMessages = [...convertToUIMessages(allMessages), message];
+    const allMessages = await this.getMessagesByConversationId(conversationId, userId);
+    const historyLimit = this.configService.get<number>('MESSAGE_HISTORY_LIMIT', 40);
+    const limitedHistory = allMessages.slice(-historyLimit);
+    const uiMessages = [...convertToUIMessages(limitedHistory), message];
 
     await this.messageRepository.createMessage({
       conversationId,

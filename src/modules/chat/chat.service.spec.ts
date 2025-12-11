@@ -9,11 +9,13 @@ import { CreateConversationDto } from './dto/create-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { Conversation } from './entities/conversation.entity';
 import { Message, MessageRole } from './entities/message.entity';
+import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
 
 describe('ChatService', () => {
   let service: ChatService;
   let conversationRepository: jest.Mocked<ConversationRepository>;
   let messageRepository: jest.Mocked<MessageRepository>;
+  let configService: { get: jest.Mock };
 
   const mockConversation: Conversation = {
     _id: {} as Conversation['_id'],
@@ -38,9 +40,11 @@ describe('ChatService', () => {
   beforeEach(async () => {
     const mockConversationRepository = {
       findById: jest.fn(),
+      findByIdAndUserId: jest.fn(),
       findByUserId: jest.fn(),
       createConversation: jest.fn(),
       deleteById: jest.fn(),
+      deleteByIdForUser: jest.fn(),
       deleteAllByUserId: jest.fn(),
     };
 
@@ -49,6 +53,11 @@ describe('ChatService', () => {
       createMessage: jest.fn(),
       createMessages: jest.fn(),
       deleteAllByConversationId: jest.fn(),
+      countUserMessagesInPeriod: jest.fn().mockResolvedValue(0),
+    };
+
+    configService = {
+      get: jest.fn((key: string, defaultValue?: unknown) => defaultValue),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -64,9 +73,7 @@ describe('ChatService', () => {
         },
         {
           provide: ConfigService,
-          useValue: {
-            get: jest.fn((key: string, defaultValue?: unknown) => defaultValue),
-          },
+          useValue: configService,
         },
       ],
     }).compile();
@@ -107,18 +114,29 @@ describe('ChatService', () => {
 
   describe('getConversationById', () => {
     it('should return a conversation by id', async () => {
-      jest.spyOn(conversationRepository, 'findById').mockResolvedValue(mockConversation);
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(mockConversation);
 
-      const result = await service.getConversationById(mockConversation.id);
+      const result = await service.getConversationById(mockConversation.id, mockConversation.userId);
 
-      expect(conversationRepository.findById).toHaveBeenCalledWith(mockConversation.id);
+      expect(conversationRepository.findByIdAndUserId).toHaveBeenCalledWith(
+        mockConversation.id,
+        mockConversation.userId,
+      );
       expect(result.id).toBe(mockConversation.id);
     });
 
     it('should throw NotFoundException when conversation not found', async () => {
-      jest.spyOn(conversationRepository, 'findById').mockResolvedValue(null);
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(null);
 
-      await expect(service.getConversationById('non-existent-id')).rejects.toThrow(NotFoundException);
+      await expect(service.getConversationById('non-existent-id', mockConversation.userId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw NotFoundException when conversation belongs to another user', async () => {
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(null); // repo is user-scoped, so returns null
+
+      await expect(service.getConversationById(mockConversation.id, 'other-user')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -144,20 +162,37 @@ describe('ChatService', () => {
 
   describe('deleteConversationById', () => {
     it('should delete a conversation and its messages', async () => {
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(mockConversation);
       jest.spyOn(messageRepository, 'deleteAllByConversationId').mockResolvedValue(2);
-      jest.spyOn(conversationRepository, 'deleteById').mockResolvedValue(true);
+      jest.spyOn(conversationRepository, 'deleteByIdForUser').mockResolvedValue(true);
 
-      await service.deleteConversationById(mockConversation.id);
+      await service.deleteConversationById(mockConversation.id, mockConversation.userId);
 
+      expect(conversationRepository.findByIdAndUserId).toHaveBeenCalledWith(
+        mockConversation.id,
+        mockConversation.userId,
+      );
       expect(messageRepository.deleteAllByConversationId).toHaveBeenCalledWith(mockConversation.id);
-      expect(conversationRepository.deleteById).toHaveBeenCalledWith(mockConversation.id);
+      expect(conversationRepository.deleteByIdForUser).toHaveBeenCalledWith(
+        mockConversation.id,
+        mockConversation.userId,
+      );
     });
 
     it('should throw NotFoundException when conversation not found', async () => {
-      jest.spyOn(messageRepository, 'deleteAllByConversationId').mockResolvedValue(0);
-      jest.spyOn(conversationRepository, 'deleteById').mockResolvedValue(false);
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(null);
 
-      await expect(service.deleteConversationById('non-existent-id')).rejects.toThrow(NotFoundException);
+      await expect(service.deleteConversationById('non-existent-id', mockConversation.userId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw NotFoundException when deleting another user’s conversation', async () => {
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(null);
+
+      await expect(service.deleteConversationById(mockConversation.id, 'other-user')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -186,12 +221,16 @@ describe('ChatService', () => {
         },
       ];
 
-      jest.spyOn(conversationRepository, 'findById').mockResolvedValue(mockConversation);
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(mockConversation);
       jest.spyOn(messageRepository, 'createMessages').mockResolvedValue([mockMessage]);
+      jest.spyOn(messageRepository, 'countUserMessagesInPeriod').mockResolvedValue(0);
 
-      const result = await service.saveMessages(dtos);
+      const result = await service.saveMessages(dtos, mockConversation.userId);
 
-      expect(conversationRepository.findById).toHaveBeenCalledWith(dtos[0].conversationId);
+      expect(conversationRepository.findByIdAndUserId).toHaveBeenCalledWith(
+        dtos[0].conversationId,
+        mockConversation.userId,
+      );
       expect(messageRepository.createMessages).toHaveBeenCalledWith([
         expect.objectContaining({
           conversationId: dtos[0].conversationId,
@@ -205,7 +244,7 @@ describe('ChatService', () => {
     });
 
     it('should return empty array when given empty array', async () => {
-      const result = await service.saveMessages([]);
+      const result = await service.saveMessages([], mockConversation.userId);
 
       expect(result).toEqual([]);
     });
@@ -224,7 +263,9 @@ describe('ChatService', () => {
         },
       ];
 
-      await expect(service.saveMessages(dtos)).rejects.toThrow('All messages must belong to the same conversation');
+      await expect(service.saveMessages(dtos, mockConversation.userId)).rejects.toThrow(
+        'All messages must belong to the same conversation',
+      );
     });
 
     it('should throw NotFoundException when conversation not found', async () => {
@@ -236,29 +277,93 @@ describe('ChatService', () => {
         },
       ];
 
-      jest.spyOn(conversationRepository, 'findById').mockResolvedValue(null);
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(null);
 
-      await expect(service.saveMessages(dtos)).rejects.toThrow(NotFoundException);
+      await expect(service.saveMessages(dtos, mockConversation.userId)).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException when trying to save to another user’s conversation', async () => {
+      const dtos: CreateMessageDto[] = [
+        {
+          conversationId: mockConversation.id,
+          role: MessageRole.USER,
+          parts: [{ type: 'text', text: 'Hello' }],
+        },
+      ];
+
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(null);
+
+      await expect(service.saveMessages(dtos, 'other-user')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should enforce rate limits and throw RateLimitExceededException', async () => {
+      const dtos: CreateMessageDto[] = [
+        {
+          conversationId: mockConversation.id,
+          role: MessageRole.USER,
+          parts: [{ type: 'text', text: 'Hello' }],
+        },
+      ];
+
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(mockConversation);
+      jest.spyOn(messageRepository, 'countUserMessagesInPeriod').mockResolvedValue(5);
+      configService.get.mockImplementation((key: string, defaultValue?: unknown) => {
+        if (key === 'MESSAGE_LIMIT') return 3;
+        if (key === 'RATE_LIMIT_PERIOD_HOURS') return 24;
+        return defaultValue;
+      });
+
+      await expect(service.saveMessages(dtos, mockConversation.userId)).rejects.toThrow(RateLimitExceededException);
     });
   });
 
   describe('getMessagesByConversationId', () => {
     it('should return messages for a conversation', async () => {
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(mockConversation);
       jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue([mockMessage]);
 
-      const result = await service.getMessagesByConversationId(mockConversation.id);
+      const result = await service.getMessagesByConversationId(mockConversation.id, mockConversation.userId);
 
+      expect(conversationRepository.findByIdAndUserId).toHaveBeenCalledWith(
+        mockConversation.id,
+        mockConversation.userId,
+      );
       expect(messageRepository.findByConversationId).toHaveBeenCalledWith(mockConversation.id);
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe(mockMessage.id);
     });
 
     it('should return empty array when conversation has no messages', async () => {
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(mockConversation);
       jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue([]);
 
-      const result = await service.getMessagesByConversationId(mockConversation.id);
+      const result = await service.getMessagesByConversationId(mockConversation.id, mockConversation.userId);
 
       expect(result).toEqual([]);
+    });
+
+    it('should throw NotFoundException when accessing another user’s conversation', async () => {
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(null);
+
+      await expect(service.getMessagesByConversationId(mockConversation.id, 'other-user')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('handleStreamingChat', () => {
+    it('should throw NotFoundException when conversation exists but belongs to another user', async () => {
+      jest.spyOn(conversationRepository, 'findById').mockResolvedValue({ ...mockConversation, userId: 'someone-else' });
+
+      await expect(
+        service.handleStreamingChat(
+          {
+            conversationId: mockConversation.id,
+            message: { id: '123', role: MessageRole.USER, parts: [{ type: 'text', text: 'hi' }] },
+          },
+          mockConversation.userId,
+        ),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });
