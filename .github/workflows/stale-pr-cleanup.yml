@@ -1,0 +1,90 @@
+name: Stale PR Cleanup
+
+on:
+  schedule:
+    # Runs weekdays at 6:00 AM UTC to catch PRs before most teams start work
+    - cron: '0 6 * * 1-5'
+  workflow_dispatch: # Allow manual triggering for immediate cleanup
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    name: Clean up stale PRs
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Close stale PRs
+        uses: actions/stale@5bef64f19d7facfb25b37b414482c7164d639639 # v9.1.0
+        with:
+          # Authentication token for GitHub API (automatically provided by GitHub)
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          
+          # PR lifecycle configuration - marks stale after 30 days, closes after 7 more days
+          days-before-pr-stale: 30
+          days-before-pr-close: 7
+          
+          # Labels and user-friendly messages for stale PRs
+          stale-pr-label: 'stale'
+          stale-pr-message: |
+            This pull request has been automatically marked as stale because it has not had any activity for 30 days.
+            
+            If this PR is still relevant and should remain open, please:
+            - Add a comment explaining why it should stay open
+            - Push new commits to update the branch
+            - Remove the 'stale' label
+            
+            If no activity occurs within 7 days, this PR will be automatically closed.
+            
+            Thank you for your contribution! 🚀
+          
+          close-pr-message: |
+            This pull request has been automatically closed due to inactivity for 7 days after being marked as stale.
+            
+            If you believe this PR was closed in error or you'd like to continue working on it, please:
+            - Reopen the PR
+            - Add a comment with your plans
+            - Push new commits if needed
+            
+            Thank you for your understanding! 🙏
+          
+          close-pr-label: 'auto-closed'
+          
+          # Issues are disabled (-1 means never mark as stale or close)
+          days-before-issue-stale: -1
+          days-before-issue-close: -1
+          
+          # PRs with these labels are protected from stale processing
+          exempt-pr-labels: 'pinned,security,dependencies,breaking-change,work-in-progress,wip'
+          exempt-draft-pr: true
+          
+          # Only process PRs (not issues)
+          only-labels: ''
+          any-of-labels: ''
+          
+          # Limit the number of operations per run to avoid rate limiting
+          operations-per-run: 30
+          
+          # Remove stale label when PR is updated
+          remove-stale-when-updated: true
+          
+          # Enable debug logging
+          debug-only: false
+          
+          # Order to process PRs (oldest first)
+          ascending: true
+          
+            # Additional configuration
+          delete-branch: false
+          
+      - name: Summary
+        run: |
+          echo "✅ Stale PR cleanup completed successfully"
+          echo "📊 Check the logs above for details on processed PRs"
+          echo "🔧 Configuration:"
+          echo "  - Days until stale: 30"
+          echo "  - Days until close: 7"
+          echo "  - Schedule: 0 6 * * 1-5 (weekdays at 6:00 AM UTC)"

@@ -1,0 +1,242 @@
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel in-progress runs on the same branch / PR so we don't waste minutes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Explicit permissions following principle of least privilege
+permissions:
+  contents: read      # Required for actions/checkout
+  checks: write      # Required for publishing test results  
+  pull-requests: write # Required for commenting on PRs with test results
+
+env:
+  NODE_VERSION: '24.5.0'
+  PNPM_VERSION: '10.14.0'
+
+defaults:
+  run:
+    shell: bash
+
+# ----------------------- Shared dependency layer -----------------------
+# Restores / populates pnpm store & node_modules once and lets the other
+# jobs re-use that data via the GitHub cache. Running `pnpm install` in the
+# other jobs is therefore almost instantaneous (download-free).
+# ----------------------------------------------------------------------
+jobs:
+  deps:
+    name: 'Install dependencies & prime cache'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read  # Required for checkout
+      
+    steps:
+      - name: Install zstd for faster cache compression
+        run: sudo apt-get update -y && sudo apt-get install -y zstd
+
+      - name: Checkout code
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Configure npm for private packages
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.PERSONAL_ACCESS_TOKEN }}" > .npmrc
+          echo "@paystackhq:registry=https://npm.pkg.github.com" >> .npmrc
+          echo "always-auth=true" >> .npmrc
+
+      # Restore pnpm store + node_modules if available
+      - name: Restore pnpm cache
+        id: cache-deps
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
+        with:
+          path: |
+            ~/.pnpm-store
+            node_modules
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      - name: Install dependencies (if cache miss)
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+
+  # -------------------- Lint / Format --------------------
+  lint:
+    name: 'Lint & Format'
+    runs-on: ubuntu-latest
+    needs: deps
+    permissions:
+      contents: read  # Required for checkout
+      
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Restore pnpm cache
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
+        with:
+          path: |
+            ~/.pnpm-store
+            node_modules
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml') }}
+
+      - run: pnpm install --frozen-lockfile --prefer-offline --ignore-scripts
+
+      - name: Check formatting
+        run: pnpm run format:check
+
+      - name: Lint
+        run: pnpm run lint:check
+
+  # -------------------- Unit Tests --------------------
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: deps
+    permissions:
+      contents: read       # Required for checkout
+      checks: write       # Required for test result reporting
+      pull-requests: write # Required for PR comments on test results
+      
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+
+      - uses: pnpm/action-setup@53751a9789c7351e4924f01fe68370252a4f1f18 # v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Restore pnpm cache
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
+        with:
+          path: |
+            ~/.pnpm-store
+            node_modules
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml') }}
+
+      - run: pnpm install --frozen-lockfile --prefer-offline --ignore-scripts
+
+      - name: Run unit tests w/ coverage
+        run: pnpm run test:cov:ci
+        env:
+          NODE_ENV: test
+          APP_NAME: command-centre-api
+          APP_VERSION: ${{ steps.version.outputs.app_version }}
+          LOG_LEVEL: error
+          METRICS_ENABLED: false
+          TRACING_ENABLED: false
+
+  # -------------------- E2E Tests --------------------
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: deps
+    permissions:
+      contents: read       # Required for checkout
+      checks: write       # Required for test result reporting
+      pull-requests: write # Required for PR comments on test results
+      
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+
+      - uses: pnpm/action-setup@53751a9789c7351e4924f01fe68370252a4f1f18 # v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Restore pnpm cache
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
+        with:
+          path: |
+            ~/.pnpm-store
+            node_modules
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml') }}
+
+      - run: pnpm install --frozen-lockfile --prefer-offline --ignore-scripts
+
+      - name: Run E2E tests
+        run: pnpm run test:e2e:ci
+        env:
+          NODE_ENV: test
+          APP_NAME: command-centre-api
+          APP_VERSION: ${{ steps.version.outputs.app_version }}
+          LOG_LEVEL: error
+          METRICS_ENABLED: true
+          TRACING_ENABLED: false
+
+  # -------------------- Docker Image --------------------
+  docker-build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [lint, unit-tests, e2e-tests]
+    permissions:
+      contents: read  # Required for checkout
+      
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+
+      - name: Compute service version (branch-shortsha)
+        id: version
+        run: |
+          BRANCH_REF="${GITHUB_REF##*/}"
+          # Normalize branch name to docker/tag-safe (lowercase, replace invalid chars)
+          SAFE_BRANCH=$(echo "$BRANCH_REF" | tr '[:upper:]' '[:lower:]' | sed -E 's#[^a-z0-9._-]+#-#g')
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          APP_VERSION="$SAFE_BRANCH-$SHORT_SHA"
+          echo "app_version=$APP_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+
+      - name: Build & cache image (BuildKit inline cache)
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          push: false
+          tags: |
+            ${{ github.repository }}:${{ github.sha }}
+            ${{ github.repository }}:${{ steps.version.outputs.app_version }}
+          build-args: |
+            PERSONAL_ACCESS_TOKEN=${{ secrets.PERSONAL_ACCESS_TOKEN }}
+            APP_VERSION=${{ steps.version.outputs.app_version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+

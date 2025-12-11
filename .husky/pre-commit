@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Try to use project-specific pnpm first, fall back to npx if pnpm is not available
+if command -v pnpm >/dev/null 2>&1; then
+  echo "Running lint-staged with pnpm..."
+  pnpm lint-staged
+else
+  echo "pnpm not found, falling back to npx..."
+  npx lint-staged
+fi

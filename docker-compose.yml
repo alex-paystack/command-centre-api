@@ -1,0 +1,84 @@
+services:
+  # Main Application
+  app:
+    build:
+      context: .
+      target: development
+      args:
+        PERSONAL_ACCESS_TOKEN: ${PERSONAL_ACCESS_TOKEN}
+    ports:
+      - '${HOST_APP_PORT:-3000}:3000'
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - APP_NAME=command-centre-api
+      - APP_VERSION=dev-local
+      - LOG_LEVEL=debug
+      - METRICS_ENABLED=true
+      - TRACING_ENABLED=true
+      - DATABASE_HOST=mongodb
+      - DATABASE_USERNAME=root
+      - DATABASE_PASSWORD=root
+      - DATABASE_NAME=command-centre-api
+      - OTEL_SERVICE_NAME=command-centre-api
+      - OTEL_SERVICE_VERSION=dev-local
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://grafana-otel:4318
+      - OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://grafana-otel:4318/v1/logs
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://grafana-otel:4318/v1/traces
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_LOG_LEVEL=INFO
+    depends_on:
+      - mongodb
+    develop:
+      watch:
+        - path: .
+          action: sync
+          target: /app
+          ignore:
+            - node_modules/
+        - path: package.json
+          action: rebuild
+        - path: pnpm-lock.yaml
+          action: rebuild
+        - path: pnpm-workspace.yaml
+          action: rebuild
+        - path: .env
+          action: rebuild
+    networks:
+      - paystack-net
+    restart: unless-stopped
+  mongodb:
+    image: mongo:7.0
+    ports:
+      - '${HOST_MONGODB_PORT:-27017}:27017'
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=root
+      - MONGO_INITDB_DATABASE=command-centre-api
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - paystack-net
+    restart: unless-stopped
+  grafana-otel:
+    image: grafana/otel-lgtm
+    container_name: grafana-otel
+    ports:
+      - '3001:3000'
+      - '4317:4317'
+      - '4318:4318'
+    networks:
+      - paystack-net
+
+
+volumes:
+  mongodb_data:
+
+
+networks:
+  # @TODO: create a network for the project as part of the init script
+  paystack-net:
+    external: true

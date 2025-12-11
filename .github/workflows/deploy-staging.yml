@@ -1,0 +1,113 @@
+name: Staging - Build & Deploy
+
+on:
+  push:
+    branches:
+      - dev # Update this to the staging branch for your repo
+  workflow_run:
+    workflows: [Reset Dev Branch]
+    types:
+      - completed
+
+env:
+  ENVIRONMENT: staging
+  AWS_REGION: eu-west-2
+  CLUSTER: paystack-staging
+  NAMESPACE: platform-engineering # The namespace for your app
+  APP_NAME: Command Centre API # The name of your app
+  ARGOCD_URL: argocd.private.paystack.studio
+  RUNNER: paystack-staging-platform-engineering # The namespace for your app
+  DOCKERFILE_PATH: . # Update if your Dockerfile is at a different path. Eg: './packages/tps-api'
+
+
+concurrency:
+  group: ${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: false
+
+# Explicit permissions following principle of least privilege
+permissions:
+  contents: read      # Required for workflow access and reusable workflows
+  actions: read      # Required for reusable workflows
+
+
+jobs:
+  # Hack: We can't pass env vars directly to a reusable workflow,
+  # so using this job to expose env vars as outputs
+  vars:
+    name: Set up environment variables
+    runs-on: paystack-staging-platform-engineering # The namespace for your app
+    permissions:
+      contents: read  # Minimal permissions for environment variable setup
+    
+    outputs:
+      environment: ${{ env.ENVIRONMENT }}
+      aws-region: ${{ env.AWS_REGION }}
+      cluster: ${{ env.CLUSTER }}
+      namespace: ${{ env.NAMESPACE }}
+      app-name: ${{ env.APP_NAME }}
+      argocd-url: ${{ env.ARGOCD_URL }}
+      runner: ${{ env.RUNNER }}
+      dockerfile-path: ${{ env.DOCKERFILE_PATH }}
+    
+
+    steps:
+      - name: Exposing env vars as outputs
+        run: echo "Exposing env vars as outputs"
+
+  build-push-image:
+    name: Build and push docker image to ECR
+    uses: PaystackHQ/common-github-actions/.github/workflows/build-push-docker-image.yml@v1.8.1
+    needs:
+      - vars
+    with:
+      application-name: ${{ needs.vars.outputs.app-name }}
+      aws-region: ${{ needs.vars.outputs.aws-region }}
+      dockerfile-path: ${{ needs.vars.outputs.dockerfile-path }}
+      # Optional, set the following variable only if you're using a jinja templated Dockerfile.j2
+      # dockerfile-templatized: true
+    secrets:
+      slack-webhook-url: ${{ secrets.SLACK_FEED_DEPLOY_WEBHOOK_URL }}
+      aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      github-token: ${{ secrets.INFRA_COMMON_REPO_TOKEN }}
+      docker-svc-username: ${{ secrets.DOCKER_SVC_USERNAME }}
+      docker-svc-pat: ${{ secrets.DOCKER_SVC_PAT }}
+
+  deploy-app:
+    name: Deploy app to cluster
+    uses: PaystackHQ/common-github-actions/.github/workflows/eks-deploy-app.yml@v1.3.0
+    needs:
+      - vars
+      - build-push-image
+    with:
+      environment: ${{ needs.vars.outputs.environment }}
+      cluster: ${{ needs.vars.outputs.cluster }}
+      argocd-url: ${{ needs.vars.outputs.argocd-url }}
+      runs-on: ${{ needs.vars.outputs.runner }}
+      application-name: ${{ needs.vars.outputs.app-name }}
+      namespace: ${{ needs.vars.outputs.namespace }}
+      version: ${{ needs.build-push-image.outputs.version }}
+    secrets:
+      slack-webhook-url: ${{ secrets.SLACK_FEED_DEPLOY_WEBHOOK_URL }}
+      argocd-token: ${{ secrets.ARGOCD_TOKEN }}
+      github-token: ${{ secrets.INFRA_COMMON_REPO_TOKEN }}
+
+  notify-on-failure:
+    if: failure()
+    needs:
+      - vars
+      - build-push-image
+      - deploy-app
+    runs-on: paystack-staging-platform-engineering # The namespace for your app
+    permissions:
+      contents: read  # Minimal permissions for notification job
+    steps:
+    
+      - name: Send failure notification
+        uses: someimportantcompany/github-actions-slack-message@a975b440de2bcef178d451cc70d4c1161b5a30cd # v1
+        with:
+          webhook-url: ${{ secrets.SLACK_FEED_DEPLOY_WEBHOOK_URL }}
+          color: failure
+          text: |
+            :x: *Oh no! Something went wrong while deploying `${{ needs.vars.outputs.app-name }}` on `${{ needs.vars.outputs.cluster }}` cluster. Please check the action workflow logs!*
+    

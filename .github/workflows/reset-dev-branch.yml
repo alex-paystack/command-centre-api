@@ -1,0 +1,17 @@
+name: Reset Dev Branch
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0' # Runs every Sunday at midnight UTC
+
+permissions:
+  contents: read
+
+jobs:
+  reset_dev_branch:
+    permissions:
+      contents: write
+    uses: PaystackHQ/common-github-actions/.github/workflows/force-reset-branch.yml@master
+    with:
+      reset_branch: 'dev'
+      base_branch: 'main'

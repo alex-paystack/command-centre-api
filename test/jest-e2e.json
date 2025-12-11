@@ -1,0 +1,23 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": ".",
+  "testEnvironment": "node",
+  "testRegex": ".e2e-spec.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "collectCoverageFrom": [
+    "src/**/*.(t|j)s",
+    "!src/**/*.module.ts",
+    "!src/**/*.entity.ts",
+    "!src/**/*.dto.ts",
+    "!src/**/*.interface.ts",
+    "!src/**/*.enum.ts",
+    "!src/**/*.constant.ts",
+    "!src/index.ts",
+    "!src/main.ts"
+  ],
+  "coverageDirectory": "../coverage-e2e",
+  "coverageReporters": ["text", "lcov", "html"],
+  "setupFilesAfterEnv": ["<rootDir>/jest-e2e.setup.ts"]
+}
