@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { Request, Response } from 'express';
+import { Readable } from 'stream';
 import { ChatService } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
@@ -139,29 +140,13 @@ export class ChatController {
       return res.end();
     }
 
-    const reader = body.getReader();
-    let aborted = false;
+    // Convert Web ReadableStream to Node.js Readable stream
+    const nodeStream = Readable.fromWeb(body as Parameters<typeof Readable.fromWeb>[0]);
 
     req.on('close', () => {
-      aborted = true;
-      reader.cancel().catch(() => undefined);
+      nodeStream.destroy();
     });
 
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done || aborted) {
-          break;
-        }
-        res.write(value);
-      }
-      if (!res.writableEnded) {
-        res.end();
-      }
-    } catch {
-      if (!res.writableEnded) {
-        res.status(500).end();
-      }
-    }
+    nodeStream.pipe(res);
   }
 }

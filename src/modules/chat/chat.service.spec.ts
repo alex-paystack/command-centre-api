@@ -455,39 +455,6 @@ describe('ChatService', () => {
       expect(result?.responseStream).toBeDefined();
     });
 
-    it('should return clarification response when message NEEDS_CLARIFICATION with suggestion', async () => {
-      const suggestedClarification = 'Could you please specify which transaction you are referring to?';
-
-      classifyMessage.mockResolvedValue({
-        intent: MessageClassificationIntent.NEEDS_CLARIFICATION,
-        confidence: 0.85,
-        needsMerchantData: false,
-        suggestedClarification,
-      });
-
-      const result = await service.handleMessageClassification(mockUIMessage);
-
-      expect(classifyMessage).toHaveBeenCalledWith(mockUIMessage);
-      expect(result).toBeDefined();
-      expect(result?.type).toBe(ChatResponseType.CLARIFICATION_REQUIRED);
-      expect(result?.responseStream).toBeDefined();
-    });
-
-    it('should use default clarification text when suggestedClarification is not provided', async () => {
-      classifyMessage.mockResolvedValue({
-        intent: MessageClassificationIntent.NEEDS_CLARIFICATION,
-        confidence: 0.75,
-        needsMerchantData: false,
-      });
-
-      const result = await service.handleMessageClassification(mockUIMessage);
-
-      expect(classifyMessage).toHaveBeenCalledWith(mockUIMessage);
-      expect(result).toBeDefined();
-      expect(result?.type).toBe(ChatResponseType.CLARIFICATION_REQUIRED);
-      expect(result?.responseStream).toBeDefined();
-    });
-
     it('should return null when message classification is DASHBOARD_INSIGHT', async () => {
       classifyMessage.mockResolvedValue({
         intent: MessageClassificationIntent.DASHBOARD_INSIGHT,

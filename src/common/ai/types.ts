@@ -116,13 +116,11 @@ export enum MessageClassificationIntent {
   PAYSTACK_PRODUCT_FAQ = 'PAYSTACK_PRODUCT_FAQ',
   ACCOUNT_HELP = 'ACCOUNT_HELP',
   OUT_OF_SCOPE = 'OUT_OF_SCOPE',
-  NEEDS_CLARIFICATION = 'NEEDS_CLARIFICATION',
 }
 
 export enum ChatResponseType {
   CHAT_RESPONSE = 'CHAT_RESPONSE',
   REFUSAL = 'REFUSAL',
-  CLARIFICATION_REQUIRED = 'CLARIFICATION_REQUIRED',
 }
 
 export type ClassificationUIMessage = UIMessage<

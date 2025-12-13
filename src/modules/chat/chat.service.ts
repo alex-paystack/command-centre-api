@@ -154,26 +154,7 @@ export class ChatService {
       return {
         type: ChatResponseType.REFUSAL,
         responseStream: refusalStream,
-      };
-    }
-
-    if (messageClassification?.intent === MessageClassificationIntent.NEEDS_CLARIFICATION) {
-      const clarificationText = messageClassification.suggestedClarification ?? 'I need more information to help you.';
-
-      const clarificationStream = createUIMessageStream<ClassificationUIMessage>({
-        execute: ({ writer }) => {
-          writer.write({
-            type: 'data-clarification',
-            data: {
-              text: clarificationText,
-            },
-          });
-        },
-      });
-
-      return {
-        type: ChatResponseType.CLARIFICATION_REQUIRED,
-        responseStream: clarificationStream,
+        text: refusalText,
       };
     }
 
@@ -212,18 +193,29 @@ export class ChatService {
 
     const messageClassification = await this.handleMessageClassification(message);
 
-    if (messageClassification) {
-      return {
-        type: messageClassification.type,
-        responseStream: messageClassification.responseStream,
-      };
-    }
-
     await this.messageRepository.createMessage({
       conversationId,
       role: MessageRole.USER,
       parts: message.parts,
     });
+
+    if (messageClassification) {
+      await this.messageRepository.createMessage({
+        conversationId,
+        role: MessageRole.ASSISTANT,
+        parts: [
+          {
+            type: 'text',
+            text: messageClassification.text,
+          },
+        ],
+      });
+
+      return {
+        type: messageClassification.type,
+        responseStream: messageClassification.responseStream,
+      };
+    }
 
     const getJwtToken = () => jwtToken;
 

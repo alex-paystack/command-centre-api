@@ -35,11 +35,9 @@ const ClassifierSchema = z.object({
     MessageClassificationIntent.PAYSTACK_PRODUCT_FAQ,
     MessageClassificationIntent.ACCOUNT_HELP,
     MessageClassificationIntent.OUT_OF_SCOPE,
-    MessageClassificationIntent.NEEDS_CLARIFICATION,
   ]),
   confidence: z.number().min(0).max(1),
   needsMerchantData: z.boolean(),
-  suggestedClarification: z.string().optional(),
 });
 
 /**
@@ -66,7 +64,6 @@ export async function classifyMessage(message: UIMessage) {
     console.error('Error classifying message:', error);
     return {
       intent: MessageClassificationIntent.OUT_OF_SCOPE,
-      suggestedClarification: null,
     };
   }
 }
