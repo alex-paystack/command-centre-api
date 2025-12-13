@@ -1,5 +1,7 @@
 // TODO: Make types more specific
 
+import { UIMessage } from 'ai';
+
 /**
  * Paystack Transaction status
  */
@@ -108,3 +110,29 @@ export interface PaystackRefund {
   createdAt: string;
   updatedAt: string;
 }
+
+export enum MessageClassificationIntent {
+  DASHBOARD_INSIGHT = 'DASHBOARD_INSIGHT',
+  PAYSTACK_PRODUCT_FAQ = 'PAYSTACK_PRODUCT_FAQ',
+  ACCOUNT_HELP = 'ACCOUNT_HELP',
+  OUT_OF_SCOPE = 'OUT_OF_SCOPE',
+  NEEDS_CLARIFICATION = 'NEEDS_CLARIFICATION',
+}
+
+export enum ChatResponseType {
+  CHAT_RESPONSE = 'CHAT_RESPONSE',
+  REFUSAL = 'REFUSAL',
+  CLARIFICATION_REQUIRED = 'CLARIFICATION_REQUIRED',
+}
+
+export type ClassificationUIMessage = UIMessage<
+  never,
+  {
+    refusal: {
+      text: string;
+    };
+    clarification: {
+      text: string;
+    };
+  }
+>;

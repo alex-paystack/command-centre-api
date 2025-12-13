@@ -19,9 +19,9 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
-import { MessageRole } from './entities/message.entity';
 import { PaystackResponse } from '../../common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { createUIMessageStreamResponse } from 'ai';
 
 @ApiTags('chat')
 @ApiBearerAuth()
@@ -124,20 +124,9 @@ export class ChatController {
 
     const jwtToken = authHeader.split(' ')[1];
 
-    const result = await this.chatService.handleStreamingChat(dto, userId, jwtToken);
+    const { responseStream } = await this.chatService.handleStreamingChat(dto, userId, jwtToken);
 
-    const response = result.toUIMessageStreamResponse({
-      sendReasoning: true,
-      onFinish: async ({ messages }) => {
-        const formattedMessages = messages.map((message) => ({
-          conversationId: dto.conversationId,
-          role: message.role as MessageRole,
-          parts: message.parts,
-        }));
-
-        await this.chatService.saveMessages(formattedMessages, userId);
-      },
-    });
+    const response = createUIMessageStreamResponse({ stream: responseStream });
 
     res.status(response.status ?? HttpStatus.OK);
 

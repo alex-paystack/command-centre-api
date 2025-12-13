@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { convertToModelMessages, stepCountIs, streamText } from 'ai';
+import { convertToModelMessages, createUIMessageStream, stepCountIs, streamText, UIMessage } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { ConversationRepository } from './repositories/conversation.repository';
 import { MessageRepository } from './repositories/message.repository';
@@ -10,7 +10,17 @@ import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { MessageRole } from './entities/message.entity';
-import { generateConversationTitle, convertToUIMessages, createTools, CHAT_AGENT_SYSTEM_PROMPT } from '../../common/ai';
+import {
+  generateConversationTitle,
+  convertToUIMessages,
+  createTools,
+  CHAT_AGENT_SYSTEM_PROMPT,
+  classifyMessage,
+  MessageClassificationIntent,
+  policy,
+  ChatResponseType,
+  ClassificationUIMessage,
+} from '../../common/ai';
 import { PaystackApiService } from '../../common/services/paystack-api.service';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
 
@@ -124,6 +134,52 @@ export class ChatService {
     }
   }
 
+  async handleMessageClassification(message: UIMessage) {
+    const messageClassification = await classifyMessage(message);
+
+    if (messageClassification?.intent === MessageClassificationIntent.OUT_OF_SCOPE) {
+      const refusalText = policy.refusalText;
+
+      const refusalStream = createUIMessageStream<ClassificationUIMessage>({
+        execute: ({ writer }) => {
+          writer.write({
+            type: 'data-refusal',
+            data: {
+              text: refusalText,
+            },
+          });
+        },
+      });
+
+      return {
+        type: ChatResponseType.REFUSAL,
+        responseStream: refusalStream,
+      };
+    }
+
+    if (messageClassification?.intent === MessageClassificationIntent.NEEDS_CLARIFICATION) {
+      const clarificationText = messageClassification.suggestedClarification ?? 'I need more information to help you.';
+
+      const clarificationStream = createUIMessageStream<ClassificationUIMessage>({
+        execute: ({ writer }) => {
+          writer.write({
+            type: 'data-clarification',
+            data: {
+              text: clarificationText,
+            },
+          });
+        },
+      });
+
+      return {
+        type: ChatResponseType.CLARIFICATION_REQUIRED,
+        responseStream: clarificationStream,
+      };
+    }
+
+    return null;
+  }
+
   async handleStreamingChat(dto: ChatRequestDto, userId: string, jwtToken: string) {
     const { conversationId, message } = dto;
 
@@ -154,6 +210,15 @@ export class ChatService {
     const limitedHistory = allMessages.slice(-historyLimit);
     const uiMessages = [...convertToUIMessages(limitedHistory), message];
 
+    const messageClassification = await this.handleMessageClassification(message);
+
+    if (messageClassification) {
+      return {
+        type: messageClassification.type,
+        responseStream: messageClassification.responseStream,
+      };
+    }
+
     await this.messageRepository.createMessage({
       conversationId,
       role: MessageRole.USER,
@@ -164,14 +229,33 @@ export class ChatService {
 
     const tools = createTools(this.paystackApiService, getJwtToken);
 
-    const result = streamText({
-      model: openai('gpt-4o-mini'),
-      system: CHAT_AGENT_SYSTEM_PROMPT,
-      messages: convertToModelMessages(uiMessages),
-      stopWhen: stepCountIs(10),
-      tools,
+    const stream = createUIMessageStream({
+      execute: ({ writer }) => {
+        const result = streamText({
+          model: openai('gpt-4o-mini'),
+          system: CHAT_AGENT_SYSTEM_PROMPT,
+          messages: convertToModelMessages(uiMessages),
+          stopWhen: stepCountIs(10),
+          tools,
+        });
+
+        writer.merge(
+          result.toUIMessageStream({
+            sendReasoning: true,
+          }),
+        );
+      },
+      onFinish: async ({ messages }) => {
+        const formattedMessages = messages.map((message) => ({
+          conversationId: dto.conversationId,
+          role: message.role as MessageRole,
+          parts: message.parts,
+        }));
+
+        await this.saveMessages(formattedMessages, userId);
+      },
     });
 
-    return result;
+    return { type: ChatResponseType.CHAT_RESPONSE, responseStream: stream };
   }
 }

@@ -11,6 +11,14 @@ import { Conversation } from './entities/conversation.entity';
 import { Message, MessageRole } from './entities/message.entity';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
 import { PaystackApiService } from '../../common/services/paystack-api.service';
+import { MessageClassificationIntent, ChatResponseType } from '../../common/ai/types';
+
+// Mock the classifyMessage function
+// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+jest.mock('../../common/ai/actions', () => ({
+  ...jest.requireActual('../../common/ai/actions'),
+  classifyMessage: jest.fn(),
+}));
 
 describe('ChatService', () => {
   let service: ChatService;
@@ -356,6 +364,167 @@ describe('ChatService', () => {
       await expect(service.getMessagesByConversationId(mockConversation.id, 'other-user')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('checkUserEntitlement', () => {
+    it('should not throw when user is under message limit', async () => {
+      jest.spyOn(messageRepository, 'countUserMessagesInPeriod').mockResolvedValue(50);
+      configService.get.mockImplementation((key: string, defaultValue?: unknown) => {
+        if (key === 'MESSAGE_LIMIT') {
+          return 100;
+        }
+        if (key === 'RATE_LIMIT_PERIOD_HOURS') {
+          return 24;
+        }
+        return defaultValue;
+      });
+
+      await expect(service.checkUserEntitlement('user_123')).resolves.toBeUndefined();
+      expect(messageRepository.countUserMessagesInPeriod).toHaveBeenCalledWith('user_123', 24);
+    });
+
+    it('should throw RateLimitExceededException when user exceeds message limit', async () => {
+      jest.spyOn(messageRepository, 'countUserMessagesInPeriod').mockResolvedValue(150);
+      configService.get.mockImplementation((key: string, defaultValue?: unknown) => {
+        if (key === 'MESSAGE_LIMIT') {
+          return 100;
+        }
+        if (key === 'RATE_LIMIT_PERIOD_HOURS') {
+          return 24;
+        }
+        return defaultValue;
+      });
+
+      await expect(service.checkUserEntitlement('user_123')).rejects.toThrow(RateLimitExceededException);
+    });
+
+    it('should throw RateLimitExceededException when user is exactly at the limit', async () => {
+      jest.spyOn(messageRepository, 'countUserMessagesInPeriod').mockResolvedValue(100);
+      configService.get.mockImplementation((key: string, defaultValue?: unknown) => {
+        if (key === 'MESSAGE_LIMIT') {
+          return 100;
+        }
+        if (key === 'RATE_LIMIT_PERIOD_HOURS') {
+          return 24;
+        }
+        return defaultValue;
+      });
+
+      await expect(service.checkUserEntitlement('user_123')).rejects.toThrow(RateLimitExceededException);
+    });
+
+    it('should use default values when config values are not set', async () => {
+      jest.spyOn(messageRepository, 'countUserMessagesInPeriod').mockResolvedValue(50);
+      configService.get.mockImplementation((key: string, defaultValue?: unknown) => defaultValue);
+
+      await expect(service.checkUserEntitlement('user_123')).resolves.toBeUndefined();
+      expect(messageRepository.countUserMessagesInPeriod).toHaveBeenCalledWith('user_123', 24);
+    });
+  });
+
+  describe('handleMessageClassification', () => {
+    const mockUIMessage = {
+      id: 'msg_123',
+      role: 'user' as const,
+      parts: [{ type: 'text' as const, text: 'Can you help me with my taxes?' }],
+    };
+
+    let classifyMessage: jest.Mock;
+
+    beforeEach(async () => {
+      // Get the mocked classifyMessage function
+      const aiActions = await import('../../common/ai/actions');
+      classifyMessage = aiActions.classifyMessage as jest.Mock;
+      jest.clearAllMocks();
+    });
+
+    it('should return refusal response when message is OUT_OF_SCOPE', async () => {
+      classifyMessage.mockResolvedValue({
+        intent: MessageClassificationIntent.OUT_OF_SCOPE,
+        confidence: 0.95,
+        needsMerchantData: false,
+        suggestedClarification: null,
+      });
+
+      const result = await service.handleMessageClassification(mockUIMessage);
+
+      expect(classifyMessage).toHaveBeenCalledWith(mockUIMessage);
+      expect(result).toBeDefined();
+      expect(result?.type).toBe(ChatResponseType.REFUSAL);
+      expect(result?.responseStream).toBeDefined();
+    });
+
+    it('should return clarification response when message NEEDS_CLARIFICATION with suggestion', async () => {
+      const suggestedClarification = 'Could you please specify which transaction you are referring to?';
+
+      classifyMessage.mockResolvedValue({
+        intent: MessageClassificationIntent.NEEDS_CLARIFICATION,
+        confidence: 0.85,
+        needsMerchantData: false,
+        suggestedClarification,
+      });
+
+      const result = await service.handleMessageClassification(mockUIMessage);
+
+      expect(classifyMessage).toHaveBeenCalledWith(mockUIMessage);
+      expect(result).toBeDefined();
+      expect(result?.type).toBe(ChatResponseType.CLARIFICATION_REQUIRED);
+      expect(result?.responseStream).toBeDefined();
+    });
+
+    it('should use default clarification text when suggestedClarification is not provided', async () => {
+      classifyMessage.mockResolvedValue({
+        intent: MessageClassificationIntent.NEEDS_CLARIFICATION,
+        confidence: 0.75,
+        needsMerchantData: false,
+      });
+
+      const result = await service.handleMessageClassification(mockUIMessage);
+
+      expect(classifyMessage).toHaveBeenCalledWith(mockUIMessage);
+      expect(result).toBeDefined();
+      expect(result?.type).toBe(ChatResponseType.CLARIFICATION_REQUIRED);
+      expect(result?.responseStream).toBeDefined();
+    });
+
+    it('should return null when message classification is DASHBOARD_INSIGHT', async () => {
+      classifyMessage.mockResolvedValue({
+        intent: MessageClassificationIntent.DASHBOARD_INSIGHT,
+        confidence: 0.9,
+        needsMerchantData: true,
+      });
+
+      const result = await service.handleMessageClassification(mockUIMessage);
+
+      expect(classifyMessage).toHaveBeenCalledWith(mockUIMessage);
+      expect(result).toBeNull();
+    });
+
+    it('should return null when message classification is PAYSTACK_PRODUCT_FAQ', async () => {
+      classifyMessage.mockResolvedValue({
+        intent: MessageClassificationIntent.PAYSTACK_PRODUCT_FAQ,
+        confidence: 0.88,
+        needsMerchantData: false,
+      });
+
+      const result = await service.handleMessageClassification(mockUIMessage);
+
+      expect(classifyMessage).toHaveBeenCalledWith(mockUIMessage);
+      expect(result).toBeNull();
+    });
+
+    it('should return null when message classification is ACCOUNT_HELP', async () => {
+      classifyMessage.mockResolvedValue({
+        intent: MessageClassificationIntent.ACCOUNT_HELP,
+        confidence: 0.92,
+        needsMerchantData: true,
+      });
+
+      const result = await service.handleMessageClassification(mockUIMessage);
+
+      expect(classifyMessage).toHaveBeenCalledWith(mockUIMessage);
+      expect(result).toBeNull();
     });
   });
 

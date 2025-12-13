@@ -76,7 +76,7 @@ export class PaystackApiService {
           headers: {
             Authorization: `Bearer ${jwtToken}`,
             'Content-Type': 'application/json',
-            'jwt-auth': true,
+            'jwt-auth': 'true',
           },
         }),
       );
