@@ -7,5 +7,5 @@ export const policy = {
     MessageClassificationIntent.ACCOUNT_HELP,
   ]),
   refusalText:
-    'I can only help with questions about your Paystack merchant dashboard (transactions, revenue, customers, disputes, payouts) and Paystack product usage. Ask me something like “What’s my revenue today?”',
+    'I can only help with questions about your Paystack merchant dashboard (transactions, refunds, customers, disputes, payouts) and Paystack product usage. Ask me something like “What’s my revenue today?”',
 };

@@ -221,11 +221,15 @@ export class ChatService {
 
     const tools = createTools(this.paystackApiService, getJwtToken);
 
+    // Inject current date into system prompt
+    const currentDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    const systemPrompt = CHAT_AGENT_SYSTEM_PROMPT.replace(/\{\{CURRENT_DATE\}\}/g, currentDate);
+
     const stream = createUIMessageStream({
       execute: ({ writer }) => {
         const result = streamText({
           model: openai('gpt-4o-mini'),
-          system: CHAT_AGENT_SYSTEM_PROMPT,
+          system: systemPrompt,
           messages: convertToModelMessages(uiMessages),
           stopWhen: stepCountIs(10),
           tools,

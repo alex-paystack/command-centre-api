@@ -13,7 +13,6 @@ import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exc
 import { PaystackApiService } from '../../common/services/paystack-api.service';
 import { MessageClassificationIntent, ChatResponseType } from '../../common/ai/types';
 
-// Mock the classifyMessage function
 // eslint-disable-next-line @typescript-eslint/no-unsafe-return
 jest.mock('../../common/ai/actions', () => ({
   ...jest.requireActual('../../common/ai/actions'),
