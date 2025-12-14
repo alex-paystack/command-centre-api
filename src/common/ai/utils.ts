@@ -1,4 +1,5 @@
 import { type UIMessage } from 'ai';
+import { differenceInCalendarDays, isAfter, isValid, parseISO } from 'date-fns';
 import { MessageResponseDto } from 'src/modules/chat/dto/message-response.dto';
 
 export function getTextFromMessage(message: UIMessage) {
@@ -37,39 +38,39 @@ export function validateDateRange(
 ): { isValid: boolean; error?: string; daysDifference?: number } {
   const MAX_DAYS = 30;
   const today = new Date();
-  const DAY_IN_MS = 1000 * 60 * 60 * 24;
 
   if (!from && !to) {
     return { isValid: true };
   }
 
-  const fromDate = from ? new Date(from) : null;
-  const toDate = to ? new Date(to) : null;
+  const fromDate = from ? parseISO(from) : null;
+  const toDate = to ? parseISO(to) : null;
 
-  if (fromDate && isNaN(fromDate.getTime())) {
+  // Validate date formats
+  if (fromDate && !isValid(fromDate)) {
     return {
       isValid: false,
       error: `Invalid 'from' date format: ${from}. Please use ISO 8601 format (e.g., 2024-01-01)`,
     };
   }
 
-  if (toDate && isNaN(toDate.getTime())) {
+  if (toDate && !isValid(toDate)) {
     return {
       isValid: false,
       error: `Invalid 'to' date format: ${to}. Please use ISO 8601 format (e.g., 2024-01-01)`,
     };
   }
 
+  // Both dates provided
   if (fromDate && toDate) {
-    if (fromDate > toDate) {
+    if (isAfter(fromDate, toDate)) {
       return {
         isValid: false,
         error: "The 'from' date cannot be after the 'to' date",
       };
     }
 
-    const diffInMs = toDate.getTime() - fromDate.getTime();
-    const diffInDays = Math.ceil(diffInMs / DAY_IN_MS);
+    const diffInDays = Math.abs(differenceInCalendarDays(toDate, fromDate));
 
     if (diffInDays > MAX_DAYS) {
       return {
@@ -82,9 +83,9 @@ export function validateDateRange(
     return { isValid: true, daysDifference: diffInDays };
   }
 
+  // Only 'from' date provided (defaults to today as end)
   if (fromDate && !toDate) {
-    const diffInMs = Math.abs(today.getTime() - fromDate.getTime());
-    const diffInDays = Math.ceil(diffInMs / DAY_IN_MS);
+    const diffInDays = Math.abs(differenceInCalendarDays(today, fromDate));
 
     if (diffInDays > MAX_DAYS) {
       return {
@@ -97,9 +98,9 @@ export function validateDateRange(
     return { isValid: true, daysDifference: diffInDays };
   }
 
+  // Only 'to' date provided (defaults to today as start)
   if (!fromDate && toDate) {
-    const diffInMs = Math.abs(toDate.getTime() - today.getTime());
-    const diffInDays = Math.ceil(diffInMs / DAY_IN_MS);
+    const diffInDays = Math.abs(differenceInCalendarDays(toDate, today));
 
     if (diffInDays > MAX_DAYS) {
       return {
@@ -117,4 +118,8 @@ export function validateDateRange(
 
 export function amountInBaseUnitToSubUnit(amount: number) {
   return amount * 100;
+}
+
+export function amountInSubUnitToBaseUnit(amount: number) {
+  return amount / 100;
 }

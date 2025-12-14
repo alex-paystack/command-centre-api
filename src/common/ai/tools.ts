@@ -10,6 +10,14 @@ import type {
 } from './types/index';
 import { DisputeStatusSlug, PaymentChannel, PayoutStatus, RefundStatus, TransactionStatus } from './types/data';
 import { amountInBaseUnitToSubUnit, validateDateRange } from './utils';
+import {
+  aggregateTransactions,
+  calculateSummary,
+  generateChartLabel,
+  getChartType,
+  AggregationType,
+} from './aggregation';
+import { parseISO, format } from 'date-fns';
 
 /**
  * Create the getTransactions tool
@@ -363,6 +371,151 @@ export function createGetDisputesTool(paystackService: PaystackApiService, getJw
 }
 
 /**
+ * Create the generateChartData tool
+ */
+export function createGenerateChartDataTool(
+  paystackService: PaystackApiService,
+  getJwtToken: () => string | undefined,
+) {
+  return tool({
+    description:
+      'Generate chart data for transaction analytics. Use this to create visualizations of transaction trends, patterns, and distributions. Supports aggregation by day, hour, week, month, or status. Returns Recharts-compatible data with count, volume, and average metrics.',
+    inputSchema: z.object({
+      aggregationType: z
+        .enum([
+          AggregationType.BY_DAY,
+          AggregationType.BY_HOUR,
+          AggregationType.BY_WEEK,
+          AggregationType.BY_MONTH,
+          AggregationType.BY_STATUS,
+        ])
+        .describe('Type of aggregation: by-day, by-hour, by-week, by-month, or by-status'),
+      from: z.string().optional().describe('Start date for filtering transactions (ISO 8601 format, e.g., 2024-01-01)'),
+      to: z.string().optional().describe('End date for filtering transactions (ISO 8601 format, e.g., 2024-12-31)'),
+      status: z
+        .enum([TransactionStatus.SUCCESS, TransactionStatus.FAILED, TransactionStatus.ABANDONED])
+        .optional()
+        .describe('Filter by transaction status: success, failed, or abandoned'),
+      currency: z.string().optional().describe('Filter by currency (e.g., NGN, USD, GHS)'),
+    }),
+    execute: async function* ({ aggregationType, from, to, status, currency }) {
+      const jwtToken = getJwtToken();
+
+      if (!jwtToken) {
+        return {
+          error: 'Authentication token not available. Please ensure you are logged in.',
+        };
+      }
+
+      // Validate date range does not exceed 30 days
+      const dateValidation = validateDateRange(from, to);
+
+      if (!dateValidation.isValid) {
+        return {
+          error: dateValidation.error,
+        };
+      }
+
+      try {
+        const dateRange = { from, to };
+        const chartType = getChartType(aggregationType);
+
+        yield {
+          loading: true,
+          label: generateChartLabel(aggregationType, dateRange),
+          chartType,
+          message: 'Fetching transactions...',
+        };
+
+        // Fetch transactions with increased perPage for better aggregation (up to 500)
+        const allTransactions: PaystackTransaction[] = [];
+        const perPage = 100; // Max per request
+        const maxPages = 5; // Fetch up to 500 transactions total
+
+        for (let page = 1; page <= maxPages; page++) {
+          const params: Record<string, unknown> = {
+            perPage,
+            page,
+            reduced_fields: true,
+            use_cursor: false,
+            ...(status && { status }),
+            ...(from && { from }),
+            ...(to && { to }),
+            ...(currency && { currency }),
+          };
+
+          const response = await paystackService.get<PaystackTransaction[]>('/transaction', jwtToken, params);
+
+          allTransactions.push(...response.data);
+
+          if (page < maxPages && response.data.length === perPage) {
+            yield {
+              loading: true,
+              label: generateChartLabel(aggregationType, dateRange),
+              chartType,
+              message: `Fetching transactions... (${allTransactions.length} loaded)`,
+            };
+          }
+
+          // Stop if we've received fewer than perPage (no more data)
+          if (response.data.length < perPage) {
+            break;
+          }
+        }
+
+        if (allTransactions.length === 0) {
+          yield {
+            success: true,
+            label: generateChartLabel(aggregationType, dateRange),
+            chartType,
+            chartData: [],
+            summary: {
+              totalCount: 0,
+              totalVolume: 0,
+              overallAverage: 0,
+              ...(from || to
+                ? {
+                    dateRange: {
+                      from: from ? format(parseISO(from), 'MMM d, yyyy') : 'N/A',
+                      to: to ? format(parseISO(to), 'MMM d, yyyy') : 'N/A',
+                    },
+                  }
+                : {}),
+            },
+            message: 'No transactions found for the specified criteria',
+          };
+          return;
+        }
+
+        yield {
+          loading: true,
+          label: generateChartLabel(aggregationType, dateRange),
+          chartType,
+          message: `Processing ${allTransactions.length} transactions...`,
+        };
+
+        const chartData = aggregateTransactions(allTransactions, aggregationType);
+
+        const summary = calculateSummary(allTransactions, dateRange);
+
+        yield {
+          success: true,
+          label: generateChartLabel(aggregationType, dateRange),
+          chartType,
+          chartData,
+          summary,
+          message: `Generated chart data with ${chartData.length} data points from ${allTransactions.length} transactions`,
+        };
+      } catch (error: unknown) {
+        return {
+          error: error instanceof Error ? error.message : 'Failed to generate chart data',
+        };
+      }
+    },
+  });
+}
+
+/**
  * Create AI tools with access to PaystackApiService
  * @param paystackService - The Paystack API service instance
  * @param getJwtToken - Function to retrieve the user's JWT authentication token
@@ -377,5 +530,6 @@ export function createTools(
     getRefunds: createGetRefundsTool(paystackService, getJwtToken),
     getPayouts: createGetPayoutsTool(paystackService, getJwtToken),
     getDisputes: createGetDisputesTool(paystackService, getJwtToken),
+    generateChartData: createGenerateChartDataTool(paystackService, getJwtToken),
   };
 }

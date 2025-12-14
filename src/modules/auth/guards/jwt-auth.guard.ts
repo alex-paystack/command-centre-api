@@ -12,7 +12,7 @@ interface RequestWithUser extends Request {
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  private readonly excludedPaths = ['/health', '/dummy'];
+  private readonly excludedPaths = ['/health'];
 
   constructor(private readonly authService: AuthService) {}
 
