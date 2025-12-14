@@ -1,15 +1,28 @@
-import { Controller, Get, Post, Delete, Body, Param, HttpCode, HttpStatus, Res, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Body,
+  Param,
+  HttpCode,
+  HttpStatus,
+  Res,
+  Req,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { Request, Response } from 'express';
+import { Readable } from 'stream';
 import { ChatService } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
-import { MessageRole } from './entities/message.entity';
 import { PaystackResponse } from '../../common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { createUIMessageStreamResponse } from 'ai';
 
 @ApiTags('chat')
 @ApiBearerAuth()
@@ -105,20 +118,16 @@ export class ChatController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    const result = await this.chatService.handleStreamingChat(dto, userId);
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new UnauthorizedException('Authorization header missing or malformed');
+    }
 
-    const response = result.toUIMessageStreamResponse({
-      sendReasoning: true,
-      onFinish: async ({ messages }) => {
-        const formattedMessages = messages.map((message) => ({
-          conversationId: dto.conversationId,
-          role: message.role as MessageRole,
-          parts: message.parts,
-        }));
+    const jwtToken = authHeader.split(' ')[1];
 
-        await this.chatService.saveMessages(formattedMessages, userId);
-      },
-    });
+    const { responseStream } = await this.chatService.handleStreamingChat(dto, userId, jwtToken);
+
+    const response = createUIMessageStreamResponse({ stream: responseStream });
 
     res.status(response.status ?? HttpStatus.OK);
 
@@ -131,29 +140,13 @@ export class ChatController {
       return res.end();
     }
 
-    const reader = body.getReader();
-    let aborted = false;
+    // Convert Web ReadableStream to Node.js Readable stream
+    const nodeStream = Readable.fromWeb(body as Parameters<typeof Readable.fromWeb>[0]);
 
     req.on('close', () => {
-      aborted = true;
-      reader.cancel().catch(() => undefined);
+      nodeStream.destroy();
     });
 
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done || aborted) {
-          break;
-        }
-        res.write(value);
-      }
-      if (!res.writableEnded) {
-        res.end();
-      }
-    } catch {
-      if (!res.writableEnded) {
-        res.status(500).end();
-      }
-    }
+    nodeStream.pipe(res);
   }
 }

@@ -10,6 +10,14 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { Conversation } from './entities/conversation.entity';
 import { Message, MessageRole } from './entities/message.entity';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
+import { PaystackApiService } from '../../common/services/paystack-api.service';
+import { MessageClassificationIntent, ChatResponseType } from '../../common/ai/types';
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+jest.mock('../../common/ai/actions', () => ({
+  ...jest.requireActual('../../common/ai/actions'),
+  classifyMessage: jest.fn(),
+}));
 
 describe('ChatService', () => {
   let service: ChatService;
@@ -63,6 +71,13 @@ describe('ChatService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ChatService,
+        {
+          provide: PaystackApiService,
+          useValue: {
+            get: jest.fn(),
+            post: jest.fn(),
+          },
+        },
         {
           provide: ConversationRepository,
           useValue: mockConversationRepository,
@@ -351,6 +366,148 @@ describe('ChatService', () => {
     });
   });
 
+  describe('checkUserEntitlement', () => {
+    it('should not throw when user is under message limit', async () => {
+      jest.spyOn(messageRepository, 'countUserMessagesInPeriod').mockResolvedValue(50);
+      configService.get.mockImplementation((key: string, defaultValue?: unknown) => {
+        if (key === 'MESSAGE_LIMIT') {
+          return 100;
+        }
+        if (key === 'RATE_LIMIT_PERIOD_HOURS') {
+          return 24;
+        }
+        return defaultValue;
+      });
+
+      await expect(service.checkUserEntitlement('user_123')).resolves.toBeUndefined();
+      expect(messageRepository.countUserMessagesInPeriod).toHaveBeenCalledWith('user_123', 24);
+    });
+
+    it('should throw RateLimitExceededException when user exceeds message limit', async () => {
+      jest.spyOn(messageRepository, 'countUserMessagesInPeriod').mockResolvedValue(150);
+      configService.get.mockImplementation((key: string, defaultValue?: unknown) => {
+        if (key === 'MESSAGE_LIMIT') {
+          return 100;
+        }
+        if (key === 'RATE_LIMIT_PERIOD_HOURS') {
+          return 24;
+        }
+        return defaultValue;
+      });
+
+      await expect(service.checkUserEntitlement('user_123')).rejects.toThrow(RateLimitExceededException);
+    });
+
+    it('should throw RateLimitExceededException when user is exactly at the limit', async () => {
+      jest.spyOn(messageRepository, 'countUserMessagesInPeriod').mockResolvedValue(100);
+      configService.get.mockImplementation((key: string, defaultValue?: unknown) => {
+        if (key === 'MESSAGE_LIMIT') {
+          return 100;
+        }
+        if (key === 'RATE_LIMIT_PERIOD_HOURS') {
+          return 24;
+        }
+        return defaultValue;
+      });
+
+      await expect(service.checkUserEntitlement('user_123')).rejects.toThrow(RateLimitExceededException);
+    });
+
+    it('should use default values when config values are not set', async () => {
+      jest.spyOn(messageRepository, 'countUserMessagesInPeriod').mockResolvedValue(50);
+      configService.get.mockImplementation((key: string, defaultValue?: unknown) => defaultValue);
+
+      await expect(service.checkUserEntitlement('user_123')).resolves.toBeUndefined();
+      expect(messageRepository.countUserMessagesInPeriod).toHaveBeenCalledWith('user_123', 24);
+    });
+  });
+
+  describe('handleMessageClassification', () => {
+    const mockUIMessage = {
+      id: 'msg_123',
+      role: 'user' as const,
+      parts: [{ type: 'text' as const, text: 'Can you help me with my taxes?' }],
+    };
+    const mockHistory = [mockUIMessage];
+
+    let classifyMessage: jest.Mock;
+
+    beforeEach(async () => {
+      // Get the mocked classifyMessage function
+      const aiActions = await import('../../common/ai/actions');
+      classifyMessage = aiActions.classifyMessage as jest.Mock;
+      jest.clearAllMocks();
+    });
+
+    it('should return refusal response when message is OUT_OF_SCOPE', async () => {
+      classifyMessage.mockResolvedValue({
+        intent: MessageClassificationIntent.OUT_OF_SCOPE,
+        confidence: 0.95,
+        needsMerchantData: false,
+        suggestedClarification: null,
+      });
+
+      const result = await service.handleMessageClassification(mockHistory);
+
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(result).toBeDefined();
+      expect(result?.type).toBe(ChatResponseType.REFUSAL);
+      expect(result?.responseStream).toBeDefined();
+    });
+
+    it('should return null when message classification is DASHBOARD_INSIGHT', async () => {
+      classifyMessage.mockResolvedValue({
+        intent: MessageClassificationIntent.DASHBOARD_INSIGHT,
+        confidence: 0.9,
+        needsMerchantData: true,
+      });
+
+      const result = await service.handleMessageClassification(mockHistory);
+
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(result).toBeNull();
+    });
+
+    it('should return null when message classification is PAYSTACK_PRODUCT_FAQ', async () => {
+      classifyMessage.mockResolvedValue({
+        intent: MessageClassificationIntent.PAYSTACK_PRODUCT_FAQ,
+        confidence: 0.88,
+        needsMerchantData: false,
+      });
+
+      const result = await service.handleMessageClassification(mockHistory);
+
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(result).toBeNull();
+    });
+
+    it('should return null when message classification is ACCOUNT_HELP', async () => {
+      classifyMessage.mockResolvedValue({
+        intent: MessageClassificationIntent.ACCOUNT_HELP,
+        confidence: 0.92,
+        needsMerchantData: true,
+      });
+
+      const result = await service.handleMessageClassification(mockHistory);
+
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(result).toBeNull();
+    });
+
+    it('should return null when message classification is ASSISTANT_CAPABILITIES', async () => {
+      classifyMessage.mockResolvedValue({
+        intent: MessageClassificationIntent.ASSISTANT_CAPABILITIES,
+        confidence: 0.85,
+        needsMerchantData: false,
+      });
+
+      const result = await service.handleMessageClassification(mockHistory);
+
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(result).toBeNull();
+    });
+  });
+
   describe('handleStreamingChat', () => {
     it('should throw NotFoundException when conversation exists but belongs to another user', async () => {
       jest.spyOn(conversationRepository, 'findById').mockResolvedValue({ ...mockConversation, userId: 'someone-else' });
@@ -362,6 +519,7 @@ describe('ChatService', () => {
             message: { id: '123', role: MessageRole.USER, parts: [{ type: 'text', text: 'hi' }] },
           },
           mockConversation.userId,
+          'mock-jwt-token',
         ),
       ).rejects.toThrow(NotFoundException);
     });

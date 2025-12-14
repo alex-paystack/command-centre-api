@@ -2,6 +2,16 @@ import { INestApplication, ValidationPipe, ValidationError as NestValidationErro
 import { GlobalExceptionFilter, ValidationError } from './common';
 
 export function configureApp(app: INestApplication): void {
+  // Enable CORS for external services
+  app.enableCors({
+    origin: process.env.CORS_ORIGIN?.split(',') || '*', // Allow configured origins or all origins
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    exposedHeaders: ['Content-Type', 'X-Request-Id'], // Expose headers for streaming responses
+    credentials: true,
+    maxAge: 3600, // Cache preflight requests for 1 hour
+  });
+
   // Register global exception filter for standardized error responses
   app.useGlobalFilters(new GlobalExceptionFilter());
 

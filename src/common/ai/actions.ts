@@ -1,7 +1,9 @@
-import { generateText, type UIMessage } from 'ai';
+import { generateObject, generateText, type UIMessage } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { CONVERSATION_TITLE_GENERATION_PROMPT } from './prompts';
-import { getTextFromMessage } from './utils';
+import { CONVERSATION_TITLE_GENERATION_PROMPT, CLASSIFIER_SYSTEM_PROMPT, getClassifierUserPrompt } from './prompts';
+import { getTextFromMessage, getTextFromMessages } from './utils';
+import { z } from 'zod';
+import { MessageClassificationIntent } from './types';
 
 /**
  * Generate a conversation title from a message
@@ -24,5 +26,45 @@ export async function generateConversationTitle(message: UIMessage) {
     // eslint-disable-next-line no-console
     console.error('Error generating conversation title:', error);
     return 'New Conversation';
+  }
+}
+
+const ClassifierSchema = z.object({
+  intent: z.enum([
+    MessageClassificationIntent.DASHBOARD_INSIGHT,
+    MessageClassificationIntent.PAYSTACK_PRODUCT_FAQ,
+    MessageClassificationIntent.ACCOUNT_HELP,
+    MessageClassificationIntent.ASSISTANT_CAPABILITIES,
+    MessageClassificationIntent.OUT_OF_SCOPE,
+  ]),
+  confidence: z.number().min(0).max(1),
+  needsMerchantData: z.boolean(),
+});
+
+/**
+ * Classify a message into an intent
+ * This ensures that the chat response is scoped to the merchant's dashboard and Paystack product usage.
+ *
+ * Uses a fast model to ensure a quick response.
+ *
+ * @param messages - The conversation history
+ * @returns The classified intent
+ */
+export async function classifyMessage(messages: UIMessage[]) {
+  try {
+    const { object } = await generateObject({
+      model: openai('gpt-4o-mini'),
+      schema: ClassifierSchema,
+      system: CLASSIFIER_SYSTEM_PROMPT,
+      prompt: getClassifierUserPrompt(getTextFromMessages(messages)),
+    });
+
+    return object;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error classifying message:', error);
+    return {
+      intent: MessageClassificationIntent.OUT_OF_SCOPE,
+    };
   }
 }

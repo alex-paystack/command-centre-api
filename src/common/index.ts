@@ -10,3 +10,6 @@ export * from './interfaces/error.interface';
 
 // AI utilities
 export * from './ai';
+
+// Services
+export * from './services/paystack-api.service';
