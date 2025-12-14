@@ -428,6 +428,7 @@ describe('ChatService', () => {
       role: 'user' as const,
       parts: [{ type: 'text' as const, text: 'Can you help me with my taxes?' }],
     };
+    const mockHistory = [mockUIMessage];
 
     let classifyMessage: jest.Mock;
 
@@ -446,9 +447,9 @@ describe('ChatService', () => {
         suggestedClarification: null,
       });
 
-      const result = await service.handleMessageClassification(mockUIMessage);
+      const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockUIMessage);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
       expect(result).toBeDefined();
       expect(result?.type).toBe(ChatResponseType.REFUSAL);
       expect(result?.responseStream).toBeDefined();
@@ -461,9 +462,9 @@ describe('ChatService', () => {
         needsMerchantData: true,
       });
 
-      const result = await service.handleMessageClassification(mockUIMessage);
+      const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockUIMessage);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
       expect(result).toBeNull();
     });
 
@@ -474,9 +475,9 @@ describe('ChatService', () => {
         needsMerchantData: false,
       });
 
-      const result = await service.handleMessageClassification(mockUIMessage);
+      const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockUIMessage);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
       expect(result).toBeNull();
     });
 
@@ -487,9 +488,9 @@ describe('ChatService', () => {
         needsMerchantData: true,
       });
 
-      const result = await service.handleMessageClassification(mockUIMessage);
+      const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockUIMessage);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
       expect(result).toBeNull();
     });
 
@@ -500,9 +501,9 @@ describe('ChatService', () => {
         needsMerchantData: false,
       });
 
-      const result = await service.handleMessageClassification(mockUIMessage);
+      const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockUIMessage);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
       expect(result).toBeNull();
     });
   });

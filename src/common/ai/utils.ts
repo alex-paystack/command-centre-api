@@ -8,6 +8,15 @@ export function getTextFromMessage(message: UIMessage) {
     .join('');
 }
 
+export function getTextFromMessages(messages: UIMessage[]) {
+  return messages
+    .map((message) => {
+      const content = getTextFromMessage(message);
+      return `${message.role}: ${content}`.trim();
+    })
+    .join('\n');
+}
+
 export function convertToUIMessages(messages: MessageResponseDto[]): UIMessage[] {
   return messages.map((message) => ({
     id: message.id,

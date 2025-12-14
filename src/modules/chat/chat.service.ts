@@ -134,8 +134,8 @@ export class ChatService {
     }
   }
 
-  async handleMessageClassification(message: UIMessage) {
-    const messageClassification = await classifyMessage(message);
+  async handleMessageClassification(messages: UIMessage[]) {
+    const messageClassification = await classifyMessage(messages);
 
     if (messageClassification?.intent === MessageClassificationIntent.OUT_OF_SCOPE) {
       const refusalText = policy.refusalText;
@@ -191,7 +191,7 @@ export class ChatService {
     const limitedHistory = allMessages.slice(-historyLimit);
     const uiMessages = [...convertToUIMessages(limitedHistory), message];
 
-    const messageClassification = await this.handleMessageClassification(message);
+    const messageClassification = await this.handleMessageClassification(uiMessages);
 
     await this.messageRepository.createMessage({
       conversationId,

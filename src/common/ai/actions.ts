@@ -1,7 +1,7 @@
 import { generateObject, generateText, type UIMessage } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { CONVERSATION_TITLE_GENERATION_PROMPT, CLASSIFIER_SYSTEM_PROMPT, getClassifierUserPrompt } from './prompts';
-import { getTextFromMessage } from './utils';
+import { getTextFromMessage, getTextFromMessages } from './utils';
 import { z } from 'zod';
 import { MessageClassificationIntent } from './types';
 
@@ -47,16 +47,16 @@ const ClassifierSchema = z.object({
  *
  * Uses a fast model to ensure a quick response.
  *
- * @param message - The user message to classify
+ * @param messages - The conversation history
  * @returns The classified intent
  */
-export async function classifyMessage(message: UIMessage) {
+export async function classifyMessage(messages: UIMessage[]) {
   try {
     const { object } = await generateObject({
       model: openai('gpt-4o-mini'),
       schema: ClassifierSchema,
       system: CLASSIFIER_SYSTEM_PROMPT,
-      prompt: getClassifierUserPrompt(getTextFromMessage(message)),
+      prompt: getClassifierUserPrompt(getTextFromMessages(messages)),
     });
 
     return object;
