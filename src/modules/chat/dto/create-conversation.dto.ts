@@ -18,6 +18,14 @@ export class CreateConversationDto {
   @IsNotEmpty()
   title: string;
 
+  @ApiProperty({
+    description: 'Page key where the conversation is scoped (e.g. dashboard route or surface identifier)',
+    example: 'dashboard/payments',
+  })
+  @IsString()
+  @IsNotEmpty()
+  pageKey: string;
+
   @ApiPropertyOptional({
     description: 'User ID who owns the conversation (automatically set from authenticated user)',
     example: 'user_12345',

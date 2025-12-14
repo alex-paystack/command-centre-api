@@ -30,6 +30,7 @@ describe('ChatService', () => {
     id: '123e4567-e89b-12d3-a456-426614174000',
     title: 'Test Conversation',
     userId: 'user_123',
+    pageKey: 'dashboard/payments',
     createdAt: new Date('2024-01-01'),
     messages: [],
   };
@@ -50,6 +51,7 @@ describe('ChatService', () => {
       findById: jest.fn(),
       findByIdAndUserId: jest.fn(),
       findByUserId: jest.fn(),
+      findByUserIdAndPageKey: jest.fn(),
       createConversation: jest.fn(),
       deleteById: jest.fn(),
       deleteByIdForUser: jest.fn(),
@@ -108,6 +110,7 @@ describe('ChatService', () => {
         id: mockConversation.id,
         title: mockConversation.title,
         userId: mockConversation.userId,
+        pageKey: mockConversation.pageKey,
       };
 
       jest.spyOn(conversationRepository, 'createConversation').mockResolvedValue(mockConversation);
@@ -119,6 +122,7 @@ describe('ChatService', () => {
           id: dto.id,
           title: dto.title,
           userId: dto.userId,
+          pageKey: dto.pageKey,
         }),
       );
       expect(result.id).toBe(mockConversation.id);
@@ -172,6 +176,16 @@ describe('ChatService', () => {
       const result = await service.getConversationsByUserId('user_123');
 
       expect(result).toEqual([]);
+    });
+
+    it('should filter conversations by page key when provided', async () => {
+      jest.spyOn(conversationRepository, 'findByUserIdAndPageKey').mockResolvedValue([mockConversation]);
+
+      const result = await service.getConversationsByUserId('user_123', 'dashboard/payments');
+
+      expect(conversationRepository.findByUserIdAndPageKey).toHaveBeenCalledWith('user_123', 'dashboard/payments');
+      expect(result).toHaveLength(1);
+      expect(result[0].pageKey).toBe('dashboard/payments');
     });
   });
 

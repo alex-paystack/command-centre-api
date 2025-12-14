@@ -1,5 +1,5 @@
-import { IsNotEmpty, IsUUID } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsUUID, IsOptional, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { type UIMessage } from 'ai';
 
 export class ChatRequestDto {
@@ -25,4 +25,13 @@ export class ChatRequestDto {
   })
   @IsNotEmpty()
   message: UIMessage;
+
+  @ApiPropertyOptional({
+    description: 'Page key where this conversation belongs. Required when creating a new conversation via stream.',
+    example: 'dashboard/payments',
+  })
+  @IsString()
+  @IsOptional()
+  @IsNotEmpty()
+  pageKey?: string;
 }

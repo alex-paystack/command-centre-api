@@ -20,6 +20,7 @@ describe('ChatController', () => {
     id: '123e4567-e89b-12d3-a456-426614174000',
     title: 'Test Conversation',
     userId: mockUserId,
+    pageKey: 'dashboard/payments',
     createdAt: new Date('2024-01-01'),
   };
 
@@ -74,6 +75,7 @@ describe('ChatController', () => {
       const dto: CreateConversationDto = {
         id: mockConversationResponse.id,
         title: mockConversationResponse.title,
+        pageKey: mockConversationResponse.pageKey,
       };
 
       jest.spyOn(service, 'saveConversation').mockResolvedValue(mockConversationResponse);
@@ -110,12 +112,21 @@ describe('ChatController', () => {
 
       const result = await controller.getConversationsByUserId(mockUserId);
 
-      expect(service.getConversationsByUserId).toHaveBeenCalledWith(mockUserId);
+      expect(service.getConversationsByUserId).toHaveBeenCalledWith(mockUserId, undefined);
       expect(result).toEqual({
         status: true,
         message: 'Conversations retrieved successfully',
         data: [mockConversationResponse],
       });
+    });
+
+    it('should filter conversations by pageKey when provided', async () => {
+      jest.spyOn(service, 'getConversationsByUserId').mockResolvedValue([mockConversationResponse]);
+
+      const result = await controller.getConversationsByUserId(mockUserId, 'dashboard/payments');
+
+      expect(service.getConversationsByUserId).toHaveBeenCalledWith(mockUserId, 'dashboard/payments');
+      expect(result.data).toEqual([mockConversationResponse]);
     });
   });
 

@@ -5,13 +5,14 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   HttpCode,
   HttpStatus,
   Res,
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { Readable } from 'stream';
 import { ChatService } from './chat.service';
@@ -44,9 +45,14 @@ export class ChatController {
 
   @Get('conversations')
   @ApiOperation({ summary: 'Get all conversations for the authenticated user' })
+  @ApiQuery({
+    name: 'pageKey',
+    required: false,
+    description: 'When provided, conversations will be filtered to this page key',
+  })
   @ApiResponse({ status: 200, description: 'List of conversations', type: [ConversationResponseDto] })
-  async getConversationsByUserId(@CurrentUser() userId: string) {
-    const conversations = await this.chatService.getConversationsByUserId(userId);
+  async getConversationsByUserId(@CurrentUser() userId: string, @Query('pageKey') pageKey?: string) {
+    const conversations = await this.chatService.getConversationsByUserId(userId, pageKey);
     return PaystackResponse.success(conversations, 'Conversations retrieved successfully');
   }
 

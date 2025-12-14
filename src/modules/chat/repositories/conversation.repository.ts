@@ -20,6 +20,10 @@ export class ConversationRepository extends MongoRepository<Conversation> {
     return this.findBy({ userId });
   }
 
+  async findByUserIdAndPageKey(userId: string, pageKey: string) {
+    return this.findBy({ userId, pageKey });
+  }
+
   async createConversation(data: Partial<Conversation>) {
     const conversation = this.create(data);
     return this.save(conversation);
