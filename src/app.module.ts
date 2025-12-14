@@ -5,7 +5,6 @@ import { ObservabilityModule } from '@paystackhq/nestjs-observability';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthModule } from './modules/health/health.module';
-import { DummyModule } from './modules/dummy/dummy.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
@@ -26,7 +25,6 @@ import { DatabaseModule } from './database/database.module';
     DatabaseModule,
     AuthModule,
     HealthModule,
-    DummyModule,
     ChatModule,
     ObservabilityModule.forRoot(),
   ],

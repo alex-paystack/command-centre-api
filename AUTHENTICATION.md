@@ -4,7 +4,7 @@ This document describes the JWT authentication system implemented in the Command
 
 ## Overview
 
-All API endpoints (except `/health` and `/dummy`) are protected with JWT authentication. The JWT token must be sent in the `Authorization` header with the `Bearer` scheme.
+All API endpoints (except `/health`) are protected with JWT authentication. The JWT token must be sent in the `Authorization` header with the `Bearer` scheme.
 
 ## Configuration
 
@@ -91,7 +91,6 @@ All `/chat` endpoints are now protected and automatically use the authenticated 
 The following endpoints do **not** require authentication:
 
 - `/health` - Health check endpoint
-- `/dummy/*` - Test/dummy endpoints
 
 ## Error Responses
 
