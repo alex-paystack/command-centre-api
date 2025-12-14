@@ -161,6 +161,27 @@ export class ChatService {
       };
     }
 
+    if (messageClassification?.intent === MessageClassificationIntent.ASSISTANT_CAPABILITIES) {
+      const assistantCapabilitiesText = policy.assistantCapabilitiesText;
+
+      const assistantCapabilitiesStream = createUIMessageStream<ClassificationUIMessage>({
+        execute: ({ writer }) => {
+          writer.write({
+            type: 'data-capabilities',
+            data: {
+              text: assistantCapabilitiesText,
+            },
+          });
+        },
+      });
+
+      return {
+        type: ChatResponseType.ASSISTANT_CAPABILITIES,
+        responseStream: assistantCapabilitiesStream,
+        text: assistantCapabilitiesText,
+      };
+    }
+
     return null;
   }
 

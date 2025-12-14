@@ -12,6 +12,7 @@ import { Message, MessageRole } from './entities/message.entity';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
 import { PaystackApiService } from '../../common/services/paystack-api.service';
 import { MessageClassificationIntent, ChatResponseType } from '../../common/ai/types';
+import { policy } from '../../common/ai/policy';
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-return
 jest.mock('../../common/ai/actions', () => ({
@@ -508,7 +509,7 @@ describe('ChatService', () => {
       expect(result).toBeNull();
     });
 
-    it('should return null when message classification is ASSISTANT_CAPABILITIES', async () => {
+    it('should return capabilities response when message classification is ASSISTANT_CAPABILITIES', async () => {
       classifyMessage.mockResolvedValue({
         intent: MessageClassificationIntent.ASSISTANT_CAPABILITIES,
         confidence: 0.85,
@@ -518,7 +519,9 @@ describe('ChatService', () => {
       const result = await service.handleMessageClassification(mockHistory);
 
       expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
-      expect(result).toBeNull();
+      expect(result?.type).toBe(ChatResponseType.ASSISTANT_CAPABILITIES);
+      expect(result?.text).toBe(policy.assistantCapabilitiesText);
+      expect(result?.responseStream).toBeDefined();
     });
   });
 
