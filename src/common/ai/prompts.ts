@@ -99,6 +99,7 @@ Allowed:
 - Merchant dashboard analytics/insights (revenue, transactions, refunds, payouts, customers, disputes)
 - Help using Paystack dashboard & Paystack product FAQs
 - Account help related to the dashboard
+- Questions about the assistant's own capabilities (e.g., "what can you do?", "how can you help?", "what are your abilities?") — classify these as ASSISTANT_CAPABILITIES
 
 Disallowed:
 - General knowledge unrelated to Paystack/merchant dashboard (politics, presidents, celebrities, etc.)

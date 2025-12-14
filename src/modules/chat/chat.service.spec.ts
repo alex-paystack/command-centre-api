@@ -492,6 +492,19 @@ describe('ChatService', () => {
       expect(classifyMessage).toHaveBeenCalledWith(mockUIMessage);
       expect(result).toBeNull();
     });
+
+    it('should return null when message classification is ASSISTANT_CAPABILITIES', async () => {
+      classifyMessage.mockResolvedValue({
+        intent: MessageClassificationIntent.ASSISTANT_CAPABILITIES,
+        confidence: 0.85,
+        needsMerchantData: false,
+      });
+
+      const result = await service.handleMessageClassification(mockUIMessage);
+
+      expect(classifyMessage).toHaveBeenCalledWith(mockUIMessage);
+      expect(result).toBeNull();
+    });
   });
 
   describe('handleStreamingChat', () => {
