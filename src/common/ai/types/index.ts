@@ -37,6 +37,7 @@ export enum MessageClassificationIntent {
 export enum ChatResponseType {
   CHAT_RESPONSE = 'CHAT_RESPONSE',
   REFUSAL = 'REFUSAL',
+  ASSISTANT_CAPABILITIES = 'ASSISTANT_CAPABILITIES',
 }
 
 export type ClassificationUIMessage = UIMessage<
@@ -46,6 +47,9 @@ export type ClassificationUIMessage = UIMessage<
       text: string;
     };
     clarification: {
+      text: string;
+    };
+    capabilities: {
       text: string;
     };
   }
