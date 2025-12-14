@@ -430,6 +430,7 @@ export function createGenerateChartDataTool(
         // Fetch transactions with increased perPage for better aggregation (up to 500)
         const allTransactions: PaystackTransaction[] = [];
         const perPage = 100; // Max per request
+        // TDDO: Revisit this
         const maxPages = 5; // Fetch up to 500 transactions total
 
         for (let page = 1; page <= maxPages; page++) {

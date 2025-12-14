@@ -1,6 +1,6 @@
 # Command Centre API
 
-AI-powered merchant dashboard API built with NestJS, MongoDB, and OpenAI
+Paystack-aware, AI-powered merchant dashboard API built with NestJS, MongoDB, and OpenAI
 
 ## 📖 Overview
 
@@ -8,14 +8,15 @@ Command Centre API is a NestJS-based backend service that powers an AI-driven me
 
 ### Key Features
 
-- 🤖 **AI-Powered Chat**: Streaming AI responses using OpenAI GPT-4o-mini
-- 💬 **Conversation Management**: Full CRUD operations for conversations and messages
-- 🎯 **Smart Title Generation**: Automatic conversation title generation from first message
-- 🛠️ **AI Tools Integration**: Extensible tool system for AI to interact with backend services
-- 📊 **Multi-Modal Messages**: Support for text, images, and rich content via UIMessage format
-- 🔄 **Real-time Streaming**: Server-sent events for streaming AI responses
-- 🗄️ **MongoDB Storage**: Scalable conversation and message storage
-- 🛡️ **Rate Limiting**: Configurable message entitlement with sliding window rate limiting
+- 🤖 **AI-Powered Chat**: Streaming GPT-4o-mini responses with live reasoning
+- 🔒 **JWT-Protected & User-Scoped**: All `/chat` endpoints require Bearer tokens; Paystack calls reuse the user's JWT
+- 💬 **Page-Scoped Conversations**: Full CRUD with `pageKey` support so each surface keeps its own thread list
+- 🛠️ **Paystack Tooling**: Built-in tools for transactions, customers, refunds, payouts, disputes, and chart data (30-day max range)
+- 📊 **Analytics & Charts**: Multi-currency aggregation by day/hour/week/month/status; Recharts-ready output and streaming progress
+- 🧭 **Guardrails & Classification**: Conversation-history classifier enforces in-scope policy and graceful refusals
+- 🎯 **Smart Title Generation**: Automatic titles from the first message
+- 🔄 **Real-time Streaming**: Server-sent events with capped history (default last 40 messages)
+- 🛡️ **Rate Limiting**: Configurable message entitlement with sliding window enforcement
 
 ## 🚀 Quick Start
 
@@ -76,6 +77,10 @@ Command Centre API is a NestJS-based backend service that powers an AI-driven me
 
 The API will be available at `http://localhost:3000`
 
+## 🔐 Authentication
+
+All `/chat` routes are protected by JWT Bearer auth. Include `Authorization: Bearer <token>` in every request. The token must contain an `id` claim (user ID). See `AUTHENTICATION.md` for full details and testing tips.
+
 ## 🏗️ Architecture
 
 ### Project Structure
@@ -116,6 +121,7 @@ src/
 - **Language**: TypeScript v5.7
 - **Validation**: class-validator & class-transformer
 - **Documentation**: Swagger/OpenAPI
+- **Observability**: @paystackhq/nestjs-observability (metrics/logs/traces)
 
 ## 🤖 AI Features
 
@@ -146,51 +152,38 @@ Content-Type: application/json
 - Streams AI responses in real-time using UIMessageStream format
 - Includes reasoning steps in the response
 - Automatically generates conversation titles for new conversations
-- Maintains full conversation history context
+- Maintains full conversation history context (last 40 messages by default)
 - Supports AI tools for dynamic actions
+- Requires `pageKey` when starting a new conversation via stream (keeps threads scoped per page/surface)
 
-### AI Tools
+### Paystack Tools & Data Scope
 
-AI tools allow the model to interact with backend services. Current tools:
+The assistant can only operate on merchant data exposed by these tools (all requests reuse the caller's JWT):
 
-#### Get Transactions
+- `getTransactions` – filter by status, channel, customer, date (max 30-day window)
+- `getCustomers` – list/search customers with pagination
+- `getRefunds` – status/date/amount filters
+- `getPayouts` – payout lookup with status/date filters
+- `getDisputes` – dispute lookup with status/date filters
+- `generateChartData` – streams Recharts-ready data for trends and breakdowns
 
-```typescript
-{
-  name: "Get Transactions",
-  description: "Get the transactions for a given integration",
-  parameters: {
-    integrationId: string
-  }
-}
-```
+All date filters are limited to 30 days; helper validation returns clear errors when exceeded.
 
-**Adding New Tools:**
+### Charting & Aggregation
 
-1. Define your tool in `src/common/ai/tools.ts`:
+- Aggregations: by day, hour, week, month, or status
+- Outputs include count, volume, average, per-currency summaries, suggested chart type
+- Streams progress while fetching up to 500 transactions (5 pages × 100)
 
-   ```typescript
-   export const myCustomTool = tool({
-     name: 'My Custom Tool',
-     description: 'What this tool does',
-     inputSchema: z.object({
-       param: z.string().describe('Parameter description'),
-     }),
-     execute: ({ param }) => {
-       // Your implementation
-       return result;
-     },
-   });
-   ```
+### Guardrails & Classification
 
-2. Add to the tools export:
+- Classifier runs on conversation history to keep answers in-scope (dashboard insights, Paystack FAQs, account help, assistant capabilities)
+- Out-of-scope requests return a refusal message from policy
+- System prompt injects current date to handle relative time phrases accurately
 
-   ```typescript
-   export const tools: Record<string, Tool<unknown, unknown>> = {
-     getTransactionsTool,
-     myCustomTool,
-   };
-   ```
+### Extending Tools
+
+To add a new AI tool, create it in `src/common/ai/tools.ts` with `tool({ description, inputSchema, execute })`, then export it from `createTools`. Keep inputs validated with `zod` and ensure execution uses the caller's JWT for Paystack API access.
 
 ### Automatic Title Generation
 
@@ -207,6 +200,8 @@ const title = await generateConversationTitle(message);
 
 ### Chat Module
 
+All `/chat` endpoints require `Authorization: Bearer <jwt>` and use the authenticated user's ID.
+
 #### Stream AI Chat
 
 ```http
@@ -220,6 +215,7 @@ Streams AI responses for a conversation.
 ```json
 {
   "conversationId": "uuid",
+  "pageKey": "dashboard/payments",
   "message": {
     "role": "user",
     "parts": [{ "type": "text", "text": "Your message" }]
@@ -261,7 +257,7 @@ Creates a new conversation.
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
   "title": "Payment Integration Help",
-  "userId": "user_123"
+  "pageKey": "dashboard/payments"
 }
 ```
 
@@ -287,10 +283,14 @@ Retrieves a conversation by ID.
 #### Get User Conversations
 
 ```http
-GET /chat/conversations/user/:userId
+GET /chat/conversations
 ```
 
-Retrieves all conversations for a user.
+Retrieves all conversations for the authenticated user.
+
+**Query Params (optional):**
+
+- `pageKey` — when provided, only conversations for that surface are returned
 
 #### Delete Conversation
 
@@ -299,6 +299,14 @@ DELETE /chat/conversations/:id
 ```
 
 Deletes a conversation and all its messages.
+
+#### Delete All Conversations
+
+```http
+DELETE /chat/conversations
+```
+
+Deletes every conversation for the authenticated user.
 
 #### Create Message
 
@@ -314,9 +322,7 @@ Manually creates a message in a conversation.
 {
   "conversationId": "550e8400-e29b-41d4-a716-446655440000",
   "role": "user",
-  "parts": {
-    "text": "How do I integrate payments?"
-  }
+  "parts": [{ "type": "text", "text": "How do I integrate payments?" }]
 }
 ```
 
@@ -334,7 +340,7 @@ Retrieves all messages in a conversation.
 GET /health
 ```
 
-Returns application health status.
+Returns application health status. This endpoint is public (no authentication required).
 
 ## 🗄️ Database
 
@@ -518,6 +524,10 @@ DATABASE_NAME=command-centre-api
 # OpenAI Configuration
 OPENAI_API_KEY=sk-your-openai-api-key
 
+# JWT Authentication
+JWT_SECRET=your-secret-key-change-in-production
+JWT_EXPIRES_IN=24h
+
 # Service Configuration
 NODE_ENV=development
 APP_NAME=command-centre-api
@@ -528,9 +538,13 @@ OTEL_SERVICE_NAME=command-centre-api
 ### Optional Variables
 
 ```env
+# Paystack API
+PAYSTACK_API_BASE_URL=https://studio-api.paystack.co
+
 # Rate Limiting
 MESSAGE_LIMIT=100
 RATE_LIMIT_PERIOD_HOURS=24
+MESSAGE_HISTORY_LIMIT=40  # Number of past messages kept in context (default: 40)
 
 # Logging
 LOG_LEVEL=info
