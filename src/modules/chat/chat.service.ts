@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { convertToModelMessages, createUIMessageStream, stepCountIs, streamText, UIMessage } from 'ai';
 import { openai } from '@ai-sdk/openai';
@@ -83,8 +83,10 @@ export class ChatService {
     return ConversationResponseDto.fromEntity(conversation);
   }
 
-  async getConversationsByUserId(userId: string) {
-    const conversations = await this.conversationRepository.findByUserId(userId);
+  async getConversationsByUserId(userId: string, pageKey?: string) {
+    const conversations = pageKey
+      ? await this.conversationRepository.findByUserIdAndPageKey(userId, pageKey)
+      : await this.conversationRepository.findByUserId(userId);
 
     return ConversationResponseDto.fromEntities(conversations);
   }
@@ -94,6 +96,7 @@ export class ChatService {
       id: dto.id,
       title: dto.title,
       userId: dto.userId,
+      pageKey: dto.pageKey,
     });
 
     return ConversationResponseDto.fromEntity(conversation);
@@ -162,13 +165,17 @@ export class ChatService {
   }
 
   async handleStreamingChat(dto: ChatRequestDto, userId: string, jwtToken: string) {
-    const { conversationId, message } = dto;
+    const { conversationId, message, pageKey } = dto;
 
     await this.checkUserEntitlement(userId);
 
     let conversation = await this.conversationRepository.findById(conversationId);
 
     if (!conversation) {
+      if (!pageKey) {
+        throw new BadRequestException('pageKey is required when starting a new conversation');
+      }
+
       try {
         const title = await generateConversationTitle(message);
 
@@ -176,6 +183,7 @@ export class ChatService {
           id: conversationId,
           title,
           userId,
+          pageKey,
         });
       } catch (error) {
         // eslint-disable-next-line no-console

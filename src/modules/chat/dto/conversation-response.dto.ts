@@ -26,6 +26,13 @@ export class ConversationResponseDto {
   userId: string;
 
   @ApiProperty({
+    description: 'Page key where the conversation is scoped',
+    example: 'dashboard/payments',
+  })
+  @Expose()
+  pageKey: string;
+
+  @ApiProperty({
     description: 'Timestamp when the conversation was created',
     example: '2024-01-01T12:00:00.000Z',
   })
@@ -37,6 +44,7 @@ export class ConversationResponseDto {
     dto.id = conversation.id;
     dto.title = conversation.title;
     dto.userId = conversation.userId;
+    dto.pageKey = conversation.pageKey;
     dto.createdAt = conversation.createdAt;
     return dto;
   }

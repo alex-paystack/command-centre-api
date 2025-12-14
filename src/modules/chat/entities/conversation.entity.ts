@@ -18,6 +18,10 @@ export class Conversation {
   @Index()
   userId: string;
 
+  @Column()
+  @Index()
+  pageKey: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
