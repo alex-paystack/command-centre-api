@@ -17,6 +17,7 @@ import {
   getChartType,
   AggregationType,
 } from './aggregation';
+import { parseISO, format } from 'date-fns';
 
 /**
  * Create the getTransactions tool
@@ -472,7 +473,14 @@ export function createGenerateChartDataTool(
               totalCount: 0,
               totalVolume: 0,
               overallAverage: 0,
-              ...(from || to ? { dateRange: { from: from || 'N/A', to: to || 'N/A' } } : {}),
+              ...(from || to
+                ? {
+                    dateRange: {
+                      from: from ? format(parseISO(from), 'MMM d, yyyy') : 'N/A',
+                      to: to ? format(parseISO(to), 'MMM d, yyyy') : 'N/A',
+                    },
+                  }
+                : {}),
             },
             message: 'No transactions found for the specified criteria',
           };

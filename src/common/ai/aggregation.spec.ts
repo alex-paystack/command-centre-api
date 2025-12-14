@@ -112,6 +112,7 @@ describe('Aggregation Functions', () => {
         count: 1,
         volume: 1000,
         average: 1000,
+        currency: 'NGN',
       });
     });
 
@@ -129,6 +130,7 @@ describe('Aggregation Functions', () => {
         count: 3,
         volume: 4500,
         average: 1500,
+        currency: 'NGN',
       });
     });
 
@@ -146,18 +148,21 @@ describe('Aggregation Functions', () => {
         count: 1,
         volume: 1000,
         average: 1000,
+        currency: 'NGN',
       });
       expect(result[1]).toEqual({
         name: 'Wednesday, Dec 11',
         count: 1,
         volume: 2000,
         average: 2000,
+        currency: 'NGN',
       });
       expect(result[2]).toEqual({
         name: 'Thursday, Dec 12',
         count: 1,
         volume: 3000,
         average: 3000,
+        currency: 'NGN',
       });
     });
 
@@ -172,6 +177,15 @@ describe('Aggregation Functions', () => {
       expect(result[0].name).toBe('Tuesday, Dec 10');
       expect(result[1].name).toBe('Wednesday, Dec 11');
       expect(result[2].name).toBe('Thursday, Dec 12');
+    });
+
+    it('should bucket days using UTC to avoid local timezone shifts', () => {
+      // 23:30 UTC on Dec 10 should remain Dec 10 regardless of local timezone
+      const transactions = [createMockTransaction(1000, '2024-12-10T23:30:00Z')];
+      const result = aggregateByDay(transactions);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Tuesday, Dec 10');
     });
   });
 
@@ -191,6 +205,7 @@ describe('Aggregation Functions', () => {
         count: 1,
         volume: 1000,
         average: 1000,
+        currency: 'NGN',
       });
     });
 
@@ -208,6 +223,7 @@ describe('Aggregation Functions', () => {
         count: 3,
         volume: 4500,
         average: 1500,
+        currency: 'NGN',
       });
     });
 
@@ -225,18 +241,21 @@ describe('Aggregation Functions', () => {
         count: 1,
         volume: 1000,
         average: 1000,
+        currency: 'NGN',
       });
       expect(result[1]).toEqual({
         name: '14:00',
         count: 1,
         volume: 2000,
         average: 2000,
+        currency: 'NGN',
       });
       expect(result[2]).toEqual({
         name: '20:00',
         count: 1,
         volume: 3000,
         average: 3000,
+        currency: 'NGN',
       });
     });
 
@@ -269,6 +288,7 @@ describe('Aggregation Functions', () => {
       expect(result[0].count).toBe(1);
       expect(result[0].volume).toBe(1000);
       expect(result[0].average).toBe(1000);
+      expect(result[0].currency).toBe('NGN');
     });
 
     it('should aggregate multiple transactions in the same week', () => {
@@ -283,6 +303,7 @@ describe('Aggregation Functions', () => {
       expect(result[0].count).toBe(3);
       expect(result[0].volume).toBe(4500);
       expect(result[0].average).toBe(1500);
+      expect(result[0].currency).toBe('NGN');
     });
 
     it('should aggregate transactions across multiple weeks', () => {
@@ -311,6 +332,18 @@ describe('Aggregation Functions', () => {
       expect(result[0].name < result[1].name).toBe(true);
       expect(result[1].name < result[2].name).toBe(true);
     });
+
+    it('should use ISO week-year for year boundaries', () => {
+      const transactions = [
+        // Dec 31, 2024 is ISO week 01 of 2025
+        createMockTransaction(1000, '2024-12-31T12:00:00Z'),
+      ];
+
+      const result = aggregateByWeek(transactions);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('2025-W01');
+    });
   });
 
   describe('aggregateByMonth', () => {
@@ -329,6 +362,7 @@ describe('Aggregation Functions', () => {
         count: 1,
         volume: 1000,
         average: 1000,
+        currency: 'NGN',
       });
     });
 
@@ -346,6 +380,7 @@ describe('Aggregation Functions', () => {
         count: 3,
         volume: 4500,
         average: 1500,
+        currency: 'NGN',
       });
     });
 
@@ -363,18 +398,21 @@ describe('Aggregation Functions', () => {
         count: 1,
         volume: 1000,
         average: 1000,
+        currency: 'NGN',
       });
       expect(result[1]).toEqual({
         name: '2024-11',
         count: 1,
         volume: 2000,
         average: 2000,
+        currency: 'NGN',
       });
       expect(result[2]).toEqual({
         name: '2024-12',
         count: 1,
         volume: 3000,
         average: 3000,
+        currency: 'NGN',
       });
     });
 
@@ -408,6 +446,7 @@ describe('Aggregation Functions', () => {
         count: 1,
         volume: 1000,
         average: 1000,
+        currency: 'NGN',
       });
     });
 
@@ -425,6 +464,7 @@ describe('Aggregation Functions', () => {
         count: 3,
         volume: 4500,
         average: 1500,
+        currency: 'NGN',
       });
     });
 
@@ -447,18 +487,21 @@ describe('Aggregation Functions', () => {
         count: 1,
         volume: 1000,
         average: 1000,
+        currency: 'NGN',
       });
       expect(failedData).toEqual({
         name: 'failed',
         count: 1,
         volume: 2000,
         average: 2000,
+        currency: 'NGN',
       });
       expect(abandonedData).toEqual({
         name: 'abandoned',
         count: 1,
         volume: 3000,
         average: 3000,
+        currency: 'NGN',
       });
     });
 
@@ -519,6 +562,21 @@ describe('Aggregation Functions', () => {
         aggregateTransactions(transactions, 'unknown' as AggregationType);
       }).toThrow('Unknown aggregation type: unknown');
     });
+
+    it('should split aggregation by currency when mixed', () => {
+      const mixed = [
+        createMockTransaction(1000, '2024-12-10T10:30:00Z', TransactionStatus.SUCCESS), // NGN
+        { ...createMockTransaction(1500, '2024-12-10T12:00:00Z', TransactionStatus.SUCCESS), currency: 'USD' },
+      ];
+
+      const result = aggregateTransactions(mixed, AggregationType.BY_DAY);
+
+      const ngn = result.find((d) => d.currency === 'NGN');
+      const usd = result.find((d) => d.currency === 'USD');
+
+      expect(ngn).toMatchObject({ currency: 'NGN', volume: 1000, count: 1 });
+      expect(usd).toMatchObject({ currency: 'USD', volume: 1500, count: 1 });
+    });
   });
 
   describe('calculateSummary', () => {
@@ -528,6 +586,7 @@ describe('Aggregation Functions', () => {
         totalCount: 0,
         totalVolume: 0,
         overallAverage: 0,
+        perCurrency: [],
       });
     });
 
@@ -539,6 +598,7 @@ describe('Aggregation Functions', () => {
         totalCount: 1,
         totalVolume: 1000,
         overallAverage: 1000,
+        perCurrency: [{ currency: 'NGN', totalCount: 1, totalVolume: 1000, overallAverage: 1000 }],
       });
     });
 
@@ -554,6 +614,7 @@ describe('Aggregation Functions', () => {
         totalCount: 3,
         totalVolume: 6000,
         overallAverage: 2000,
+        perCurrency: [{ currency: 'NGN', totalCount: 3, totalVolume: 6000, overallAverage: 2000 }],
       });
     });
 
@@ -568,6 +629,7 @@ describe('Aggregation Functions', () => {
       expect(result.totalCount).toBe(3);
       expect(result.totalVolume).toBe(4500);
       expect(result.overallAverage).toBe(1500);
+      expect(result.perCurrency).toEqual([{ currency: 'NGN', totalCount: 3, totalVolume: 4500, overallAverage: 1500 }]);
     });
 
     it('should include date range in summary when provided', () => {
@@ -581,6 +643,7 @@ describe('Aggregation Functions', () => {
       expect(result.totalCount).toBe(2);
       expect(result.totalVolume).toBe(3000);
       expect(result.overallAverage).toBe(1500);
+      expect(result.perCurrency).toEqual([{ currency: 'NGN', totalCount: 2, totalVolume: 3000, overallAverage: 1500 }]);
       expect(result.dateRange).toEqual({
         from: 'Dec 1, 2024',
         to: 'Dec 31, 2024',
@@ -592,6 +655,24 @@ describe('Aggregation Functions', () => {
       const result = calculateSummary(transactions);
 
       expect(result.dateRange).toBeUndefined();
+    });
+
+    it('should split summary per currency when mixed', () => {
+      const transactions = [
+        createMockTransaction(1000, '2024-12-10T10:30:00Z'),
+        { ...createMockTransaction(2000, '2024-12-11T10:30:00Z'), currency: 'USD' },
+      ];
+
+      const result = calculateSummary(transactions);
+
+      expect(result.totalCount).toBe(2);
+      // Cross-currency volume/average default to 0 to avoid misleading sums
+      expect(result.totalVolume).toBe(0);
+      expect(result.overallAverage).toBe(0);
+      expect(result.perCurrency).toEqual([
+        { currency: 'NGN', totalCount: 1, totalVolume: 1000, overallAverage: 1000 },
+        { currency: 'USD', totalCount: 1, totalVolume: 2000, overallAverage: 2000 },
+      ]);
     });
   });
 });
