@@ -7,11 +7,13 @@ import { ConversationRepository } from './repositories/conversation.repository';
 import { MessageRepository } from './repositories/message.repository';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { ChatMode } from '../../common/ai/types';
 import { Conversation } from './entities/conversation.entity';
 import { Message, MessageRole } from './entities/message.entity';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
 import { PaystackApiService } from '../../common/services/paystack-api.service';
-import { MessageClassificationIntent, ChatResponseType } from '../../common/ai/types';
+import { PageContextService } from '../../common/services/page-context.service';
+import { MessageClassificationIntent, ChatResponseType, PageContextType } from '../../common/ai/types';
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-return
 jest.mock('../../common/ai/actions', () => ({
@@ -78,6 +80,12 @@ describe('ChatService', () => {
           useValue: {
             get: jest.fn(),
             post: jest.fn(),
+          },
+        },
+        {
+          provide: PageContextService,
+          useValue: {
+            enrichContext: jest.fn(),
           },
         },
         {
@@ -536,6 +544,78 @@ describe('ChatService', () => {
           'mock-jwt-token',
         ),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('Page-Scoped Chat', () => {
+    describe('buildPageScopedPrompt', () => {
+      it('should build prompt with transaction context', () => {
+        const enrichedContext = {
+          type: PageContextType.TRANSACTION,
+          resourceId: 'ref_123',
+          resourceData: { id: 123, reference: 'ref_123' },
+          formattedData: 'Transaction Details:\n- Reference: ref_123\n- Amount: NGN 1000.00',
+        };
+
+        const prompt = service['buildPageScopedPrompt'](enrichedContext);
+
+        expect(prompt).toContain('Transaction');
+        expect(prompt).toContain('Transaction Details');
+        expect(prompt).toContain('ref_123');
+      });
+
+      it('should build prompt with customer context', () => {
+        const enrichedContext = {
+          type: PageContextType.CUSTOMER,
+          resourceId: 'CUS_123',
+          resourceData: { customer_code: 'CUS_123', email: 'test@example.com' },
+          formattedData: 'Customer Details:\n- Customer Code: CUS_123\n- Email: test@example.com',
+        };
+
+        const prompt = service['buildPageScopedPrompt'](enrichedContext);
+
+        expect(prompt).toContain('Customer');
+        expect(prompt).toContain('Customer Details');
+        expect(prompt).toContain('CUS_123');
+      });
+
+      it('should include current date in prompt', () => {
+        const enrichedContext = {
+          type: PageContextType.TRANSACTION,
+          resourceId: 'ref_123',
+          resourceData: {},
+          formattedData: 'Transaction Details',
+        };
+
+        const prompt = service['buildPageScopedPrompt'](enrichedContext);
+        const currentDate = new Date().toISOString().split('T')[0];
+
+        expect(prompt).toContain(currentDate);
+      });
+    });
+
+    describe('handleStreamingChat with ChatMode', () => {
+      beforeEach(() => {
+        jest.spyOn(conversationRepository, 'findById').mockResolvedValue(mockConversation);
+        jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(mockConversation);
+        jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue([]);
+        jest.spyOn(messageRepository, 'createMessage').mockResolvedValue(mockMessage);
+        jest.spyOn(messageRepository, 'countUserMessagesInPeriod').mockResolvedValue(0);
+      });
+
+      it('should throw BadRequestException when mode is PAGE but pageContext is missing', async () => {
+        await expect(
+          service.handleStreamingChat(
+            {
+              conversationId: mockConversation.id,
+              message: { id: '123', role: MessageRole.USER, parts: [{ type: 'text', text: 'hi' }] },
+              mode: ChatMode.PAGE,
+            },
+            mockConversation.userId,
+            'mock-jwt-token',
+          ),
+        ).rejects.toThrow('pageContext is required when mode is "page"');
+      });
     });
   });
 });

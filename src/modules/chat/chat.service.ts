@@ -9,19 +9,24 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
+import { ChatMode } from '../../common/ai/types';
 import { MessageRole } from './entities/message.entity';
 import {
   generateConversationTitle,
   convertToUIMessages,
   createTools,
+  createPageScopedTools,
   CHAT_AGENT_SYSTEM_PROMPT,
+  PAGE_SCOPED_SYSTEM_PROMPT,
   classifyMessage,
   MessageClassificationIntent,
   policy,
   ChatResponseType,
   ClassificationUIMessage,
+  EnrichedPageContext,
 } from '../../common/ai';
 import { PaystackApiService } from '../../common/services/paystack-api.service';
+import { PageContextService } from '../../common/services/page-context.service';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
 
 @Injectable()
@@ -31,6 +36,7 @@ export class ChatService {
     private readonly messageRepository: MessageRepository,
     private readonly configService: ConfigService,
     private readonly paystackApiService: PaystackApiService,
+    private readonly pageContextService: PageContextService,
   ) {}
 
   async getMessagesByConversationId(conversationId: string, userId: string) {
@@ -228,11 +234,23 @@ export class ChatService {
 
     const getJwtToken = () => jwtToken;
 
-    const tools = createTools(this.paystackApiService, getJwtToken);
+    const chatMode = dto.mode || ChatMode.GLOBAL;
+    let systemPrompt: string;
+    let tools: ReturnType<typeof createTools>;
 
-    // Inject current date into system prompt
-    const currentDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
-    const systemPrompt = CHAT_AGENT_SYSTEM_PROMPT.replace(/\{\{CURRENT_DATE\}\}/g, currentDate);
+    if (chatMode === ChatMode.PAGE) {
+      if (!dto.pageContext) {
+        throw new BadRequestException('pageContext is required when mode is "page"');
+      }
+
+      const enrichedContext = await this.pageContextService.enrichContext(dto.pageContext, jwtToken);
+      systemPrompt = this.buildPageScopedPrompt(enrichedContext);
+      tools = createPageScopedTools(this.paystackApiService, getJwtToken, dto.pageContext.type);
+    } else {
+      const currentDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+      systemPrompt = CHAT_AGENT_SYSTEM_PROMPT.replace(/\{\{CURRENT_DATE\}\}/g, currentDate);
+      tools = createTools(this.paystackApiService, getJwtToken);
+    }
 
     const stream = createUIMessageStream({
       execute: ({ writer }) => {
@@ -262,5 +280,14 @@ export class ChatService {
     });
 
     return { type: ChatResponseType.CHAT_RESPONSE, responseStream: stream };
+  }
+
+  private buildPageScopedPrompt(enrichedContext: EnrichedPageContext) {
+    const currentDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    const resourceType = enrichedContext.type.charAt(0).toUpperCase() + enrichedContext.type.slice(1);
+
+    return PAGE_SCOPED_SYSTEM_PROMPT.replace(/\{\{CURRENT_DATE\}\}/g, currentDate)
+      .replace(/\{\{RESOURCE_TYPE\}\}/g, resourceType)
+      .replace(/\{\{RESOURCE_DATA\}\}/g, enrichedContext.formattedData);
   }
 }

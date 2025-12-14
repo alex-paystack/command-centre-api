@@ -39,6 +39,11 @@ export enum ChatResponseType {
   REFUSAL = 'REFUSAL',
 }
 
+export enum ChatMode {
+  GLOBAL = 'global',
+  PAGE = 'page',
+}
+
 export type ClassificationUIMessage = UIMessage<
   never,
   {
@@ -50,6 +55,25 @@ export type ClassificationUIMessage = UIMessage<
     };
   }
 >;
+
+export enum PageContextType {
+  TRANSACTION = 'transaction',
+  CUSTOMER = 'customer',
+  REFUND = 'refund',
+  PAYOUT = 'payout',
+  DISPUTE = 'dispute',
+}
+
+export interface PageContext {
+  type: PageContextType;
+  resourceId: string; // ID or reference
+  resourceData?: unknown; // Optional pre-fetched data from client
+}
+
+export interface EnrichedPageContext extends PageContext {
+  resourceData: unknown; // Required after enrichment
+  formattedData: string; // Formatted for prompt injection
+}
 
 /**
  * Paystack Customer object
