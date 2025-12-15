@@ -514,6 +514,7 @@ Returns Recharts-compatible data with count, volume, and average metrics.`,
             label: generateChartLabel(aggregationType, dateRange, resourceType),
             chartType,
             chartData: [],
+            chartSeries: [],
             summary: {
               totalCount: 0,
               totalVolume: 0,
@@ -541,17 +542,22 @@ Returns Recharts-compatible data with count, volume, and average metrics.`,
 
         const chartableRecords = toChartableRecords(allRecords, fieldConfig);
 
-        const chartData = aggregateRecords(chartableRecords, aggregationType);
+        const aggregationResult = aggregateRecords(chartableRecords, aggregationType);
 
         const summary = calculateSummary(chartableRecords, dateRange);
+
+        const dataPointCount = aggregationResult.chartSeries
+          ? aggregationResult.chartSeries.reduce((sum, series) => sum + series.points.length, 0)
+          : (aggregationResult.chartData?.length ?? 0);
 
         yield {
           success: true,
           label: generateChartLabel(aggregationType, dateRange, resourceType),
           chartType,
-          chartData,
+          chartData: aggregationResult.chartData,
+          chartSeries: aggregationResult.chartSeries,
           summary,
-          message: `Generated chart data with ${chartData.length} data points from ${allRecords.length} ${resourceDisplayNamePlural}`,
+          message: `Generated chart data with ${dataPointCount} data points from ${allRecords.length} ${resourceDisplayNamePlural}`,
         };
       } catch (error: unknown) {
         return {

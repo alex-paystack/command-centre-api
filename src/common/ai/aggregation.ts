@@ -17,6 +17,14 @@ export interface ChartDataPoint {
 }
 
 /**
+ * Series of chart points for a single currency (used for time-based charts)
+ */
+export interface ChartSeries {
+  currency: string;
+  points: ChartDataPoint[];
+}
+
+/**
  * Summary statistics for the entire dataset
  */
 export interface ChartSummary {
@@ -52,7 +60,10 @@ export enum ChartType {
 export interface ChartResult {
   label: string; // e.g., "Daily Transaction Metrics"
   chartType: ChartType; // Suggested chart type for visualization
-  chartData: ChartDataPoint[];
+  // For categorical aggregations
+  chartData?: ChartDataPoint[];
+  // For time-series aggregations (per-currency series)
+  chartSeries?: ChartSeries[];
   summary: ChartSummary;
 }
 
@@ -205,8 +216,8 @@ const monthDayFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day
 /**
  * Aggregate records by day, showing day names (e.g., "Monday, Nov 25")
  */
-export function aggregateByDay(records: ChartableRecord[]): ChartDataPoint[] {
-  const chartData: ChartDataPoint[] = [];
+export function aggregateByDay(records: ChartableRecord[]): ChartSeries[] {
+  const series: ChartSeries[] = [];
   const currencyGroups = groupByCurrency(records);
 
   for (const currency of Array.from(currencyGroups.keys()).sort()) {
@@ -229,29 +240,31 @@ export function aggregateByDay(records: ChartableRecord[]): ChartDataPoint[] {
     // Sort keys chronologically first
     const sortedKeys = Array.from(groupedByDay.keys()).sort();
 
-    for (const dayKey of sortedKeys) {
+    const points = sortedKeys.map((dayKey) => {
       const dayRecords = groupedByDay.get(dayKey)!;
       const metrics = calculateMetrics(dayRecords);
       const date = parseDayKeyToUTCDate(dayKey);
       const dayName = dayNameFormatter.format(date); // Full day name (e.g., "Monday")
       const formattedDate = monthDayFormatter.format(date); // e.g., "Nov 25"
 
-      chartData.push({
+      return {
         name: `${dayName}, ${formattedDate}`,
         currency,
         ...metrics,
-      });
-    }
+      };
+    });
+
+    series.push({ currency, points });
   }
 
-  return chartData;
+  return series;
 }
 
 /**
  * Aggregate records by hour (0-23, UTC)
  */
-export function aggregateByHour(records: ChartableRecord[]): ChartDataPoint[] {
-  const chartData: ChartDataPoint[] = [];
+export function aggregateByHour(records: ChartableRecord[]): ChartSeries[] {
+  const series: ChartSeries[] = [];
   const currencyGroups = groupByCurrency(records);
 
   for (const currency of Array.from(currencyGroups.keys()).sort()) {
@@ -270,25 +283,27 @@ export function aggregateByHour(records: ChartableRecord[]): ChartDataPoint[] {
 
     const sortedHours = Array.from(groupedByHour.keys()).sort((a, b) => a - b);
 
-    for (const hour of sortedHours) {
+    const points = sortedHours.map((hour) => {
       const hourRecords = groupedByHour.get(hour)!;
       const metrics = calculateMetrics(hourRecords);
-      chartData.push({
+      return {
         name: format(new Date(2000, 0, 1, hour), 'HH:00'), // Format hour as "HH:00"
         currency,
         ...metrics,
-      });
-    }
+      };
+    });
+
+    series.push({ currency, points });
   }
 
-  return chartData;
+  return series;
 }
 
 /**
  * Aggregate records by week (ISO week format: YYYY-Www)
  */
-export function aggregateByWeek(records: ChartableRecord[]): ChartDataPoint[] {
-  const chartData: ChartDataPoint[] = [];
+export function aggregateByWeek(records: ChartableRecord[]): ChartSeries[] {
+  const series: ChartSeries[] = [];
   const currencyGroups = groupByCurrency(records);
 
   for (const currency of Array.from(currencyGroups.keys()).sort()) {
@@ -309,25 +324,27 @@ export function aggregateByWeek(records: ChartableRecord[]): ChartDataPoint[] {
 
     const sortedWeeks = Array.from(groupedByWeek.keys()).sort();
 
-    for (const week of sortedWeeks) {
+    const points = sortedWeeks.map((week) => {
       const weekRecords = groupedByWeek.get(week)!;
       const metrics = calculateMetrics(weekRecords);
-      chartData.push({
+      return {
         name: week,
         currency,
         ...metrics,
-      });
-    }
+      };
+    });
+
+    series.push({ currency, points });
   }
 
-  return chartData;
+  return series;
 }
 
 /**
  * Aggregate records by month (YYYY-MM)
  */
-export function aggregateByMonth(records: ChartableRecord[]): ChartDataPoint[] {
-  const chartData: ChartDataPoint[] = [];
+export function aggregateByMonth(records: ChartableRecord[]): ChartSeries[] {
+  const series: ChartSeries[] = [];
   const currencyGroups = groupByCurrency(records);
 
   for (const currency of Array.from(currencyGroups.keys()).sort()) {
@@ -346,18 +363,20 @@ export function aggregateByMonth(records: ChartableRecord[]): ChartDataPoint[] {
 
     const sortedMonths = Array.from(groupedByMonth.keys()).sort();
 
-    for (const month of sortedMonths) {
+    const points = sortedMonths.map((month) => {
       const monthRecords = groupedByMonth.get(month)!;
       const metrics = calculateMetrics(monthRecords);
-      chartData.push({
+      return {
         name: month,
         currency,
         ...metrics,
-      });
-    }
+      };
+    });
+
+    series.push({ currency, points });
   }
 
-  return chartData;
+  return series;
 }
 
 /**
@@ -392,24 +411,28 @@ export function aggregateByResolution(records: ChartableRecord[]): ChartDataPoin
  * Router function that calls the appropriate aggregator based on type
  * Works with generic ChartableRecord for all resource types
  */
-export function aggregateRecords(records: ChartableRecord[], aggregationType: AggregationType): ChartDataPoint[] {
+export type AggregationResult =
+  | { chartSeries: ChartSeries[]; chartData?: undefined }
+  | { chartSeries?: undefined; chartData: ChartDataPoint[] };
+
+export function aggregateRecords(records: ChartableRecord[], aggregationType: AggregationType): AggregationResult {
   switch (aggregationType) {
     case AggregationType.BY_DAY:
-      return aggregateByDay(records);
+      return { chartSeries: aggregateByDay(records) };
     case AggregationType.BY_HOUR:
-      return aggregateByHour(records);
+      return { chartSeries: aggregateByHour(records) };
     case AggregationType.BY_WEEK:
-      return aggregateByWeek(records);
+      return { chartSeries: aggregateByWeek(records) };
     case AggregationType.BY_MONTH:
-      return aggregateByMonth(records);
+      return { chartSeries: aggregateByMonth(records) };
     case AggregationType.BY_STATUS:
-      return aggregateByStatus(records);
+      return { chartData: aggregateByStatus(records) };
     case AggregationType.BY_TYPE:
-      return aggregateByType(records);
+      return { chartData: aggregateByType(records) };
     case AggregationType.BY_CATEGORY:
-      return aggregateByCategory(records);
+      return { chartData: aggregateByCategory(records) };
     case AggregationType.BY_RESOLUTION:
-      return aggregateByResolution(records);
+      return { chartData: aggregateByResolution(records) };
     default: {
       throw new Error(`Unknown aggregation type: ${String(aggregationType)}`);
     }

@@ -174,7 +174,9 @@ describe('Aggregation Functions', () => {
       const result = aggregateByDay(transactions);
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({
+      expect(result[0].currency).toBe('NGN');
+      expect(result[0].points).toHaveLength(1);
+      expect(result[0].points[0]).toEqual({
         name: 'Tuesday, Dec 10',
         count: 1,
         volume: 1000,
@@ -192,7 +194,8 @@ describe('Aggregation Functions', () => {
       const result = aggregateByDay(transactions);
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({
+      expect(result[0].points).toHaveLength(1);
+      expect(result[0].points[0]).toEqual({
         name: 'Tuesday, Dec 10',
         count: 3,
         volume: 4500,
@@ -209,22 +212,24 @@ describe('Aggregation Functions', () => {
       ];
       const result = aggregateByDay(transactions);
 
-      expect(result).toHaveLength(3);
-      expect(result[0]).toEqual({
+      expect(result).toHaveLength(1);
+      const points = result[0].points;
+      expect(points).toHaveLength(3);
+      expect(points[0]).toEqual({
         name: 'Tuesday, Dec 10',
         count: 1,
         volume: 1000,
         average: 1000,
         currency: 'NGN',
       });
-      expect(result[1]).toEqual({
+      expect(points[1]).toEqual({
         name: 'Wednesday, Dec 11',
         count: 1,
         volume: 2000,
         average: 2000,
         currency: 'NGN',
       });
-      expect(result[2]).toEqual({
+      expect(points[2]).toEqual({
         name: 'Thursday, Dec 12',
         count: 1,
         volume: 3000,
@@ -241,9 +246,10 @@ describe('Aggregation Functions', () => {
       ];
       const result = aggregateByDay(transactions);
 
-      expect(result[0].name).toBe('Tuesday, Dec 10');
-      expect(result[1].name).toBe('Wednesday, Dec 11');
-      expect(result[2].name).toBe('Thursday, Dec 12');
+      const points = result[0].points;
+      expect(points[0].name).toBe('Tuesday, Dec 10');
+      expect(points[1].name).toBe('Wednesday, Dec 11');
+      expect(points[2].name).toBe('Thursday, Dec 12');
     });
 
     it('should bucket days using UTC to avoid local timezone shifts', () => {
@@ -252,7 +258,7 @@ describe('Aggregation Functions', () => {
       const result = aggregateByDay(transactions);
 
       expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Tuesday, Dec 10');
+      expect(result[0].points[0].name).toBe('Tuesday, Dec 10');
     });
   });
 
@@ -267,7 +273,7 @@ describe('Aggregation Functions', () => {
       const result = aggregateByHour(transactions);
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({
+      expect(result[0].points[0]).toEqual({
         name: '10:00',
         count: 1,
         volume: 1000,
@@ -285,7 +291,7 @@ describe('Aggregation Functions', () => {
       const result = aggregateByHour(transactions);
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({
+      expect(result[0].points[0]).toEqual({
         name: '10:00',
         count: 3,
         volume: 4500,
@@ -302,22 +308,24 @@ describe('Aggregation Functions', () => {
       ];
       const result = aggregateByHour(transactions);
 
-      expect(result).toHaveLength(3);
-      expect(result[0]).toEqual({
+      expect(result).toHaveLength(1);
+      const points = result[0].points;
+      expect(points).toHaveLength(3);
+      expect(points[0]).toEqual({
         name: '08:00',
         count: 1,
         volume: 1000,
         average: 1000,
         currency: 'NGN',
       });
-      expect(result[1]).toEqual({
+      expect(points[1]).toEqual({
         name: '14:00',
         count: 1,
         volume: 2000,
         average: 2000,
         currency: 'NGN',
       });
-      expect(result[2]).toEqual({
+      expect(points[2]).toEqual({
         name: '20:00',
         count: 1,
         volume: 3000,
@@ -334,9 +342,10 @@ describe('Aggregation Functions', () => {
       ];
       const result = aggregateByHour(transactions);
 
-      expect(result[0].name).toBe('08:00');
-      expect(result[1].name).toBe('14:00');
-      expect(result[2].name).toBe('20:00');
+      const points = result[0].points;
+      expect(points[0].name).toBe('08:00');
+      expect(points[1].name).toBe('14:00');
+      expect(points[2].name).toBe('20:00');
     });
   });
 
@@ -351,11 +360,12 @@ describe('Aggregation Functions', () => {
       const result = aggregateByWeek(transactions);
 
       expect(result).toHaveLength(1);
-      expect(result[0].name).toMatch(/2024-W\d{2}/);
-      expect(result[0].count).toBe(1);
-      expect(result[0].volume).toBe(1000);
-      expect(result[0].average).toBe(1000);
-      expect(result[0].currency).toBe('NGN');
+      const point = result[0].points[0];
+      expect(point.name).toMatch(/2024-W\d{2}/);
+      expect(point.count).toBe(1);
+      expect(point.volume).toBe(1000);
+      expect(point.average).toBe(1000);
+      expect(point.currency).toBe('NGN');
     });
 
     it('should aggregate multiple transactions in the same week', () => {
@@ -367,10 +377,11 @@ describe('Aggregation Functions', () => {
       const result = aggregateByWeek(transactions);
 
       expect(result).toHaveLength(1);
-      expect(result[0].count).toBe(3);
-      expect(result[0].volume).toBe(4500);
-      expect(result[0].average).toBe(1500);
-      expect(result[0].currency).toBe('NGN');
+      const point = result[0].points[0];
+      expect(point.count).toBe(3);
+      expect(point.volume).toBe(4500);
+      expect(point.average).toBe(1500);
+      expect(point.currency).toBe('NGN');
     });
 
     it('should aggregate transactions across multiple weeks', () => {
@@ -381,10 +392,12 @@ describe('Aggregation Functions', () => {
       ];
       const result = aggregateByWeek(transactions);
 
-      expect(result).toHaveLength(3);
-      expect(result[0].count).toBe(1);
-      expect(result[1].count).toBe(1);
-      expect(result[2].count).toBe(1);
+      expect(result).toHaveLength(1);
+      const points = result[0].points;
+      expect(points).toHaveLength(3);
+      expect(points[0].count).toBe(1);
+      expect(points[1].count).toBe(1);
+      expect(points[2].count).toBe(1);
     });
 
     it('should sort results chronologically', () => {
@@ -396,8 +409,9 @@ describe('Aggregation Functions', () => {
       const result = aggregateByWeek(transactions);
 
       // Should be sorted by week string (YYYY-Www format)
-      expect(result[0].name < result[1].name).toBe(true);
-      expect(result[1].name < result[2].name).toBe(true);
+      const points = result[0].points;
+      expect(points[0].name < points[1].name).toBe(true);
+      expect(points[1].name < points[2].name).toBe(true);
     });
 
     it('should use ISO week-year for year boundaries', () => {
@@ -409,7 +423,7 @@ describe('Aggregation Functions', () => {
       const result = aggregateByWeek(transactions);
 
       expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('2025-W01');
+      expect(result[0].points[0].name).toBe('2025-W01');
     });
   });
 
@@ -424,7 +438,7 @@ describe('Aggregation Functions', () => {
       const result = aggregateByMonth(transactions);
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({
+      expect(result[0].points[0]).toEqual({
         name: '2024-12',
         count: 1,
         volume: 1000,
@@ -442,7 +456,7 @@ describe('Aggregation Functions', () => {
       const result = aggregateByMonth(transactions);
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({
+      expect(result[0].points[0]).toEqual({
         name: '2024-12',
         count: 3,
         volume: 4500,
@@ -459,22 +473,24 @@ describe('Aggregation Functions', () => {
       ];
       const result = aggregateByMonth(transactions);
 
-      expect(result).toHaveLength(3);
-      expect(result[0]).toEqual({
+      expect(result).toHaveLength(1);
+      const points = result[0].points;
+      expect(points).toHaveLength(3);
+      expect(points[0]).toEqual({
         name: '2024-10',
         count: 1,
         volume: 1000,
         average: 1000,
         currency: 'NGN',
       });
-      expect(result[1]).toEqual({
+      expect(points[1]).toEqual({
         name: '2024-11',
         count: 1,
         volume: 2000,
         average: 2000,
         currency: 'NGN',
       });
-      expect(result[2]).toEqual({
+      expect(points[2]).toEqual({
         name: '2024-12',
         count: 1,
         volume: 3000,
@@ -491,9 +507,10 @@ describe('Aggregation Functions', () => {
       ];
       const result = aggregateByMonth(transactions);
 
-      expect(result[0].name).toBe('2024-10');
-      expect(result[1].name).toBe('2024-11');
-      expect(result[2].name).toBe('2024-12');
+      const points = result[0].points;
+      expect(points[0].name).toBe('2024-10');
+      expect(points[1].name).toBe('2024-11');
+      expect(points[2].name).toBe('2024-12');
     });
   });
 
@@ -957,9 +974,10 @@ describe('Aggregation Functions', () => {
       ];
       const result = aggregateRecords(records, AggregationType.BY_TYPE);
 
-      expect(result).toHaveLength(2);
-      expect(result.some((d) => d.name === 'full')).toBe(true);
-      expect(result.some((d) => d.name === 'partial')).toBe(true);
+      expect(result.chartData).toBeDefined();
+      expect(result.chartData).toHaveLength(2);
+      expect(result.chartData?.some((d) => d.name === 'full')).toBe(true);
+      expect(result.chartData?.some((d) => d.name === 'partial')).toBe(true);
     });
 
     it('should route to aggregateByCategory for by-category aggregation', () => {
@@ -981,9 +999,10 @@ describe('Aggregation Functions', () => {
       ];
       const result = aggregateRecords(records, AggregationType.BY_CATEGORY);
 
-      expect(result).toHaveLength(2);
-      expect(result.some((d) => d.name === 'fraud')).toBe(true);
-      expect(result.some((d) => d.name === 'chargeback')).toBe(true);
+      expect(result.chartData).toBeDefined();
+      expect(result.chartData).toHaveLength(2);
+      expect(result.chartData?.some((d) => d.name === 'fraud')).toBe(true);
+      expect(result.chartData?.some((d) => d.name === 'chargeback')).toBe(true);
     });
 
     it('should route to aggregateByResolution for by-resolution aggregation', () => {
@@ -1005,9 +1024,10 @@ describe('Aggregation Functions', () => {
       ];
       const result = aggregateRecords(records, AggregationType.BY_RESOLUTION);
 
-      expect(result).toHaveLength(2);
-      expect(result.some((d) => d.name === 'merchant-accepted')).toBe(true);
-      expect(result.some((d) => d.name === 'declined')).toBe(true);
+      expect(result.chartData).toBeDefined();
+      expect(result.chartData).toHaveLength(2);
+      expect(result.chartData?.some((d) => d.name === 'merchant-accepted')).toBe(true);
+      expect(result.chartData?.some((d) => d.name === 'declined')).toBe(true);
     });
   });
 });
