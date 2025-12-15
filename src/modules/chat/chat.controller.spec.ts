@@ -9,7 +9,7 @@ import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
 import { MessageRole } from './entities/message.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ChatMode, PageContextType } from 'src/common';
+import { ChatMode, PageContextType } from '../../common/ai/types';
 
 describe('ChatController', () => {
   let controller: ChatController;
@@ -111,7 +111,7 @@ describe('ChatController', () => {
 
       const result = await controller.getConversationsByUserId(mockUserId);
 
-      expect(service.getConversationsByUserId).toHaveBeenCalledWith(mockUserId, undefined);
+      expect(service.getConversationsByUserId).toHaveBeenCalledWith(mockUserId, undefined, undefined);
       expect(result).toEqual({
         status: true,
         message: 'Conversations retrieved successfully',
@@ -124,7 +124,7 @@ describe('ChatController', () => {
 
       const result = await controller.getConversationsByUserId(mockUserId, PageContextType.TRANSACTION);
 
-      expect(service.getConversationsByUserId).toHaveBeenCalledWith(mockUserId, PageContextType.TRANSACTION);
+      expect(service.getConversationsByUserId).toHaveBeenCalledWith(mockUserId, PageContextType.TRANSACTION, undefined);
       expect(result.data).toEqual([mockConversationResponse]);
     });
 

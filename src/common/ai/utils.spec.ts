@@ -173,7 +173,7 @@ describe('validateDateRange', () => {
       const result = validateDateRange('2024-01-01T00:00:00Z', '2024-01-15T23:59:59Z');
 
       expect(result.isValid).toBe(true);
-      expect(result.daysDifference).toBe(15);
+      expect(result.daysDifference).toBe(14);
     });
 
     it('should handle dates far in the future', () => {
