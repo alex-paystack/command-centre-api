@@ -1,26 +1,18 @@
 import { format, getISOWeek, getISOWeekYear, parseISO } from 'date-fns';
-import type { PaystackTransaction } from './types/index';
+import type { ChartableRecord } from './chart-config';
+import { AggregationType, ChartResourceType, getResourceDisplayName } from './chart-config';
 import { amountInSubUnitToBaseUnit } from './utils';
 
-/**
- * Aggregation type options for transaction data
- */
-export enum AggregationType {
-  BY_DAY = 'by-day',
-  BY_HOUR = 'by-hour',
-  BY_WEEK = 'by-week',
-  BY_MONTH = 'by-month',
-  BY_STATUS = 'by-status',
-}
+export { AggregationType } from './chart-config';
 
 /**
  * Recharts-compatible data point for charting
  */
 export interface ChartDataPoint {
   name: string; // Label (e.g., "2024-01-15", "Monday", "success")
-  count: number; // Transaction count
+  count: number; // Record count
   volume: number; // Total amount (converted from subunits)
-  average: number; // Average transaction amount
+  average: number; // Average amount
   currency: string; // Currency code for the aggregated data
 }
 
@@ -74,24 +66,33 @@ export function getChartType(aggregationType: AggregationType): ChartType {
     [AggregationType.BY_WEEK]: ChartType.AREA,
     [AggregationType.BY_MONTH]: ChartType.AREA,
     [AggregationType.BY_STATUS]: ChartType.DOUGHNUT,
+    [AggregationType.BY_TYPE]: ChartType.DOUGHNUT,
+    [AggregationType.BY_CATEGORY]: ChartType.DOUGHNUT,
+    [AggregationType.BY_RESOLUTION]: ChartType.DOUGHNUT,
   };
 
   return chartTypeMap[aggregationType];
 }
 
 /**
- * Generate a descriptive label for the chart based on aggregation type and date range
+ * Generate a descriptive label for the chart based on aggregation type, resource type, and date range
  */
 export function generateChartLabel(
   aggregationType: AggregationType,
   dateRange?: { from?: string; to?: string },
+  resourceType: ChartResourceType = ChartResourceType.TRANSACTION,
 ): string {
+  const resourceName = getResourceDisplayName(resourceType);
+
   const labelMap: Record<AggregationType, string> = {
-    [AggregationType.BY_DAY]: 'Daily Transaction Metrics',
-    [AggregationType.BY_HOUR]: 'Hourly Transaction Metrics',
-    [AggregationType.BY_WEEK]: 'Weekly Transaction Metrics',
-    [AggregationType.BY_MONTH]: 'Monthly Transaction Metrics',
-    [AggregationType.BY_STATUS]: 'Transaction Metrics by Status',
+    [AggregationType.BY_DAY]: `Daily ${resourceName} Metrics`,
+    [AggregationType.BY_HOUR]: `Hourly ${resourceName} Metrics`,
+    [AggregationType.BY_WEEK]: `Weekly ${resourceName} Metrics`,
+    [AggregationType.BY_MONTH]: `Monthly ${resourceName} Metrics`,
+    [AggregationType.BY_STATUS]: `${resourceName} Metrics by Status`,
+    [AggregationType.BY_TYPE]: `${resourceName} Metrics by Type`,
+    [AggregationType.BY_CATEGORY]: `${resourceName} Metrics by Category`,
+    [AggregationType.BY_RESOLUTION]: `${resourceName} Metrics by Resolution`,
   };
 
   let label = labelMap[aggregationType];
@@ -113,15 +114,15 @@ export function generateChartLabel(
 }
 
 /**
- * Helper to calculate metrics from a group of transactions
+ * Helper to calculate metrics from a group of chartable records
  */
-function calculateMetrics(transactions: PaystackTransaction[]): {
+function calculateMetrics(records: ChartableRecord[]): {
   count: number;
   volume: number;
   average: number;
 } {
-  const count = transactions.length;
-  const volume = transactions.reduce((sum, transaction) => sum + amountInSubUnitToBaseUnit(transaction.amount), 0);
+  const count = records.length;
+  const volume = records.reduce((sum, record) => sum + amountInSubUnitToBaseUnit(record.amount), 0);
   const average = count > 0 ? volume / count : 0;
 
   return {
@@ -141,15 +142,18 @@ function parseDayKeyToUTCDate(dayKey: string): Date {
   return new Date(Date.UTC(Number(yearStr), Number(monthStr) - 1, Number(dayStr)));
 }
 
-function groupByCurrency(transactions: PaystackTransaction[]): Map<string, PaystackTransaction[]> {
-  const grouped = new Map<string, PaystackTransaction[]>();
+/**
+ * Group records by currency
+ */
+function groupByCurrency(records: ChartableRecord[]): Map<string, ChartableRecord[]> {
+  const grouped = new Map<string, ChartableRecord[]>();
 
-  for (const transaction of transactions) {
-    const currency = transaction.currency;
+  for (const record of records) {
+    const currency = record.currency;
     if (!grouped.has(currency)) {
       grouped.set(currency, []);
     }
-    grouped.get(currency)!.push(transaction);
+    grouped.get(currency)!.push(record);
   }
 
   return grouped;
@@ -160,18 +164,18 @@ const dayNameFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'long', tim
 const monthDayFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 /**
- * Aggregate transactions by day, showing day names (e.g., "Monday, Nov 25")
+ * Aggregate records by day, showing day names (e.g., "Monday, Nov 25")
  */
-export function aggregateByDay(transactions: PaystackTransaction[]): ChartDataPoint[] {
+export function aggregateByDay(records: ChartableRecord[]): ChartDataPoint[] {
   const chartData: ChartDataPoint[] = [];
-  const currencyGroups = groupByCurrency(transactions);
+  const currencyGroups = groupByCurrency(records);
 
   for (const currency of Array.from(currencyGroups.keys()).sort()) {
-    const transactionsByCurrency = currencyGroups.get(currency)!;
-    const groupedByDay = new Map<string, PaystackTransaction[]>();
+    const recordsByCurrency = currencyGroups.get(currency)!;
+    const groupedByDay = new Map<string, ChartableRecord[]>();
 
-    for (const transaction of transactionsByCurrency) {
-      const date = normalizeToUTCDate(parseISO(transaction.createdAt));
+    for (const record of recordsByCurrency) {
+      const date = normalizeToUTCDate(parseISO(record.createdAt));
       const dayKey = `${date.getUTCFullYear()}-${(date.getUTCMonth() + 1).toString().padStart(2, '0')}-${date
         .getUTCDate()
         .toString()
@@ -180,15 +184,15 @@ export function aggregateByDay(transactions: PaystackTransaction[]): ChartDataPo
       if (!groupedByDay.has(dayKey)) {
         groupedByDay.set(dayKey, []);
       }
-      groupedByDay.get(dayKey)!.push(transaction);
+      groupedByDay.get(dayKey)!.push(record);
     }
 
     // Sort keys chronologically first
     const sortedKeys = Array.from(groupedByDay.keys()).sort();
 
     for (const dayKey of sortedKeys) {
-      const dayTransactions = groupedByDay.get(dayKey)!;
-      const metrics = calculateMetrics(dayTransactions);
+      const dayRecords = groupedByDay.get(dayKey)!;
+      const metrics = calculateMetrics(dayRecords);
       const date = parseDayKeyToUTCDate(dayKey);
       const dayName = dayNameFormatter.format(date); // Full day name (e.g., "Monday")
       const formattedDate = monthDayFormatter.format(date); // e.g., "Nov 25"
@@ -205,31 +209,31 @@ export function aggregateByDay(transactions: PaystackTransaction[]): ChartDataPo
 }
 
 /**
- * Aggregate transactions by hour (0-23, UTC)
+ * Aggregate records by hour (0-23, UTC)
  */
-export function aggregateByHour(transactions: PaystackTransaction[]): ChartDataPoint[] {
+export function aggregateByHour(records: ChartableRecord[]): ChartDataPoint[] {
   const chartData: ChartDataPoint[] = [];
-  const currencyGroups = groupByCurrency(transactions);
+  const currencyGroups = groupByCurrency(records);
 
   for (const currency of Array.from(currencyGroups.keys()).sort()) {
-    const transactionsByCurrency = currencyGroups.get(currency)!;
-    const groupedByHour = new Map<number, PaystackTransaction[]>();
+    const recordsByCurrency = currencyGroups.get(currency)!;
+    const groupedByHour = new Map<number, ChartableRecord[]>();
 
-    for (const transaction of transactionsByCurrency) {
-      const date = parseISO(transaction.createdAt);
+    for (const record of recordsByCurrency) {
+      const date = parseISO(record.createdAt);
       const hour = date.getUTCHours(); // Use UTC hours for consistency
 
       if (!groupedByHour.has(hour)) {
         groupedByHour.set(hour, []);
       }
-      groupedByHour.get(hour)!.push(transaction);
+      groupedByHour.get(hour)!.push(record);
     }
 
     const sortedHours = Array.from(groupedByHour.keys()).sort((a, b) => a - b);
 
     for (const hour of sortedHours) {
-      const hourTransactions = groupedByHour.get(hour)!;
-      const metrics = calculateMetrics(hourTransactions);
+      const hourRecords = groupedByHour.get(hour)!;
+      const metrics = calculateMetrics(hourRecords);
       chartData.push({
         name: format(new Date(2000, 0, 1, hour), 'HH:00'), // Format hour as "HH:00"
         currency,
@@ -242,18 +246,18 @@ export function aggregateByHour(transactions: PaystackTransaction[]): ChartDataP
 }
 
 /**
- * Aggregate transactions by week (ISO week format: YYYY-Www)
+ * Aggregate records by week (ISO week format: YYYY-Www)
  */
-export function aggregateByWeek(transactions: PaystackTransaction[]): ChartDataPoint[] {
+export function aggregateByWeek(records: ChartableRecord[]): ChartDataPoint[] {
   const chartData: ChartDataPoint[] = [];
-  const currencyGroups = groupByCurrency(transactions);
+  const currencyGroups = groupByCurrency(records);
 
   for (const currency of Array.from(currencyGroups.keys()).sort()) {
-    const transactionsByCurrency = currencyGroups.get(currency)!;
-    const groupedByWeek = new Map<string, PaystackTransaction[]>();
+    const recordsByCurrency = currencyGroups.get(currency)!;
+    const groupedByWeek = new Map<string, ChartableRecord[]>();
 
-    for (const transaction of transactionsByCurrency) {
-      const date = normalizeToUTCDate(parseISO(transaction.createdAt));
+    for (const record of recordsByCurrency) {
+      const date = normalizeToUTCDate(parseISO(record.createdAt));
       const year = getISOWeekYear(date);
       const week = getISOWeek(date);
       const weekKey = `${year}-W${week.toString().padStart(2, '0')}`;
@@ -261,14 +265,14 @@ export function aggregateByWeek(transactions: PaystackTransaction[]): ChartDataP
       if (!groupedByWeek.has(weekKey)) {
         groupedByWeek.set(weekKey, []);
       }
-      groupedByWeek.get(weekKey)!.push(transaction);
+      groupedByWeek.get(weekKey)!.push(record);
     }
 
     const sortedWeeks = Array.from(groupedByWeek.keys()).sort();
 
     for (const week of sortedWeeks) {
-      const weekTransactions = groupedByWeek.get(week)!;
-      const metrics = calculateMetrics(weekTransactions);
+      const weekRecords = groupedByWeek.get(week)!;
+      const metrics = calculateMetrics(weekRecords);
       chartData.push({
         name: week,
         currency,
@@ -281,31 +285,31 @@ export function aggregateByWeek(transactions: PaystackTransaction[]): ChartDataP
 }
 
 /**
- * Aggregate transactions by month (YYYY-MM)
+ * Aggregate records by month (YYYY-MM)
  */
-export function aggregateByMonth(transactions: PaystackTransaction[]): ChartDataPoint[] {
+export function aggregateByMonth(records: ChartableRecord[]): ChartDataPoint[] {
   const chartData: ChartDataPoint[] = [];
-  const currencyGroups = groupByCurrency(transactions);
+  const currencyGroups = groupByCurrency(records);
 
   for (const currency of Array.from(currencyGroups.keys()).sort()) {
-    const transactionsByCurrency = currencyGroups.get(currency)!;
-    const groupedByMonth = new Map<string, PaystackTransaction[]>();
+    const recordsByCurrency = currencyGroups.get(currency)!;
+    const groupedByMonth = new Map<string, ChartableRecord[]>();
 
-    for (const transaction of transactionsByCurrency) {
-      const date = normalizeToUTCDate(parseISO(transaction.createdAt));
+    for (const record of recordsByCurrency) {
+      const date = normalizeToUTCDate(parseISO(record.createdAt));
       const monthKey = `${date.getUTCFullYear()}-${(date.getUTCMonth() + 1).toString().padStart(2, '0')}`;
 
       if (!groupedByMonth.has(monthKey)) {
         groupedByMonth.set(monthKey, []);
       }
-      groupedByMonth.get(monthKey)!.push(transaction);
+      groupedByMonth.get(monthKey)!.push(record);
     }
 
     const sortedMonths = Array.from(groupedByMonth.keys()).sort();
 
     for (const month of sortedMonths) {
-      const monthTransactions = groupedByMonth.get(month)!;
-      const metrics = calculateMetrics(monthTransactions);
+      const monthRecords = groupedByMonth.get(month)!;
+      const metrics = calculateMetrics(monthRecords);
       chartData.push({
         name: month,
         currency,
@@ -318,30 +322,30 @@ export function aggregateByMonth(transactions: PaystackTransaction[]): ChartData
 }
 
 /**
- * Aggregate transactions by status (success/failed/abandoned)
+ * Aggregate records by status
  */
-export function aggregateByStatus(transactions: PaystackTransaction[]): ChartDataPoint[] {
+export function aggregateByStatus(records: ChartableRecord[]): ChartDataPoint[] {
   const chartData: ChartDataPoint[] = [];
-  const currencyGroups = groupByCurrency(transactions);
+  const currencyGroups = groupByCurrency(records);
 
   for (const currency of Array.from(currencyGroups.keys()).sort()) {
-    const transactionsByCurrency = currencyGroups.get(currency)!;
-    const groupedByStatus = new Map<string, PaystackTransaction[]>();
+    const recordsByCurrency = currencyGroups.get(currency)!;
+    const groupedByStatus = new Map<string, ChartableRecord[]>();
 
-    for (const transaction of transactionsByCurrency) {
-      const status = transaction.status;
+    for (const record of recordsByCurrency) {
+      const status = record.status;
 
       if (!groupedByStatus.has(status)) {
         groupedByStatus.set(status, []);
       }
-      groupedByStatus.get(status)!.push(transaction);
+      groupedByStatus.get(status)!.push(record);
     }
 
     const sortedStatuses = Array.from(groupedByStatus.keys()).sort();
 
     for (const status of sortedStatuses) {
-      const statusTransactions = groupedByStatus.get(status)!;
-      const metrics = calculateMetrics(statusTransactions);
+      const statusRecords = groupedByStatus.get(status)!;
+      const metrics = calculateMetrics(statusRecords);
       chartData.push({
         name: status,
         currency,
@@ -354,23 +358,135 @@ export function aggregateByStatus(transactions: PaystackTransaction[]): ChartDat
 }
 
 /**
- * Router function that calls the appropriate aggregator based on type
+ * Aggregate records by type (for refunds: full/partial)
  */
-export function aggregateTransactions(
-  transactions: PaystackTransaction[],
-  aggregationType: AggregationType,
-): ChartDataPoint[] {
+export function aggregateByType(records: ChartableRecord[]): ChartDataPoint[] {
+  const chartData: ChartDataPoint[] = [];
+  const currencyGroups = groupByCurrency(records);
+
+  for (const currency of Array.from(currencyGroups.keys()).sort()) {
+    const recordsByCurrency = currencyGroups.get(currency)!;
+    const groupedByType = new Map<string, ChartableRecord[]>();
+
+    for (const record of recordsByCurrency) {
+      const type = record.type ?? 'unknown';
+
+      if (!groupedByType.has(type)) {
+        groupedByType.set(type, []);
+      }
+      groupedByType.get(type)!.push(record);
+    }
+
+    const sortedTypes = Array.from(groupedByType.keys()).sort();
+
+    for (const type of sortedTypes) {
+      const typeRecords = groupedByType.get(type)!;
+      const metrics = calculateMetrics(typeRecords);
+      chartData.push({
+        name: type,
+        currency,
+        ...metrics,
+      });
+    }
+  }
+
+  return chartData;
+}
+
+/**
+ * Aggregate records by category (for disputes: fraud/chargeback)
+ */
+export function aggregateByCategory(records: ChartableRecord[]): ChartDataPoint[] {
+  const chartData: ChartDataPoint[] = [];
+  const currencyGroups = groupByCurrency(records);
+
+  for (const currency of Array.from(currencyGroups.keys()).sort()) {
+    const recordsByCurrency = currencyGroups.get(currency)!;
+    const groupedByCategory = new Map<string, ChartableRecord[]>();
+
+    for (const record of recordsByCurrency) {
+      const category = record.category ?? 'unknown';
+
+      if (!groupedByCategory.has(category)) {
+        groupedByCategory.set(category, []);
+      }
+      groupedByCategory.get(category)!.push(record);
+    }
+
+    const sortedCategories = Array.from(groupedByCategory.keys()).sort();
+
+    for (const category of sortedCategories) {
+      const categoryRecords = groupedByCategory.get(category)!;
+      const metrics = calculateMetrics(categoryRecords);
+      chartData.push({
+        name: category,
+        currency,
+        ...metrics,
+      });
+    }
+  }
+
+  return chartData;
+}
+
+/**
+ * Aggregate records by resolution (for disputes: resolution outcomes)
+ */
+export function aggregateByResolution(records: ChartableRecord[]): ChartDataPoint[] {
+  const chartData: ChartDataPoint[] = [];
+  const currencyGroups = groupByCurrency(records);
+
+  for (const currency of Array.from(currencyGroups.keys()).sort()) {
+    const recordsByCurrency = currencyGroups.get(currency)!;
+    const groupedByResolution = new Map<string, ChartableRecord[]>();
+
+    for (const record of recordsByCurrency) {
+      const resolution = record.resolution ?? 'awaiting-merchant-feedback';
+
+      if (!groupedByResolution.has(resolution)) {
+        groupedByResolution.set(resolution, []);
+      }
+      groupedByResolution.get(resolution)!.push(record);
+    }
+
+    const sortedResolutions = Array.from(groupedByResolution.keys()).sort();
+
+    for (const resolution of sortedResolutions) {
+      const resolutionRecords = groupedByResolution.get(resolution)!;
+      const metrics = calculateMetrics(resolutionRecords);
+      chartData.push({
+        name: resolution,
+        currency,
+        ...metrics,
+      });
+    }
+  }
+
+  return chartData;
+}
+
+/**
+ * Router function that calls the appropriate aggregator based on type
+ * Works with generic ChartableRecord for all resource types
+ */
+export function aggregateRecords(records: ChartableRecord[], aggregationType: AggregationType): ChartDataPoint[] {
   switch (aggregationType) {
     case AggregationType.BY_DAY:
-      return aggregateByDay(transactions);
+      return aggregateByDay(records);
     case AggregationType.BY_HOUR:
-      return aggregateByHour(transactions);
+      return aggregateByHour(records);
     case AggregationType.BY_WEEK:
-      return aggregateByWeek(transactions);
+      return aggregateByWeek(records);
     case AggregationType.BY_MONTH:
-      return aggregateByMonth(transactions);
+      return aggregateByMonth(records);
     case AggregationType.BY_STATUS:
-      return aggregateByStatus(transactions);
+      return aggregateByStatus(records);
+    case AggregationType.BY_TYPE:
+      return aggregateByType(records);
+    case AggregationType.BY_CATEGORY:
+      return aggregateByCategory(records);
+    case AggregationType.BY_RESOLUTION:
+      return aggregateByResolution(records);
     default: {
       throw new Error(`Unknown aggregation type: ${String(aggregationType)}`);
     }
@@ -378,17 +494,14 @@ export function aggregateTransactions(
 }
 
 /**
- * Calculate summary statistics for a set of transactions
+ * Calculate summary statistics for a set of chartable records
  */
-export function calculateSummary(
-  transactions: PaystackTransaction[],
-  dateRange?: { from?: string; to?: string },
-): ChartSummary {
-  const currencyGroups = groupByCurrency(transactions);
+export function calculateSummary(records: ChartableRecord[], dateRange?: { from?: string; to?: string }): ChartSummary {
+  const currencyGroups = groupByCurrency(records);
   const perCurrency: NonNullable<ChartSummary['perCurrency']> = [];
 
-  for (const [currency, transactions] of currencyGroups) {
-    const metrics = calculateMetrics(transactions);
+  for (const [currency, currencyGroupedRecords] of Array.from(currencyGroups.entries())) {
+    const metrics = calculateMetrics(currencyGroupedRecords);
     perCurrency.push({
       currency,
       totalCount: metrics.count,
@@ -401,7 +514,7 @@ export function calculateSummary(
 
   // For mixed currencies, totalVolume/average are not meaningful; keep zero and rely on perCurrency.
   const summary: ChartSummary = {
-    totalCount: transactions.length,
+    totalCount: records.length,
     totalVolume: perCurrency.length === 1 ? perCurrency[0].totalVolume : 0,
     overallAverage: perCurrency.length === 1 ? perCurrency[0].overallAverage : 0,
     perCurrency: perCurrency.sort((a, b) => a.currency.localeCompare(b.currency)),

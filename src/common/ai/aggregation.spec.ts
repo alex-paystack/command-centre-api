@@ -4,15 +4,36 @@ import {
   aggregateByWeek,
   aggregateByMonth,
   aggregateByStatus,
-  aggregateTransactions,
+  aggregateByType,
+  aggregateByCategory,
+  aggregateByResolution,
+  aggregateRecords,
   calculateSummary,
   generateChartLabel,
   getChartType,
-  AggregationType,
   ChartType,
 } from './aggregation';
-import type { PaystackCustomer, PaystackTransaction } from './types/index';
-import { Authorization, Log, PaymentChannel, TransactionStatus } from './types/data';
+import {
+  AggregationType,
+  ChartResourceType,
+  toChartableRecords,
+  refundFieldConfig,
+  disputeFieldConfig,
+} from './chart-config';
+import type { ChartableRecord } from './chart-config';
+import type { PaystackCustomer, PaystackTransaction, PaystackRefund, PaystackDispute } from './types/index';
+import {
+  Authorization,
+  Log,
+  PaymentChannel,
+  TransactionStatus,
+  RefundStatus,
+  RefundType,
+  DisputeCategory,
+  DisputeStatusSlug,
+  Currency,
+  DisputeResolutionSlug,
+} from './types/data';
 
 describe('Aggregation Functions', () => {
   const createMockTransaction = (
@@ -66,15 +87,60 @@ describe('Aggregation Functions', () => {
     it('should return doughnut chart for by-status aggregation', () => {
       expect(getChartType(AggregationType.BY_STATUS)).toBe(ChartType.DOUGHNUT);
     });
+
+    it('should return doughnut chart for by-type aggregation', () => {
+      expect(getChartType(AggregationType.BY_TYPE)).toBe(ChartType.DOUGHNUT);
+    });
+
+    it('should return doughnut chart for by-category aggregation', () => {
+      expect(getChartType(AggregationType.BY_CATEGORY)).toBe(ChartType.DOUGHNUT);
+    });
+
+    it('should return doughnut chart for by-resolution aggregation', () => {
+      expect(getChartType(AggregationType.BY_RESOLUTION)).toBe(ChartType.DOUGHNUT);
+    });
   });
 
   describe('generateChartLabel', () => {
-    it('should generate correct labels for each aggregation type', () => {
+    it('should generate correct labels for each aggregation type (default: transaction)', () => {
       expect(generateChartLabel(AggregationType.BY_DAY)).toBe('Daily Transaction Metrics');
       expect(generateChartLabel(AggregationType.BY_HOUR)).toBe('Hourly Transaction Metrics');
       expect(generateChartLabel(AggregationType.BY_WEEK)).toBe('Weekly Transaction Metrics');
       expect(generateChartLabel(AggregationType.BY_MONTH)).toBe('Monthly Transaction Metrics');
       expect(generateChartLabel(AggregationType.BY_STATUS)).toBe('Transaction Metrics by Status');
+    });
+
+    it('should generate correct labels for refund resource type', () => {
+      expect(generateChartLabel(AggregationType.BY_DAY, undefined, ChartResourceType.REFUND)).toBe(
+        'Daily Refund Metrics',
+      );
+      expect(generateChartLabel(AggregationType.BY_STATUS, undefined, ChartResourceType.REFUND)).toBe(
+        'Refund Metrics by Status',
+      );
+      expect(generateChartLabel(AggregationType.BY_TYPE, undefined, ChartResourceType.REFUND)).toBe(
+        'Refund Metrics by Type',
+      );
+    });
+
+    it('should generate correct labels for payout resource type', () => {
+      expect(generateChartLabel(AggregationType.BY_DAY, undefined, ChartResourceType.PAYOUT)).toBe(
+        'Daily Payout Metrics',
+      );
+      expect(generateChartLabel(AggregationType.BY_STATUS, undefined, ChartResourceType.PAYOUT)).toBe(
+        'Payout Metrics by Status',
+      );
+    });
+
+    it('should generate correct labels for dispute resource type', () => {
+      expect(generateChartLabel(AggregationType.BY_DAY, undefined, ChartResourceType.DISPUTE)).toBe(
+        'Daily Dispute Metrics',
+      );
+      expect(generateChartLabel(AggregationType.BY_CATEGORY, undefined, ChartResourceType.DISPUTE)).toBe(
+        'Dispute Metrics by Category',
+      );
+      expect(generateChartLabel(AggregationType.BY_RESOLUTION, undefined, ChartResourceType.DISPUTE)).toBe(
+        'Dispute Metrics by Resolution',
+      );
     });
 
     it('should include date range in label when provided', () => {
@@ -520,65 +586,6 @@ describe('Aggregation Functions', () => {
     });
   });
 
-  describe('aggregateTransactions', () => {
-    const transactions = [
-      createMockTransaction(1000, '2024-12-10T10:30:00Z', TransactionStatus.SUCCESS),
-      createMockTransaction(2000, '2024-12-11T10:30:00Z', TransactionStatus.FAILED),
-    ];
-
-    it('should route to aggregateByDay for by-day type', () => {
-      const result = aggregateTransactions(transactions, AggregationType.BY_DAY);
-      expect(result).toHaveLength(2);
-      expect(result[0].name).toMatch(/^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday), \w+ \d+$/);
-    });
-
-    it('should route to aggregateByHour for by-hour type', () => {
-      const result = aggregateTransactions(transactions, AggregationType.BY_HOUR);
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toMatch(/\d{2}:\d{2}/);
-    });
-
-    it('should route to aggregateByWeek for by-week type', () => {
-      const result = aggregateTransactions(transactions, AggregationType.BY_WEEK);
-      expect(result.length).toBeGreaterThan(0);
-      expect(result[0].name).toMatch(/2024-W\d{2}/);
-    });
-
-    it('should route to aggregateByMonth for by-month type', () => {
-      const result = aggregateTransactions(transactions, AggregationType.BY_MONTH);
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('2024-12');
-    });
-
-    it('should route to aggregateByStatus for by-status type', () => {
-      const result = aggregateTransactions(transactions, AggregationType.BY_STATUS);
-      expect(result).toHaveLength(2);
-      expect(result.some((d) => d.name === 'success')).toBe(true);
-      expect(result.some((d) => d.name === 'failed')).toBe(true);
-    });
-
-    it('should throw error for unknown aggregation type', () => {
-      expect(() => {
-        aggregateTransactions(transactions, 'unknown' as AggregationType);
-      }).toThrow('Unknown aggregation type: unknown');
-    });
-
-    it('should split aggregation by currency when mixed', () => {
-      const mixed = [
-        createMockTransaction(1000, '2024-12-10T10:30:00Z', TransactionStatus.SUCCESS), // NGN
-        { ...createMockTransaction(1500, '2024-12-10T12:00:00Z', TransactionStatus.SUCCESS), currency: 'USD' },
-      ];
-
-      const result = aggregateTransactions(mixed, AggregationType.BY_DAY);
-
-      const ngn = result.find((d) => d.currency === 'NGN');
-      const usd = result.find((d) => d.currency === 'USD');
-
-      expect(ngn).toMatchObject({ currency: 'NGN', volume: 1000, count: 1 });
-      expect(usd).toMatchObject({ currency: 'USD', volume: 1500, count: 1 });
-    });
-  });
-
   describe('calculateSummary', () => {
     it('should return zeros for empty transactions', () => {
       const result = calculateSummary([]);
@@ -673,6 +680,271 @@ describe('Aggregation Functions', () => {
         { currency: 'NGN', totalCount: 1, totalVolume: 1000, overallAverage: 1000 },
         { currency: 'USD', totalCount: 1, totalVolume: 2000, overallAverage: 2000 },
       ]);
+    });
+  });
+
+  describe('aggregateByType (Refunds)', () => {
+    const createMockRefund = (
+      amount: number,
+      createdAt: string,
+      refundType: RefundType = RefundType.FULL,
+    ): PaystackRefund => {
+      return {
+        id: Math.floor(Math.random() * 10000),
+        integration: 1,
+        domain: 'live',
+        currency: 'NGN',
+        transaction: 12345,
+        amount: amount * 100,
+        status: RefundStatus.PROCESSED,
+        dispute: null,
+        refunded_at: createdAt,
+        refunded_by: 'merchant',
+        createdAt,
+        transaction_reference: 'ref-123',
+        deducted_amount: '0',
+        fully_deducted: 0,
+        bank_reference: 'bank-ref',
+        refund_type: refundType,
+        transaction_amount: amount * 100,
+        retriable: false,
+        customer: {} as PaystackCustomer,
+      };
+    };
+
+    it('should return empty array for empty refunds', () => {
+      const result = aggregateByType([]);
+      expect(result).toEqual([]);
+    });
+
+    it('should aggregate refunds by type', () => {
+      const refunds = [
+        createMockRefund(1000, '2024-12-10T10:30:00Z', RefundType.FULL),
+        createMockRefund(500, '2024-12-11T10:30:00Z', RefundType.PARTIAL),
+        createMockRefund(2000, '2024-12-12T10:30:00Z', RefundType.FULL),
+      ];
+      const chartableRecords = toChartableRecords(refunds, refundFieldConfig);
+      const result = aggregateByType(chartableRecords);
+
+      expect(result).toHaveLength(2);
+
+      const fullRefunds = result.find((d) => d.name === 'full');
+      const partialRefunds = result.find((d) => d.name === 'partial');
+
+      expect(fullRefunds).toEqual({
+        name: 'full',
+        count: 2,
+        volume: 3000,
+        average: 1500,
+        currency: 'NGN',
+      });
+      expect(partialRefunds).toEqual({
+        name: 'partial',
+        count: 1,
+        volume: 500,
+        average: 500,
+        currency: 'NGN',
+      });
+    });
+  });
+
+  describe('aggregateByCategory (Disputes)', () => {
+    const createMockDispute = (
+      refundAmount: number,
+      createdAt: string,
+      category: DisputeCategory = DisputeCategory.CHARGEBACK,
+    ): PaystackDispute => {
+      return {
+        id: Math.floor(Math.random() * 10000),
+        refund_amount: refundAmount * 100,
+        currency: Currency.NGN,
+        status: DisputeStatusSlug.AWAITING_MERCHANT_FEEDBACK,
+        resolution: null,
+        domain: 'live',
+        transaction: {} as PaystackTransaction,
+        transaction_reference: 'ref-123',
+        category,
+        customer: {} as PaystackCustomer,
+        bin: null,
+        last4: null,
+        dueAt: createdAt,
+        resolvedAt: createdAt,
+        evidence: null,
+        attachments: null,
+        note: null,
+        history: [],
+        messages: [],
+        createdAt,
+        updatedAt: createdAt,
+      };
+    };
+
+    it('should return empty array for empty disputes', () => {
+      const result = aggregateByCategory([]);
+      expect(result).toEqual([]);
+    });
+
+    it('should aggregate disputes by category', () => {
+      const disputes = [
+        createMockDispute(1000, '2024-12-10T10:30:00Z', DisputeCategory.FRAUD),
+        createMockDispute(500, '2024-12-11T10:30:00Z', DisputeCategory.CHARGEBACK),
+        createMockDispute(2000, '2024-12-12T10:30:00Z', DisputeCategory.FRAUD),
+      ];
+      const chartableRecords = toChartableRecords(disputes, disputeFieldConfig);
+      const result = aggregateByCategory(chartableRecords);
+
+      expect(result).toHaveLength(2);
+
+      const fraudDisputes = result.find((d) => d.name === 'fraud');
+      const chargebackDisputes = result.find((d) => d.name === 'chargeback');
+
+      expect(fraudDisputes).toEqual({
+        name: 'fraud',
+        count: 2,
+        volume: 3000,
+        average: 1500,
+        currency: 'NGN',
+      });
+      expect(chargebackDisputes).toEqual({
+        name: 'chargeback',
+        count: 1,
+        volume: 500,
+        average: 500,
+        currency: 'NGN',
+      });
+    });
+  });
+
+  describe('aggregateByResolution (Disputes)', () => {
+    const createMockDisputeWithResolution = (
+      refundAmount: number,
+      createdAt: string,
+      resolution: DisputeResolutionSlug | null,
+    ): ChartableRecord => {
+      return {
+        amount: refundAmount * 100,
+        currency: 'NGN',
+        createdAt,
+        status: 'resolved',
+        resolution,
+      };
+    };
+
+    it('should return empty array for empty disputes', () => {
+      const result = aggregateByResolution([]);
+      expect(result).toEqual([]);
+    });
+
+    it('should aggregate disputes by resolution', () => {
+      const records: ChartableRecord[] = [
+        createMockDisputeWithResolution(1000, '2024-12-10T10:30:00Z', DisputeResolutionSlug.MERCHANT_ACCEPTED),
+        createMockDisputeWithResolution(500, '2024-12-11T10:30:00Z', DisputeResolutionSlug.DECLINED),
+        createMockDisputeWithResolution(2000, '2024-12-12T10:30:00Z', DisputeResolutionSlug.MERCHANT_ACCEPTED),
+        createMockDisputeWithResolution(1500, '2024-12-13T10:30:00Z', null), // pending
+      ];
+      const result = aggregateByResolution(records);
+
+      expect(result).toHaveLength(3);
+
+      const merchantAccepted = result.find((d) => d.name === 'merchant-accepted');
+      const declined = result.find((d) => d.name === 'declined');
+      const pending = result.find((d) => d.name === 'pending');
+
+      expect(merchantAccepted).toEqual({
+        name: 'merchant-accepted',
+        count: 2,
+        volume: 3000,
+        average: 1500,
+        currency: 'NGN',
+      });
+      expect(declined).toEqual({
+        name: 'declined',
+        count: 1,
+        volume: 500,
+        average: 500,
+        currency: 'NGN',
+      });
+      expect(pending).toEqual({
+        name: 'pending',
+        count: 1,
+        volume: 1500,
+        average: 1500,
+        currency: 'NGN',
+      });
+    });
+  });
+
+  describe('aggregateRecords', () => {
+    it('should route to aggregateByType for by-type aggregation', () => {
+      const records: ChartableRecord[] = [
+        {
+          amount: 100000,
+          currency: 'NGN',
+          createdAt: '2024-12-10T10:30:00Z',
+          status: 'processed',
+          type: RefundType.FULL,
+        },
+        {
+          amount: 50000,
+          currency: 'NGN',
+          createdAt: '2024-12-11T10:30:00Z',
+          status: 'processed',
+          type: RefundType.PARTIAL,
+        },
+      ];
+      const result = aggregateRecords(records, AggregationType.BY_TYPE);
+
+      expect(result).toHaveLength(2);
+      expect(result.some((d) => d.name === 'full')).toBe(true);
+      expect(result.some((d) => d.name === 'partial')).toBe(true);
+    });
+
+    it('should route to aggregateByCategory for by-category aggregation', () => {
+      const records: ChartableRecord[] = [
+        {
+          amount: 100000,
+          currency: 'NGN',
+          createdAt: '2024-12-10T10:30:00Z',
+          status: 'resolved',
+          category: DisputeCategory.FRAUD,
+        },
+        {
+          amount: 50000,
+          currency: 'NGN',
+          createdAt: '2024-12-11T10:30:00Z',
+          status: 'resolved',
+          category: DisputeCategory.CHARGEBACK,
+        },
+      ];
+      const result = aggregateRecords(records, AggregationType.BY_CATEGORY);
+
+      expect(result).toHaveLength(2);
+      expect(result.some((d) => d.name === 'fraud')).toBe(true);
+      expect(result.some((d) => d.name === 'chargeback')).toBe(true);
+    });
+
+    it('should route to aggregateByResolution for by-resolution aggregation', () => {
+      const records: ChartableRecord[] = [
+        {
+          amount: 100000,
+          currency: 'NGN',
+          createdAt: '2024-12-10T10:30:00Z',
+          status: 'resolved',
+          resolution: DisputeResolutionSlug.MERCHANT_ACCEPTED,
+        },
+        {
+          amount: 50000,
+          currency: 'NGN',
+          createdAt: '2024-12-11T10:30:00Z',
+          status: 'resolved',
+          resolution: DisputeResolutionSlug.DECLINED,
+        },
+      ];
+      const result = aggregateRecords(records, AggregationType.BY_RESOLUTION);
+
+      expect(result).toHaveLength(2);
+      expect(result.some((d) => d.name === 'merchant-accepted')).toBe(true);
+      expect(result.some((d) => d.name === 'declined')).toBe(true);
     });
   });
 });

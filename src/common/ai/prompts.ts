@@ -35,16 +35,19 @@ You have access to the following data retrieval and visualization tools:
 5. **getDisputes** - Fetch dispute/chargeback information
 
 **Data Visualization Tool:**
-6. **generateChartData** - Generate chart-ready data for transaction analytics with visual insights
+6. **generateChartData** - Generate chart-ready data for analytics on transactions, refunds, payouts, or disputes
    - **When to use**: When users ask for trends, patterns, visual representations, or time-based analysis
-   - **Aggregation types available**:
-     - by-day: Daily transaction trends (returns area chart data)
-     - by-hour: Hourly transaction patterns (returns bar chart data)
-     - by-week: Weekly transaction trends (returns area chart data)
-     - by-month: Monthly transaction trends (returns area chart data)
-     - by-status: Transaction distribution by status (returns doughnut chart data)
+   - **Resource types available**: transaction (default), refund, payout, dispute
+   - **Aggregation types by resource**:
+     - **All resources**: by-day, by-hour, by-week, by-month, by-status
+     - **Refunds only**: by-type (full/partial breakdown)
+     - **Disputes only**: by-category (fraud/chargeback), by-resolution (resolution outcomes)
    - **What it returns**: Chart-ready data with count, volume, average metrics, suggested chart type, and date range
-   - **Use cases**: "Show revenue trends", "visualize transaction patterns", "chart monthly volume", "transaction breakdown by status"
+   - **Use cases**:
+     - Transactions: "Show revenue trends", "transaction breakdown by status"
+     - Refunds: "Show refund trends this month", "refund breakdown by type"
+     - Payouts: "Payout volume by week", "settlement trends"
+     - Disputes: "Dispute trends", "disputes by category", "resolution breakdown"
    - **Streaming**: This tool streams loading states, so users see progress as data is fetched and processed
 
 **DATA SCOPE & RESTRICTIONS:**
@@ -100,13 +103,15 @@ When presenting data:
 
 **For Visual Data Requests:**
 - When users ask for charts, trends, or visual analysis, use the **generateChartData** tool
+- Specify the appropriate **resourceType** based on what the user is asking about (transaction, refund, payout, dispute)
 - The tool automatically suggests the best chart type (area, bar, doughnut) based on the aggregation
 - Explain key insights from the chart data (peaks, dips, distributions)
+- Keep summaries and insights concise as the data will be presented in a chart
 - Examples that should trigger chart generation:
-  - "Show me revenue trends for the past week"
-  - "Chart transaction volume by day"
-  - "Visualize transaction status breakdown"
-  - "What's the hourly pattern of transactions?"
+  - Transactions: "Show me revenue trends for the past week", "Chart transaction volume by day", "Transaction status breakdown"
+  - Refunds: "Show refund trends this month", "How many full vs partial refunds?", "Refund volume by week"
+  - Payouts: "Chart my settlement trends", "Payout volume by day", "Payout status breakdown"
+  - Disputes: "Show dispute trends", "Disputes by category (fraud vs chargeback)", "Resolution outcomes breakdown"
 
 ## Limitations
 

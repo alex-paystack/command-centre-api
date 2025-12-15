@@ -11,13 +11,18 @@ import type {
 } from './types/index';
 import { DisputeStatusSlug, PaymentChannel, PayoutStatus, RefundStatus, TransactionStatus } from './types/data';
 import { amountInBaseUnitToSubUnit, validateDateRange } from './utils';
+import { aggregateRecords, calculateSummary, generateChartLabel, getChartType } from './aggregation';
 import {
-  aggregateTransactions,
-  calculateSummary,
-  generateChartLabel,
-  getChartType,
   AggregationType,
-} from './aggregation';
+  ChartResourceType,
+  VALID_AGGREGATIONS,
+  API_ENDPOINTS,
+  getFieldConfig,
+  toChartableRecords,
+  isValidAggregation,
+  getResourceDisplayName,
+  ChartableResource,
+} from './chart-config';
 import { parseISO, format } from 'date-fns';
 
 /**
@@ -373,15 +378,32 @@ export function createGetDisputesTool(paystackService: PaystackApiService, getJw
 
 /**
  * Create the generateChartData tool
+ * Supports multiple resource types: transaction, refund, payout, dispute
  */
 export function createGenerateChartDataTool(
   paystackService: PaystackApiService,
   getJwtToken: () => string | undefined,
 ) {
   return tool({
-    description:
-      'Generate chart data for transaction analytics. Use this to create visualizations of transaction trends, patterns, and distributions. Supports aggregation by day, hour, week, month, or status. Returns Recharts-compatible data with count, volume, and average metrics.',
+    description: `Generate chart data for analytics on transactions, refunds, payouts, or disputes. Use this to create visualizations of trends, patterns, and distributions across different resource types.
+
+**Resource Types & Supported Aggregations:**
+- transaction: by-day, by-hour, by-week, by-month, by-status
+- refund: by-day, by-hour, by-week, by-month, by-status, by-type (full/partial)
+- payout: by-day, by-hour, by-week, by-month, by-status
+- dispute: by-day, by-hour, by-week, by-month, by-status, by-category (fraud/chargeback), by-resolution
+
+Returns Recharts-compatible data with count, volume, and average metrics.`,
     inputSchema: z.object({
+      resourceType: z
+        .enum([
+          ChartResourceType.TRANSACTION,
+          ChartResourceType.REFUND,
+          ChartResourceType.PAYOUT,
+          ChartResourceType.DISPUTE,
+        ])
+        .default(ChartResourceType.TRANSACTION)
+        .describe('Type of resource to generate chart data for (default: transaction)'),
       aggregationType: z
         .enum([
           AggregationType.BY_DAY,
@@ -389,22 +411,33 @@ export function createGenerateChartDataTool(
           AggregationType.BY_WEEK,
           AggregationType.BY_MONTH,
           AggregationType.BY_STATUS,
+          AggregationType.BY_TYPE,
+          AggregationType.BY_CATEGORY,
+          AggregationType.BY_RESOLUTION,
         ])
-        .describe('Type of aggregation: by-day, by-hour, by-week, by-month, or by-status'),
-      from: z.string().optional().describe('Start date for filtering transactions (ISO 8601 format, e.g., 2024-01-01)'),
-      to: z.string().optional().describe('End date for filtering transactions (ISO 8601 format, e.g., 2024-12-31)'),
-      status: z
-        .enum([TransactionStatus.SUCCESS, TransactionStatus.FAILED, TransactionStatus.ABANDONED])
-        .optional()
-        .describe('Filter by transaction status: success, failed, or abandoned'),
+        .describe(
+          'Type of aggregation. Time-based (by-day, by-hour, by-week, by-month) and by-status work for all resources. by-type is for refunds only. by-category and by-resolution are for disputes only.',
+        ),
+      from: z.string().optional().describe('Start date for filtering (ISO 8601 format, e.g., 2024-01-01)'),
+      to: z.string().optional().describe('End date for filtering (ISO 8601 format, e.g., 2024-12-31)'),
+      status: z.string().optional().describe('Filter by status (values depend on resource type)'),
       currency: z.string().optional().describe('Filter by currency (e.g., NGN, USD, GHS)'),
     }),
-    execute: async function* ({ aggregationType, from, to, status, currency }) {
+    execute: async function* ({ resourceType, aggregationType, from, to, status, currency }) {
       const jwtToken = getJwtToken();
 
       if (!jwtToken) {
         return {
           error: 'Authentication token not available. Please ensure you are logged in.',
+        };
+      }
+
+      // Validate aggregationType is valid for the selected resourceType
+      if (!isValidAggregation(resourceType, aggregationType)) {
+        const validAggregations = VALID_AGGREGATIONS[resourceType].join(', ');
+
+        return {
+          error: `Invalid aggregation type '${aggregationType}' for resource type '${resourceType}'. Valid options are: ${validAggregations}`,
         };
       }
 
@@ -420,42 +453,45 @@ export function createGenerateChartDataTool(
       try {
         const dateRange = { from, to };
         const chartType = getChartType(aggregationType);
+        const resourceDisplayName = getResourceDisplayName(resourceType);
+        const resourceDisplayNamePlural = `${resourceDisplayName.toLowerCase()}s`;
+        const endpoint = API_ENDPOINTS[resourceType];
+        const fieldConfig = getFieldConfig(resourceType);
 
         yield {
           loading: true,
-          label: generateChartLabel(aggregationType, dateRange),
+          label: generateChartLabel(aggregationType, dateRange, resourceType),
           chartType,
-          message: 'Fetching transactions...',
+          message: `Fetching ${resourceDisplayNamePlural}...`,
         };
 
-        // Fetch transactions with increased perPage for better aggregation (up to 500)
-        const allTransactions: PaystackTransaction[] = [];
+        // Fetch records with increased perPage for better aggregation (up to 500)
+        const allRecords: ChartableResource[] = [];
         const perPage = 100; // Max per request
-        // TDDO: Revisit this
-        const maxPages = 5; // Fetch up to 500 transactions total
+        const maxPages = 10; // Fetch up to 1000 records total
 
         for (let page = 1; page <= maxPages; page++) {
-          const params: Record<string, unknown> = {
+          const params = {
             perPage,
             page,
-            reduced_fields: true,
             use_cursor: false,
+            ...(resourceType === ChartResourceType.TRANSACTION && { reduced_fields: true }),
             ...(status && { status }),
             ...(from && { from }),
             ...(to && { to }),
             ...(currency && { currency }),
           };
 
-          const response = await paystackService.get<PaystackTransaction[]>('/transaction', jwtToken, params);
+          const response = await paystackService.get<ChartableResource[]>(endpoint, jwtToken, params);
 
-          allTransactions.push(...response.data);
+          allRecords.push(...response.data);
 
           if (page < maxPages && response.data.length === perPage) {
             yield {
               loading: true,
-              label: generateChartLabel(aggregationType, dateRange),
+              label: generateChartLabel(aggregationType, dateRange, resourceType),
               chartType,
-              message: `Fetching transactions... (${allTransactions.length} loaded)`,
+              message: `Fetching ${resourceDisplayNamePlural}... (${allRecords.length} loaded)`,
             };
           }
 
@@ -465,10 +501,10 @@ export function createGenerateChartDataTool(
           }
         }
 
-        if (allTransactions.length === 0) {
+        if (allRecords.length === 0) {
           yield {
             success: true,
-            label: generateChartLabel(aggregationType, dateRange),
+            label: generateChartLabel(aggregationType, dateRange, resourceType),
             chartType,
             chartData: [],
             summary: {
@@ -484,29 +520,31 @@ export function createGenerateChartDataTool(
                   }
                 : {}),
             },
-            message: 'No transactions found for the specified criteria',
+            message: `No ${resourceDisplayNamePlural} found for the specified criteria`,
           };
           return;
         }
 
         yield {
           loading: true,
-          label: generateChartLabel(aggregationType, dateRange),
+          label: generateChartLabel(aggregationType, dateRange, resourceType),
           chartType,
-          message: `Processing ${allTransactions.length} transactions...`,
+          message: `Processing ${allRecords.length} ${resourceDisplayNamePlural}...`,
         };
 
-        const chartData = aggregateTransactions(allTransactions, aggregationType);
+        const chartableRecords = toChartableRecords(allRecords, fieldConfig);
 
-        const summary = calculateSummary(allTransactions, dateRange);
+        const chartData = aggregateRecords(chartableRecords, aggregationType);
+
+        const summary = calculateSummary(chartableRecords, dateRange);
 
         yield {
           success: true,
-          label: generateChartLabel(aggregationType, dateRange),
+          label: generateChartLabel(aggregationType, dateRange, resourceType),
           chartType,
           chartData,
           summary,
-          message: `Generated chart data with ${chartData.length} data points from ${allTransactions.length} transactions`,
+          message: `Generated chart data with ${chartData.length} data points from ${allRecords.length} ${resourceDisplayNamePlural}`,
         };
       } catch (error: unknown) {
         return {
