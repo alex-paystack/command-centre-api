@@ -17,7 +17,7 @@ export class PageContextService {
   constructor(private readonly paystackApiService: PaystackApiService) {}
 
   /**
-   * Enrich page context by fetching resource data if not provided
+   * Enrich page context by fetching resource data
    */
   async enrichContext(pageContext: PageContext, jwtToken: string): Promise<EnrichedPageContext> {
     const resourceData = await this.fetchResourceData(pageContext.type, pageContext.resourceId, jwtToken);

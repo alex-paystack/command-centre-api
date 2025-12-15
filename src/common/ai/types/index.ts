@@ -32,6 +32,7 @@ export enum MessageClassificationIntent {
   ACCOUNT_HELP = 'ACCOUNT_HELP',
   ASSISTANT_CAPABILITIES = 'ASSISTANT_CAPABILITIES',
   OUT_OF_SCOPE = 'OUT_OF_SCOPE',
+  OUT_OF_PAGE_SCOPE = 'OUT_OF_PAGE_SCOPE',
 }
 
 export enum ChatResponseType {

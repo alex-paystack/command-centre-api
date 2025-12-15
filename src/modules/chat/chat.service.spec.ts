@@ -473,6 +473,31 @@ describe('ChatService', () => {
       expect(result?.responseStream).toBeDefined();
     });
 
+    it('should return refusal response when message is OUT_OF_PAGE_SCOPE', async () => {
+      const mockUIMessage = {
+        id: 'msg_123',
+        role: 'user' as const,
+        parts: [{ type: 'text' as const, text: 'How many terminals have I created?' }],
+      };
+      const mockHistory = [mockUIMessage];
+
+      classifyMessage.mockResolvedValue({
+        intent: MessageClassificationIntent.OUT_OF_PAGE_SCOPE,
+        confidence: 0.95,
+        needsMerchantData: false,
+      });
+
+      const result = await service.handleMessageClassification(mockHistory, {
+        type: PageContextType.TRANSACTION,
+        resourceId: 'ref_123',
+      });
+
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(result).toBeDefined();
+      expect(result?.type).toBe(ChatResponseType.REFUSAL);
+      expect(result?.responseStream).toBeDefined();
+    });
+
     it('should return null when message classification is DASHBOARD_INSIGHT', async () => {
       classifyMessage.mockResolvedValue({
         intent: MessageClassificationIntent.DASHBOARD_INSIGHT,

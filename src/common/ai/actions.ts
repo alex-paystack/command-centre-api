@@ -1,9 +1,14 @@
 import { generateObject, generateText, type UIMessage } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { CONVERSATION_TITLE_GENERATION_PROMPT, CLASSIFIER_SYSTEM_PROMPT, getClassifierUserPrompt } from './prompts';
+import {
+  CONVERSATION_TITLE_GENERATION_PROMPT,
+  CLASSIFIER_SYSTEM_PROMPT,
+  getClassifierUserPrompt,
+  PAGE_SCOPED_CLASSIFIER_SYSTEM_PROMPT,
+} from './prompts';
 import { getTextFromMessage, getTextFromMessages } from './utils';
 import { z } from 'zod';
-import { MessageClassificationIntent } from './types';
+import { MessageClassificationIntent, PageContext } from './types';
 
 /**
  * Generate a conversation title from a message
@@ -36,6 +41,7 @@ const ClassifierSchema = z.object({
     MessageClassificationIntent.ACCOUNT_HELP,
     MessageClassificationIntent.ASSISTANT_CAPABILITIES,
     MessageClassificationIntent.OUT_OF_SCOPE,
+    MessageClassificationIntent.OUT_OF_PAGE_SCOPE,
   ]),
   confidence: z.number().min(0).max(1),
   needsMerchantData: z.boolean(),
@@ -50,12 +56,18 @@ const ClassifierSchema = z.object({
  * @param messages - The conversation history
  * @returns The classified intent
  */
-export async function classifyMessage(messages: UIMessage[]) {
+export async function classifyMessage(messages: UIMessage[], pageContext?: PageContext) {
   try {
+    let systemPrompt = CLASSIFIER_SYSTEM_PROMPT;
+
+    if (pageContext) {
+      systemPrompt = PAGE_SCOPED_CLASSIFIER_SYSTEM_PROMPT.replace(/\{\{RESOURCE_TYPE\}\}/g, pageContext.type);
+    }
+
     const { object } = await generateObject({
       model: openai('gpt-4o-mini'),
       schema: ClassifierSchema,
-      system: CLASSIFIER_SYSTEM_PROMPT,
+      system: systemPrompt,
       prompt: getClassifierUserPrompt(getTextFromMessages(messages)),
     });
 

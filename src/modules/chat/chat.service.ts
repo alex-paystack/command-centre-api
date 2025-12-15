@@ -9,7 +9,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
-import { ChatMode } from '../../common/ai/types';
+import { ChatMode, PageContext } from '../../common/ai/types';
 import { MessageRole } from './entities/message.entity';
 import {
   generateConversationTitle,
@@ -143,11 +143,32 @@ export class ChatService {
     }
   }
 
-  async handleMessageClassification(messages: UIMessage[]) {
-    const messageClassification = await classifyMessage(messages);
+  async handleMessageClassification(messages: UIMessage[], pageContext?: PageContext) {
+    const messageClassification = await classifyMessage(messages, pageContext);
 
     if (messageClassification?.intent === MessageClassificationIntent.OUT_OF_SCOPE) {
-      const refusalText = policy.refusalText;
+      const refusalText = policy.outOfScopeRefusalText;
+
+      const refusalStream = createUIMessageStream<ClassificationUIMessage>({
+        execute: ({ writer }) => {
+          writer.write({
+            type: 'data-refusal',
+            data: {
+              text: refusalText,
+            },
+          });
+        },
+      });
+
+      return {
+        type: ChatResponseType.REFUSAL,
+        responseStream: refusalStream,
+        text: refusalText,
+      };
+    }
+
+    if (messageClassification?.intent === MessageClassificationIntent.OUT_OF_PAGE_SCOPE) {
+      const refusalText = policy.outOfPageScopeRefusalText.replace(/\{\{RESOURCE_TYPE\}\}/g, pageContext?.type || '');
 
       const refusalStream = createUIMessageStream<ClassificationUIMessage>({
         execute: ({ writer }) => {
@@ -171,7 +192,7 @@ export class ChatService {
   }
 
   async handleStreamingChat(dto: ChatRequestDto, userId: string, jwtToken: string) {
-    const { conversationId, message, pageKey } = dto;
+    const { conversationId, message, pageKey, pageContext } = dto;
 
     await this.checkUserEntitlement(userId);
 
@@ -206,7 +227,7 @@ export class ChatService {
     const limitedHistory = allMessages.slice(-historyLimit);
     const uiMessages = [...convertToUIMessages(limitedHistory), message];
 
-    const messageClassification = await this.handleMessageClassification(uiMessages);
+    const messageClassification = await this.handleMessageClassification(uiMessages, pageContext);
 
     await this.messageRepository.createMessage({
       conversationId,
