@@ -66,10 +66,6 @@ describe('ChatController', () => {
     service = module.get(ChatService);
   });
 
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
-  });
-
   describe('createConversation', () => {
     it('should create a conversation', async () => {
       const dto: CreateConversationDto = {

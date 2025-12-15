@@ -67,11 +67,10 @@ export enum PageContextType {
 export interface PageContext {
   type: PageContextType;
   resourceId: string; // ID or reference
-  resourceData?: unknown; // Optional pre-fetched data from client
 }
 
 export interface EnrichedPageContext extends PageContext {
-  resourceData: unknown; // Required after enrichment
+  resourceData: unknown;
   formattedData: string; // Formatted for prompt injection
 }
 

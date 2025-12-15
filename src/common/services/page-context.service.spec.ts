@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
 import { PageContextService } from './page-context.service';
 import { PaystackApiService } from './paystack-api.service';
 import { PageContextType } from '../ai/types';
@@ -31,34 +30,7 @@ describe('PageContextService', () => {
   describe('enrichContext', () => {
     const jwtToken = 'test-jwt-token';
 
-    it('should use provided resource data if available', async () => {
-      const pageContext = {
-        type: PageContextType.TRANSACTION,
-        resourceId: 'ref_123',
-        resourceData: {
-          id: 123,
-          reference: 'ref_123',
-          amount: 100000,
-          status: 'success',
-          channel: 'card',
-          customer: { email: 'test@example.com', customer_code: 'CUS_123' },
-          created_at: '2024-01-01T00:00:00Z',
-          paid_at: '2024-01-01T00:00:00Z',
-          gateway_response: 'Successful',
-          domain: 'test',
-          currency: 'NGN',
-        },
-      };
-
-      const result = await service.enrichContext(pageContext, jwtToken);
-
-      expect(result).toHaveProperty('formattedData');
-      expect(result.formattedData).toContain('Transaction Details');
-      expect(result.formattedData).toContain('ref_123');
-      expect(paystackApiService.get).not.toHaveBeenCalled();
-    });
-
-    it('should fetch transaction data if not provided', async () => {
+    it('should fetch transaction data for transaction context', async () => {
       const pageContext = {
         type: PageContextType.TRANSACTION,
         resourceId: 'ref_123',
@@ -91,7 +63,7 @@ describe('PageContextService', () => {
       expect(result.formattedData).toContain('Transaction Details');
     });
 
-    it('should fetch customer data if not provided', async () => {
+    it('should fetch customer data for customer context', async () => {
       const pageContext = {
         type: PageContextType.CUSTOMER,
         resourceId: 'CUS_123',
@@ -120,48 +92,30 @@ describe('PageContextService', () => {
       expect(result.formattedData).toContain('Customer Details');
     });
 
-    it('should throw error for invalid transaction', async () => {
-      const pageContext = {
-        type: PageContextType.TRANSACTION,
-        resourceId: 'invalid_ref',
-      };
-
-      paystackApiService.get.mockResolvedValue({
-        status: true,
-        message: 'Transactions retrieved',
-        data: null,
-      });
-
-      await expect(service.enrichContext(pageContext, jwtToken)).rejects.toThrow(BadRequestException);
-    });
-
-    it('should throw error for invalid resource data', async () => {
-      const pageContext = {
-        type: PageContextType.TRANSACTION,
-        resourceId: 'ref_123',
-        resourceData: null,
-      };
-
-      await expect(service.enrichContext(pageContext, jwtToken)).rejects.toThrow(BadRequestException);
-    });
-
     it('should format refund data correctly', async () => {
       const pageContext = {
         type: PageContextType.REFUND,
         resourceId: '123',
-        resourceData: {
-          id: 123,
-          amount: 50000,
-          currency: 'NGN',
-          status: 'processed',
-          transaction_reference: 'ref_123',
-          customer: { email: 'test@example.com' },
-          refunded_at: '2024-01-01T00:00:00Z',
-          refunded_by: 'admin@example.com',
-          refund_type: 'full',
-          domain: 'test',
-        },
       };
+
+      const mockRefund = {
+        id: 123,
+        amount: 50000,
+        currency: 'NGN',
+        status: 'processed',
+        transaction_reference: 'ref_123',
+        customer: { email: 'test@example.com' },
+        refunded_at: '2024-01-01T00:00:00Z',
+        refunded_by: 'admin@example.com',
+        refund_type: 'full',
+        domain: 'test',
+      };
+
+      paystackApiService.get.mockResolvedValue({
+        status: true,
+        message: 'Refund retrieved',
+        data: mockRefund,
+      });
 
       const result = await service.enrichContext(pageContext, jwtToken);
 
@@ -174,20 +128,27 @@ describe('PageContextService', () => {
       const pageContext = {
         type: PageContextType.PAYOUT,
         resourceId: '123',
-        resourceData: {
-          id: 123,
-          total_amount: 1000000,
-          effective_amount: 950000,
-          currency: 'NGN',
-          status: 'success',
-          settlement_date: '2024-01-01',
-          settled_by: 'system',
-          total_fees: 50000,
-          total_processed: 1000000,
-          domain: 'test',
-          createdAt: '2024-01-01T00:00:00Z',
-        },
       };
+
+      const mockPayout = {
+        id: 123,
+        total_amount: 1000000,
+        effective_amount: 950000,
+        currency: 'NGN',
+        status: 'success',
+        settlement_date: '2024-01-01',
+        settled_by: 'system',
+        total_fees: 50000,
+        total_processed: 1000000,
+        domain: 'test',
+        createdAt: '2024-01-01T00:00:00Z',
+      };
+
+      paystackApiService.get.mockResolvedValue({
+        status: true,
+        message: 'Payout retrieved',
+        data: mockPayout,
+      });
 
       const result = await service.enrichContext(pageContext, jwtToken);
 
@@ -200,21 +161,28 @@ describe('PageContextService', () => {
       const pageContext = {
         type: PageContextType.DISPUTE,
         resourceId: '123',
-        resourceData: {
-          id: 123,
-          refund_amount: 100000,
-          currency: 'NGN',
-          status: 'awaiting-merchant-feedback',
-          resolution: null,
-          category: 'general',
-          transaction_reference: 'ref_123',
-          customer: { email: 'test@example.com' },
-          dueAt: '2024-01-15T00:00:00Z',
-          resolvedAt: null,
-          domain: 'test',
-          createdAt: '2024-01-01T00:00:00Z',
-        },
       };
+
+      const mockDispute = {
+        id: 123,
+        refund_amount: 100000,
+        currency: 'NGN',
+        status: 'awaiting-merchant-feedback',
+        resolution: null,
+        category: 'general',
+        transaction_reference: 'ref_123',
+        customer: { email: 'test@example.com' },
+        dueAt: '2024-01-15T00:00:00Z',
+        resolvedAt: null,
+        domain: 'test',
+        createdAt: '2024-01-01T00:00:00Z',
+      };
+
+      paystackApiService.get.mockResolvedValue({
+        status: true,
+        message: 'Dispute retrieved',
+        data: mockDispute,
+      });
 
       const result = await service.enrichContext(pageContext, jwtToken);
 

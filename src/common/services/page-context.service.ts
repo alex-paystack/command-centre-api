@@ -20,13 +20,7 @@ export class PageContextService {
    * Enrich page context by fetching resource data if not provided
    */
   async enrichContext(pageContext: PageContext, jwtToken: string): Promise<EnrichedPageContext> {
-    let resourceData = pageContext.resourceData;
-
-    if (!resourceData) {
-      resourceData = await this.fetchResourceData(pageContext.type, pageContext.resourceId, jwtToken);
-    }
-
-    this.validateResourceData(pageContext.type, resourceData);
+    const resourceData = await this.fetchResourceData(pageContext.type, pageContext.resourceId, jwtToken);
 
     const formattedData = this.formatResourceData(pageContext.type, resourceData);
 
@@ -126,38 +120,6 @@ export class PageContextService {
   }
 
   /**
-   * Validate that resource data matches expected structure
-   */
-  private validateResourceData(resourceType: PageContextType, resourceData: unknown) {
-    if (!resourceData || typeof resourceData !== 'object') {
-      throw new BadRequestException(`Invalid resource data for ${resourceType}`);
-    }
-
-    // Basic validation - ensure data has expected fields
-    const data = resourceData as Record<string, unknown>;
-
-    switch (resourceType) {
-      case PageContextType.TRANSACTION:
-        if (!data.reference && !data.id) {
-          throw new BadRequestException('Transaction must have reference or id');
-        }
-        break;
-      case PageContextType.CUSTOMER:
-        if (!data.customer_code && !data.id) {
-          throw new BadRequestException('Customer must have customer_code or id');
-        }
-        break;
-      case PageContextType.REFUND:
-      case PageContextType.PAYOUT:
-      case PageContextType.DISPUTE:
-        if (!data.id) {
-          throw new BadRequestException(`${resourceType} must have id`);
-        }
-        break;
-    }
-  }
-
-  /**
    * Format resource data for prompt injection
    */
   private formatResourceData(resourceType: PageContextType, resourceData: unknown) {
@@ -190,8 +152,8 @@ export class PageContextService {
     - Status: ${transaction.status}
     - Channel: ${transaction.channel}
     - Customer Email: ${transaction.customer?.email || 'N/A'}
-    - Customer Code: ${transaction.customer.customer_code || 'N/A'}
-    - Customer ID: ${transaction.customer.id || 'N/A'}
+    - Customer Code: ${transaction.customer?.customer_code || 'N/A'}
+    - Customer ID: ${transaction.customer?.id || 'N/A'}
     - Created At: ${transaction.createdAt}
     - Paid At: ${transaction.paid_at || 'N/A'}
     - Gateway Response: ${transaction.gateway_response || 'N/A'}

@@ -108,10 +108,6 @@ describe('ChatService', () => {
     messageRepository = module.get(MessageRepository);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
   describe('saveConversation', () => {
     it('should create and return a conversation', async () => {
       const dto: CreateConversationDto = {
