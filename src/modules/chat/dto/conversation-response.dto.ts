@@ -1,6 +1,7 @@
 import { Exclude, Expose } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { Conversation } from '../entities/conversation.entity';
+import { ChatMode, PageContextType } from 'src/common/ai/types';
 
 @Exclude()
 export class ConversationResponseDto {
@@ -26,11 +27,28 @@ export class ConversationResponseDto {
   userId: string;
 
   @ApiProperty({
-    description: 'Page key where the conversation is scoped',
-    example: 'dashboard/payments',
+    description: 'Chat mode: global (command centre page) or page (scoped to specific resource)',
+    enum: ChatMode,
+    default: ChatMode.GLOBAL,
+    example: ChatMode.GLOBAL,
   })
   @Expose()
-  pageKey: string;
+  mode: ChatMode;
+
+  @ApiProperty({
+    description: 'Page context type: transaction, customer, refund, payout, dispute',
+    enum: PageContextType,
+    example: PageContextType.TRANSACTION,
+  })
+  @Expose()
+  contextType?: PageContextType;
+
+  @ApiProperty({
+    description: 'Resource ID or reference (e.g., transaction reference, customer code)',
+    example: 'ref_abc123',
+  })
+  @Expose()
+  contextResourceId?: string;
 
   @ApiProperty({
     description: 'Timestamp when the conversation was created',
@@ -44,7 +62,9 @@ export class ConversationResponseDto {
     dto.id = conversation.id;
     dto.title = conversation.title;
     dto.userId = conversation.userId;
-    dto.pageKey = conversation.pageKey;
+    dto.contextType = conversation.contextType;
+    dto.contextResourceId = conversation.contextResourceId;
+    dto.mode = conversation.mode;
     dto.createdAt = conversation.createdAt;
     return dto;
   }

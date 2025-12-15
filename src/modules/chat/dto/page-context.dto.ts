@@ -1,5 +1,5 @@
-import { IsEnum, IsNotEmpty, IsString, IsOptional, ValidateIf } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 import { PageContextType } from '../../../common/ai/types';
 
 export class PageContextDto {
@@ -19,16 +19,4 @@ export class PageContextDto {
   @IsString()
   @IsNotEmpty()
   resourceId: string;
-
-  @ApiPropertyOptional({
-    description: 'Optional pre-fetched resource data from client',
-    example: {
-      id: 123,
-      amount: 100000,
-      status: 'success',
-    },
-  })
-  @IsOptional()
-  @ValidateIf((dto: PageContextDto) => dto.resourceData !== undefined)
-  resourceData?: unknown;
 }

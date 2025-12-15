@@ -9,7 +9,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
-import { ChatMode } from '../../common/ai/types';
+import { ChatMode, PageContext } from '../../common/ai/types';
 import { MessageRole } from './entities/message.entity';
 import {
   generateConversationTitle,
@@ -102,7 +102,9 @@ export class ChatService {
       id: dto.id,
       title: dto.title,
       userId: dto.userId,
-      pageKey: dto.pageKey,
+      mode: dto.mode,
+      contextType: dto.mode === ChatMode.PAGE ? dto.pageContext?.type : undefined,
+      contextResourceId: dto.mode === ChatMode.PAGE ? dto.pageContext?.resourceId : undefined,
     });
 
     return ConversationResponseDto.fromEntity(conversation);
@@ -143,11 +145,32 @@ export class ChatService {
     }
   }
 
-  async handleMessageClassification(messages: UIMessage[]) {
+  async handleMessageClassification(messages: UIMessage[], pageContext?: PageContext) {
     const messageClassification = await classifyMessage(messages);
 
     if (messageClassification?.intent === MessageClassificationIntent.OUT_OF_SCOPE) {
-      const refusalText = policy.refusalText;
+      const refusalText = policy.outOfScopeRefusalText;
+
+      const refusalStream = createUIMessageStream<ClassificationUIMessage>({
+        execute: ({ writer }) => {
+          writer.write({
+            type: 'data-refusal',
+            data: {
+              text: refusalText,
+            },
+          });
+        },
+      });
+
+      return {
+        type: ChatResponseType.REFUSAL,
+        responseStream: refusalStream,
+        text: refusalText,
+      };
+    }
+
+    if (messageClassification?.intent === MessageClassificationIntent.OUT_OF_PAGE_SCOPE) {
+      const refusalText = policy.outOfPageScopeRefusalText.replace(/\{\{RESOURCE_TYPE\}\}/g, pageContext?.type || '');
 
       const refusalStream = createUIMessageStream<ClassificationUIMessage>({
         execute: ({ writer }) => {
@@ -171,7 +194,12 @@ export class ChatService {
   }
 
   async handleStreamingChat(dto: ChatRequestDto, userId: string, jwtToken: string) {
-    const { conversationId, message, pageKey } = dto;
+    const { conversationId, message, pageKey, pageContext } = dto;
+    const chatMode = dto.mode || ChatMode.GLOBAL;
+
+    if (chatMode === ChatMode.PAGE && !pageContext) {
+      throw new BadRequestException('pageContext is required when mode is "page"');
+    }
 
     await this.checkUserEntitlement(userId);
 
@@ -189,7 +217,9 @@ export class ChatService {
           id: conversationId,
           title,
           userId,
-          pageKey,
+          mode: chatMode,
+          contextType: chatMode === ChatMode.PAGE ? pageContext?.type : undefined,
+          contextResourceId: chatMode === ChatMode.PAGE ? pageContext?.resourceId : undefined,
         });
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -200,13 +230,28 @@ export class ChatService {
       throw new NotFoundException(`Conversation with ID ${conversationId} not found`);
     }
 
+    if (conversation.contextType || conversation.contextResourceId) {
+      if (chatMode !== ChatMode.PAGE) {
+        throw new BadRequestException('Conversation is page-scoped and must use mode "page"');
+      }
+      if (!pageContext) {
+        throw new BadRequestException('pageContext is required for this page-scoped conversation');
+      }
+      if (pageContext.type !== conversation.contextType || pageContext.resourceId !== conversation.contextResourceId) {
+        throw new BadRequestException('Conversation is locked to a different page context');
+      }
+    } else if (chatMode === ChatMode.PAGE) {
+      // Do not allow turning an existing global conversation into page-scoped
+      throw new BadRequestException('Cannot change an existing conversation to a page-scoped context');
+    }
+
     const allMessages = await this.getMessagesByConversationId(conversationId, userId);
     // TDDO: Revisit this
     const historyLimit = this.configService.get<number>('MESSAGE_HISTORY_LIMIT', 40);
     const limitedHistory = allMessages.slice(-historyLimit);
     const uiMessages = [...convertToUIMessages(limitedHistory), message];
 
-    const messageClassification = await this.handleMessageClassification(uiMessages);
+    const messageClassification = await this.handleMessageClassification(uiMessages, pageContext);
 
     await this.messageRepository.createMessage({
       conversationId,
@@ -233,8 +278,6 @@ export class ChatService {
     }
 
     const getJwtToken = () => jwtToken;
-
-    const chatMode = dto.mode || ChatMode.GLOBAL;
     let systemPrompt: string;
     let tools: ReturnType<typeof createTools>;
 

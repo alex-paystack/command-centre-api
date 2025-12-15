@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChatService } from './chat.service';
 import { ConversationRepository } from './repositories/conversation.repository';
@@ -14,7 +14,6 @@ import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exc
 import { PaystackApiService } from '../../common/services/paystack-api.service';
 import { PageContextService } from '../../common/services/page-context.service';
 import { MessageClassificationIntent, ChatResponseType, PageContextType } from '../../common/ai/types';
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-return
 jest.mock('../../common/ai/actions', () => ({
   ...jest.requireActual('../../common/ai/actions'),
@@ -32,7 +31,7 @@ describe('ChatService', () => {
     id: '123e4567-e89b-12d3-a456-426614174000',
     title: 'Test Conversation',
     userId: 'user_123',
-    pageKey: 'dashboard/payments',
+    mode: ChatMode.GLOBAL,
     createdAt: new Date('2024-01-01'),
     messages: [],
   };
@@ -118,7 +117,7 @@ describe('ChatService', () => {
         id: mockConversation.id,
         title: mockConversation.title,
         userId: mockConversation.userId,
-        pageKey: mockConversation.pageKey,
+        mode: mockConversation.mode,
       };
 
       jest.spyOn(conversationRepository, 'createConversation').mockResolvedValue(mockConversation);
@@ -130,7 +129,7 @@ describe('ChatService', () => {
           id: dto.id,
           title: dto.title,
           userId: dto.userId,
-          pageKey: dto.pageKey,
+          mode: dto.mode,
         }),
       );
       expect(result.id).toBe(mockConversation.id);
@@ -528,6 +527,31 @@ describe('ChatService', () => {
       expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
       expect(result).toBeNull();
     });
+
+    it('should return refusal response when message is OUT_OF_PAGE_SCOPE', async () => {
+      const mockUIMessage = {
+        id: 'msg_123',
+        role: 'user' as const,
+        parts: [{ type: 'text' as const, text: 'How many terminals have I created?' }],
+      };
+      const mockHistory = [mockUIMessage];
+
+      classifyMessage.mockResolvedValue({
+        intent: MessageClassificationIntent.OUT_OF_PAGE_SCOPE,
+        confidence: 0.95,
+        needsMerchantData: false,
+      });
+
+      const result = await service.handleMessageClassification(mockHistory, {
+        type: PageContextType.TRANSACTION,
+        resourceId: 'ref_123',
+      });
+
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(result).toBeDefined();
+      expect(result?.type).toBe(ChatResponseType.REFUSAL);
+      expect(result?.responseStream).toBeDefined();
+    });
   });
 
   describe('handleStreamingChat', () => {
@@ -615,6 +639,44 @@ describe('ChatService', () => {
             'mock-jwt-token',
           ),
         ).rejects.toThrow('pageContext is required when mode is "page"');
+      });
+
+      it('should throw BadRequestException when pageContext does not match locked conversation context', async () => {
+        const pageConversation = {
+          ...mockConversation,
+          contextType: PageContextType.TRANSACTION,
+          contextResourceId: 'ref_123',
+        };
+        jest.spyOn(conversationRepository, 'findById').mockResolvedValue(pageConversation);
+        jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(pageConversation);
+
+        await expect(
+          service.handleStreamingChat(
+            {
+              conversationId: pageConversation.id,
+              message: { id: '123', role: MessageRole.USER, parts: [{ type: 'text', text: 'hi' }] },
+              mode: ChatMode.PAGE,
+              pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_other' },
+            },
+            pageConversation.userId,
+            'mock-jwt-token',
+          ),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should prevent converting an existing global conversation to page-scoped', async () => {
+        await expect(
+          service.handleStreamingChat(
+            {
+              conversationId: mockConversation.id,
+              message: { id: '123', role: MessageRole.USER, parts: [{ type: 'text', text: 'hi' }] },
+              mode: ChatMode.PAGE,
+              pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_123' },
+            },
+            mockConversation.userId,
+            'mock-jwt-token',
+          ),
+        ).rejects.toThrow(BadRequestException);
       });
     });
   });

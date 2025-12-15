@@ -36,6 +36,7 @@ const ClassifierSchema = z.object({
     MessageClassificationIntent.ACCOUNT_HELP,
     MessageClassificationIntent.ASSISTANT_CAPABILITIES,
     MessageClassificationIntent.OUT_OF_SCOPE,
+    MessageClassificationIntent.OUT_OF_PAGE_SCOPE,
   ]),
   confidence: z.number().min(0).max(1),
   needsMerchantData: z.boolean(),

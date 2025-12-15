@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsUUID, IsOptional, IsString, ValidateNested, IsEnum, ValidateIf } from 'class-validator';
+import { IsNotEmpty, IsUUID, IsOptional, ValidateNested, IsEnum, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { type UIMessage } from 'ai';
@@ -28,15 +28,6 @@ export class ChatRequestDto {
   })
   @IsNotEmpty()
   message: UIMessage;
-
-  @ApiPropertyOptional({
-    description: 'Page key where this conversation belongs. Required when creating a new conversation via stream.',
-    example: 'dashboard/payments',
-  })
-  @IsString()
-  @IsOptional()
-  @IsNotEmpty()
-  pageKey?: string;
 
   @ApiProperty({
     description: 'Chat mode: global (command centre page) or page (scoped to specific resource)',

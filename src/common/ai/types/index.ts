@@ -32,6 +32,7 @@ export enum MessageClassificationIntent {
   ACCOUNT_HELP = 'ACCOUNT_HELP',
   ASSISTANT_CAPABILITIES = 'ASSISTANT_CAPABILITIES',
   OUT_OF_SCOPE = 'OUT_OF_SCOPE',
+  OUT_OF_PAGE_SCOPE = 'OUT_OF_PAGE_SCOPE',
 }
 
 export enum ChatResponseType {
@@ -67,11 +68,10 @@ export enum PageContextType {
 export interface PageContext {
   type: PageContextType;
   resourceId: string; // ID or reference
-  resourceData?: unknown; // Optional pre-fetched data from client
 }
 
 export interface EnrichedPageContext extends PageContext {
-  resourceData: unknown; // Required after enrichment
+  resourceData: unknown;
   formattedData: string; // Formatted for prompt injection
 }
 

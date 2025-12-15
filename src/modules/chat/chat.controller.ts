@@ -21,7 +21,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
-import { PaystackResponse } from '../../common';
+import { ChatMode, PaystackResponse } from '../../common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { createUIMessageStreamResponse } from 'ai';
 
@@ -46,13 +46,13 @@ export class ChatController {
   @Get('conversations')
   @ApiOperation({ summary: 'Get all conversations for the authenticated user' })
   @ApiQuery({
-    name: 'pageKey',
+    name: 'mode',
     required: false,
-    description: 'When provided, conversations will be filtered to this page key',
+    description: 'When provided, conversations will be filtered to this chat mode',
   })
   @ApiResponse({ status: 200, description: 'List of conversations', type: [ConversationResponseDto] })
-  async getConversationsByUserId(@CurrentUser() userId: string, @Query('pageKey') pageKey?: string) {
-    const conversations = await this.chatService.getConversationsByUserId(userId, pageKey);
+  async getConversationsByUserId(@CurrentUser() userId: string, @Query('mode') mode?: ChatMode) {
+    const conversations = await this.chatService.getConversationsByUserId(userId, mode);
     return PaystackResponse.success(conversations, 'Conversations retrieved successfully');
   }
 
