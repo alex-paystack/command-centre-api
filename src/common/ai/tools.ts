@@ -22,6 +22,7 @@ import {
   isValidAggregation,
   getResourceDisplayName,
   ChartableResource,
+  STATUS_VALUES,
 } from './chart-config';
 import { parseISO, format } from 'date-fns';
 
@@ -432,12 +433,17 @@ Returns Recharts-compatible data with count, volume, and average metrics.`,
         };
       }
 
-      // Validate aggregationType is valid for the selected resourceType
       if (!isValidAggregation(resourceType, aggregationType)) {
         const validAggregations = VALID_AGGREGATIONS[resourceType].join(', ');
 
         return {
           error: `Invalid aggregation type '${aggregationType}' for resource type '${resourceType}'. Valid options are: ${validAggregations}`,
+        };
+      }
+
+      if (status && !STATUS_VALUES[resourceType].includes(status)) {
+        return {
+          error: `Invalid status '${status}' for resource type '${resourceType}'. Valid options are: ${STATUS_VALUES[resourceType].join(', ')}`,
         };
       }
 
@@ -468,6 +474,7 @@ Returns Recharts-compatible data with count, volume, and average metrics.`,
         // Fetch records with increased perPage for better aggregation (up to 500)
         const allRecords: ChartableResource[] = [];
         const perPage = 100; // Max per request
+        // TODO: Review this limit
         const maxPages = 10; // Fetch up to 1000 records total
 
         for (let page = 1; page <= maxPages; page++) {

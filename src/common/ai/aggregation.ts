@@ -1,4 +1,4 @@
-import { format, getISOWeek, getISOWeekYear, parseISO } from 'date-fns';
+import { format, getISOWeek, getISOWeekYear, isValid, parseISO } from 'date-fns';
 import type { ChartableRecord } from './chart-config';
 import { AggregationType, ChartResourceType, getResourceDisplayName } from './chart-config';
 import { amountInSubUnitToBaseUnit } from './utils';
@@ -21,8 +21,8 @@ export interface ChartDataPoint {
  */
 export interface ChartSummary {
   totalCount: number;
-  totalVolume: number;
-  overallAverage: number;
+  totalVolume: number | null;
+  overallAverage: number | null;
   perCurrency?: {
     currency: string;
     totalCount: number;
@@ -98,9 +98,7 @@ export function generateChartLabel(
   let label = labelMap[aggregationType];
 
   // Add date range if provided
-  if (dateRange?.from || dateRange?.to) {
-    const formatDate = (dateStr: string) => format(parseISO(dateStr), 'MMM d, yyyy');
-
+  if ((dateRange?.from && isValid(parseISO(dateRange.from))) || (dateRange?.to && isValid(parseISO(dateRange.to)))) {
     if (dateRange.from && dateRange.to) {
       label += ` (${formatDate(dateRange.from)} - ${formatDate(dateRange.to)})`;
     } else if (dateRange.from) {
@@ -157,6 +155,47 @@ function groupByCurrency(records: ChartableRecord[]): Map<string, ChartableRecor
   }
 
   return grouped;
+}
+
+/**
+ * Reusable categorical aggregator
+ */
+export function aggregateByKey(
+  records: ChartableRecord[],
+  keySelector: (record: ChartableRecord) => string | null | undefined,
+  options: { unknownLabel?: string; sortKeys?: (a: string, b: string) => number } = {},
+): ChartDataPoint[] {
+  const chartData: ChartDataPoint[] = [];
+  const { unknownLabel = 'unknown', sortKeys = (a, b) => a.localeCompare(b) } = options;
+  const currencyGroups = groupByCurrency(records);
+
+  for (const currency of Array.from(currencyGroups.keys()).sort()) {
+    const recordsByCurrency = currencyGroups.get(currency)!;
+    const groupedByKey = new Map<string, ChartableRecord[]>();
+
+    for (const record of recordsByCurrency) {
+      const key = keySelector(record) ?? unknownLabel;
+
+      if (!groupedByKey.has(key)) {
+        groupedByKey.set(key, []);
+      }
+      groupedByKey.get(key)!.push(record);
+    }
+
+    const sortedKeys = Array.from(groupedByKey.keys()).sort(sortKeys);
+
+    for (const key of sortedKeys) {
+      const keyRecords = groupedByKey.get(key)!;
+      const metrics = calculateMetrics(keyRecords);
+      chartData.push({
+        name: key,
+        currency,
+        ...metrics,
+      });
+    }
+  }
+
+  return chartData;
 }
 
 // Format helpers that force UTC to avoid local timezone shifts
@@ -325,144 +364,28 @@ export function aggregateByMonth(records: ChartableRecord[]): ChartDataPoint[] {
  * Aggregate records by status
  */
 export function aggregateByStatus(records: ChartableRecord[]): ChartDataPoint[] {
-  const chartData: ChartDataPoint[] = [];
-  const currencyGroups = groupByCurrency(records);
-
-  for (const currency of Array.from(currencyGroups.keys()).sort()) {
-    const recordsByCurrency = currencyGroups.get(currency)!;
-    const groupedByStatus = new Map<string, ChartableRecord[]>();
-
-    for (const record of recordsByCurrency) {
-      const status = record.status;
-
-      if (!groupedByStatus.has(status)) {
-        groupedByStatus.set(status, []);
-      }
-      groupedByStatus.get(status)!.push(record);
-    }
-
-    const sortedStatuses = Array.from(groupedByStatus.keys()).sort();
-
-    for (const status of sortedStatuses) {
-      const statusRecords = groupedByStatus.get(status)!;
-      const metrics = calculateMetrics(statusRecords);
-      chartData.push({
-        name: status,
-        currency,
-        ...metrics,
-      });
-    }
-  }
-
-  return chartData;
+  return aggregateByKey(records, (record) => record.status);
 }
 
 /**
  * Aggregate records by type (for refunds: full/partial)
  */
 export function aggregateByType(records: ChartableRecord[]): ChartDataPoint[] {
-  const chartData: ChartDataPoint[] = [];
-  const currencyGroups = groupByCurrency(records);
-
-  for (const currency of Array.from(currencyGroups.keys()).sort()) {
-    const recordsByCurrency = currencyGroups.get(currency)!;
-    const groupedByType = new Map<string, ChartableRecord[]>();
-
-    for (const record of recordsByCurrency) {
-      const type = record.type ?? 'unknown';
-
-      if (!groupedByType.has(type)) {
-        groupedByType.set(type, []);
-      }
-      groupedByType.get(type)!.push(record);
-    }
-
-    const sortedTypes = Array.from(groupedByType.keys()).sort();
-
-    for (const type of sortedTypes) {
-      const typeRecords = groupedByType.get(type)!;
-      const metrics = calculateMetrics(typeRecords);
-      chartData.push({
-        name: type,
-        currency,
-        ...metrics,
-      });
-    }
-  }
-
-  return chartData;
+  return aggregateByKey(records, (record) => record.type);
 }
 
 /**
  * Aggregate records by category (for disputes: fraud/chargeback)
  */
 export function aggregateByCategory(records: ChartableRecord[]): ChartDataPoint[] {
-  const chartData: ChartDataPoint[] = [];
-  const currencyGroups = groupByCurrency(records);
-
-  for (const currency of Array.from(currencyGroups.keys()).sort()) {
-    const recordsByCurrency = currencyGroups.get(currency)!;
-    const groupedByCategory = new Map<string, ChartableRecord[]>();
-
-    for (const record of recordsByCurrency) {
-      const category = record.category ?? 'unknown';
-
-      if (!groupedByCategory.has(category)) {
-        groupedByCategory.set(category, []);
-      }
-      groupedByCategory.get(category)!.push(record);
-    }
-
-    const sortedCategories = Array.from(groupedByCategory.keys()).sort();
-
-    for (const category of sortedCategories) {
-      const categoryRecords = groupedByCategory.get(category)!;
-      const metrics = calculateMetrics(categoryRecords);
-      chartData.push({
-        name: category,
-        currency,
-        ...metrics,
-      });
-    }
-  }
-
-  return chartData;
+  return aggregateByKey(records, (record) => record.category);
 }
 
 /**
  * Aggregate records by resolution (for disputes: resolution outcomes)
  */
 export function aggregateByResolution(records: ChartableRecord[]): ChartDataPoint[] {
-  const chartData: ChartDataPoint[] = [];
-  const currencyGroups = groupByCurrency(records);
-
-  for (const currency of Array.from(currencyGroups.keys()).sort()) {
-    const recordsByCurrency = currencyGroups.get(currency)!;
-    const groupedByResolution = new Map<string, ChartableRecord[]>();
-
-    for (const record of recordsByCurrency) {
-      const resolution = record.resolution ?? 'awaiting-merchant-feedback';
-
-      if (!groupedByResolution.has(resolution)) {
-        groupedByResolution.set(resolution, []);
-      }
-      groupedByResolution.get(resolution)!.push(record);
-    }
-
-    const sortedResolutions = Array.from(groupedByResolution.keys()).sort();
-
-    for (const resolution of sortedResolutions) {
-      const resolutionRecords = groupedByResolution.get(resolution)!;
-      const metrics = calculateMetrics(resolutionRecords);
-      chartData.push({
-        name: resolution,
-        currency,
-        ...metrics,
-      });
-    }
-  }
-
-  return chartData;
+  return aggregateByKey(records, (record) => record.resolution);
 }
 
 /**
@@ -493,6 +416,8 @@ export function aggregateRecords(records: ChartableRecord[], aggregationType: Ag
   }
 }
 
+const formatDate = (dateStr: string) => format(parseISO(dateStr), 'MMM d, yyyy');
+
 /**
  * Calculate summary statistics for a set of chartable records
  */
@@ -510,17 +435,15 @@ export function calculateSummary(records: ChartableRecord[], dateRange?: { from?
     });
   }
 
-  const formatDate = (dateStr: string) => format(parseISO(dateStr), 'MMM d, yyyy');
-
   // For mixed currencies, totalVolume/average are not meaningful; keep zero and rely on perCurrency.
   const summary: ChartSummary = {
     totalCount: records.length,
-    totalVolume: perCurrency.length === 1 ? perCurrency[0].totalVolume : 0,
-    overallAverage: perCurrency.length === 1 ? perCurrency[0].overallAverage : 0,
+    totalVolume: records.length === 0 ? 0 : perCurrency.length === 1 ? perCurrency[0].totalVolume : null,
+    overallAverage: records.length === 0 ? 0 : perCurrency.length === 1 ? perCurrency[0].overallAverage : null,
     perCurrency: perCurrency.sort((a, b) => a.currency.localeCompare(b.currency)),
   };
 
-  if (dateRange?.from || dateRange?.to) {
+  if ((dateRange?.from && isValid(parseISO(dateRange.from))) || (dateRange?.to && isValid(parseISO(dateRange.to)))) {
     summary.dateRange = {
       from: dateRange.from ? formatDate(dateRange.from) : 'N/A',
       to: dateRange.to ? formatDate(dateRange.to) : 'N/A',

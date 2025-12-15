@@ -7,6 +7,7 @@ import {
   aggregateByType,
   aggregateByCategory,
   aggregateByResolution,
+  aggregateByKey,
   aggregateRecords,
   calculateSummary,
   generateChartLabel,
@@ -586,6 +587,68 @@ describe('Aggregation Functions', () => {
     });
   });
 
+  describe('aggregateByKey', () => {
+    const baseRecord = {
+      amount: 1000,
+      createdAt: '2024-12-10T10:30:00Z',
+      status: 'ok',
+    } as const;
+
+    it('returns empty array for empty input', () => {
+      expect(aggregateByKey([], (r) => r.status)).toEqual([]);
+    });
+
+    it('groups by selector and sums metrics per currency', () => {
+      const records: ChartableRecord[] = [
+        { ...baseRecord, currency: 'NGN', status: 'a' },
+        { ...baseRecord, currency: 'NGN', status: 'a' },
+        { ...baseRecord, currency: 'USD', status: 'a' },
+      ];
+
+      const result = aggregateByKey(records, (r) => r.status);
+
+      const ngn = result.find((d) => d.currency === 'NGN');
+      const usd = result.find((d) => d.currency === 'USD');
+
+      expect(ngn).toEqual({
+        name: 'a',
+        currency: 'NGN',
+        count: 2,
+        volume: 20,
+        average: 10,
+      });
+      expect(usd).toEqual({
+        name: 'a',
+        currency: 'USD',
+        count: 1,
+        volume: 10,
+        average: 10,
+      });
+    });
+
+    it('falls back to unknownLabel when selector returns null/undefined', () => {
+      const records: ChartableRecord[] = [{ ...baseRecord, currency: 'NGN', status: null as unknown as string }];
+
+      const result = aggregateByKey(records, (r) => r.status, { unknownLabel: 'unresolved' });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('unresolved');
+    });
+
+    it('applies custom sortKeys comparator', () => {
+      const records: ChartableRecord[] = [
+        { ...baseRecord, currency: 'NGN', status: 'b' },
+        { ...baseRecord, currency: 'NGN', status: 'a' },
+      ];
+
+      const result = aggregateByKey(records, (r) => r.status, {
+        sortKeys: (a, b) => ['b', 'a'].indexOf(a) - ['b', 'a'].indexOf(b),
+      });
+
+      expect(result.map((r) => r.name)).toEqual(['b', 'a']);
+    });
+  });
+
   describe('calculateSummary', () => {
     it('should return zeros for empty transactions', () => {
       const result = calculateSummary([]);
@@ -673,9 +736,9 @@ describe('Aggregation Functions', () => {
       const result = calculateSummary(transactions);
 
       expect(result.totalCount).toBe(2);
-      // Cross-currency volume/average default to 0 to avoid misleading sums
-      expect(result.totalVolume).toBe(0);
-      expect(result.overallAverage).toBe(0);
+      // Cross-currency volume/average default to null to avoid misleading sums
+      expect(result.totalVolume).toBe(null);
+      expect(result.overallAverage).toBe(null);
       expect(result.perCurrency).toEqual([
         { currency: 'NGN', totalCount: 1, totalVolume: 1000, overallAverage: 1000 },
         { currency: 'USD', totalCount: 1, totalVolume: 2000, overallAverage: 2000 },
@@ -840,7 +903,7 @@ describe('Aggregation Functions', () => {
         createMockDisputeWithResolution(1000, '2024-12-10T10:30:00Z', DisputeResolutionSlug.MERCHANT_ACCEPTED),
         createMockDisputeWithResolution(500, '2024-12-11T10:30:00Z', DisputeResolutionSlug.DECLINED),
         createMockDisputeWithResolution(2000, '2024-12-12T10:30:00Z', DisputeResolutionSlug.MERCHANT_ACCEPTED),
-        createMockDisputeWithResolution(1500, '2024-12-13T10:30:00Z', null), // pending
+        createMockDisputeWithResolution(1500, '2024-12-13T10:30:00Z', null), // unknown
       ];
       const result = aggregateByResolution(records);
 
@@ -848,7 +911,7 @@ describe('Aggregation Functions', () => {
 
       const merchantAccepted = result.find((d) => d.name === 'merchant-accepted');
       const declined = result.find((d) => d.name === 'declined');
-      const pending = result.find((d) => d.name === 'pending');
+      const unknown = result.find((d) => d.name === 'unknown');
 
       expect(merchantAccepted).toEqual({
         name: 'merchant-accepted',
@@ -864,8 +927,8 @@ describe('Aggregation Functions', () => {
         average: 500,
         currency: 'NGN',
       });
-      expect(pending).toEqual({
-        name: 'pending',
+      expect(unknown).toEqual({
+        name: 'unknown',
         count: 1,
         volume: 1500,
         average: 1500,
