@@ -8,13 +8,15 @@ Command Centre API is a NestJS-based backend service that powers an AI-driven me
 
 ### Key Features
 
-- 🤖 **AI-Powered Chat**: Streaming GPT-4o-mini responses with live reasoning
+- 🤖 **AI-Powered Chat**: Streaming responses with GPT-4o-mini and GPT-3.5-turbo with live reasoning
 - 🔒 **JWT-Protected & User-Scoped**: All `/chat` endpoints require Bearer tokens; Paystack calls reuse the user's JWT
-- 💬 **Page-Scoped Conversations**: Full CRUD with `pageKey` support so each surface keeps its own thread list
-- 🛠️ **Paystack Tooling**: Built-in tools for transactions, customers, refunds, payouts, disputes, and chart data (30-day max range)
+- 🌍 **Dual Chat Modes**: Global mode for general dashboard queries and page-scoped mode for resource-specific conversations
+- 📍 **Resource-Scoped Conversations**: Lock conversations to specific resources (transactions, customers, refunds, payouts, disputes) with context-aware AI responses
+- 🛠️ **Smart Tool Filtering**: Resource-specific tools automatically provided based on context (e.g., transaction pages only get relevant tools)
+- 🔍 **Context Enrichment**: Automatic fetching and formatting of resource data for enhanced AI understanding
 - 📊 **Analytics & Charts**: Multi-currency aggregation by day/hour/week/month/status; Recharts-ready output and streaming progress
-- 🧭 **Guardrails & Classification**: Conversation-history classifier enforces in-scope policy and graceful refusals
-- 🎯 **Smart Title Generation**: Automatic titles from the first message
+- 🧭 **Guardrails & Classification**: Dual-layer classification for out-of-scope and out-of-page-scope protection
+- 🎯 **Smart Title Generation**: Automatic conversation titles using GPT-3.5-turbo
 - 🔄 **Real-time Streaming**: Server-sent events with capped history (default last 40 messages)
 - 🛡️ **Rate Limiting**: Configurable message entitlement with sliding window enforcement
 
@@ -83,118 +85,348 @@ All `/chat` routes are protected by JWT Bearer auth. Include `Authorization: Bea
 
 ## 🏗️ Architecture
 
+### Core Services
+
+The application is built around several key services that work together:
+
+#### ChatService
+
+Orchestrates the entire conversation flow:
+
+- Manages conversation CRUD operations
+- Handles message streaming with AI
+- Enforces rate limiting and user entitlement
+- Coordinates message classification
+- Manages conversation history with configurable limits
+- Handles both global and page-scoped conversation modes
+
+#### PaystackApiService
+
+Provides authenticated access to Paystack APIs:
+
+- JWT-passthrough authentication (reuses user's token)
+- GET and POST request support
+- Standardized error handling with `PaystackError`
+- Configurable base URL for different environments
+- Automatic response transformation
+
+#### PageContextService
+
+Enriches page-scoped conversations with resource data:
+
+- Fetches resource details from Paystack API
+- Formats resource data for AI prompt injection
+- Supports all resource types (transactions, customers, refunds, payouts, disputes)
+- Provides structured context for better AI understanding
+- Handles resource not found errors gracefully
+
+#### AuthService
+
+Manages JWT authentication:
+
+- Token validation and verification
+- User ID extraction from token claims
+- Integration with NestJS guard system
+- Configurable token expiration
+
 ### Project Structure
 
 ```md
 src/
 ├── common/
 │ ├── ai/ # AI utilities and integrations
-│ │ ├── actions.ts # AI action functions (title generation)
-│ │ ├── prompts.ts # AI system prompts
-│ │ ├── tools.ts # AI tools definitions
-│ │ ├── utils.ts # Helper functions for AI
+│ │ ├── actions.ts # AI action functions (title generation, classification)
+│ │ ├── aggregation.ts # Chart data aggregation logic
+│ │ ├── policy.ts # Classification policy and refusal messages
+│ │ ├── prompts.ts # AI system prompts (global & page-scoped)
+│ │ ├── tools.ts # AI tools definitions & resource-specific filtering
+│ │ ├── utils.ts # Helper functions for AI (date validation, conversions)
+│ │ ├── types/ # TypeScript types for Paystack resources
 │ │ └── index.ts
-│ ├── exceptions/ # Custom exceptions and filters
-│ └── helpers/ # Shared utilities
+│ ├── exceptions/ # Custom exceptions and global filters
+│ ├── helpers/ # Shared utilities
+│ ├── interfaces/ # Common interfaces
+│ └── services/
+│ ├── paystack-api.service.ts # Paystack API integration
+│ └── page-context.service.ts # Resource enrichment service
 ├── config/ # Configuration modules
+│ ├── database.config.ts
+│ ├── jwt.config.ts
+│ └── helpers.ts
 ├── database/
 │ ├── migrations/ # TypeORM migrations
 │ └── database.module.ts
 ├── modules/
+│ ├── auth/ # JWT authentication module
+│ │ ├── guards/ # JWT auth guard
+│ │ ├── decorators/ # @CurrentUser() decorator
+│ │ └── auth.service.ts
 │ ├── chat/ # Chat & conversation module
 │ │ ├── dto/ # Data transfer objects
+│ │ │ ├── chat-request.dto.ts # Includes mode & pageContext
+│ │ │ ├── page-context.dto.ts # PageContext validation
+│ │ │ └── ...
 │ │ ├── entities/ # TypeORM entities
+│ │ │ ├── conversation.entity.ts # Includes mode & pageContext
+│ │ │ └── message.entity.ts
 │ │ ├── repositories/ # Database repositories
+│ │ ├── exceptions/ # Rate limiting exception
 │ │ ├── chat.controller.ts
-│ │ ├── chat.service.ts
+│ │ ├── chat.service.ts # Orchestrates AI, tools, and classification
 │ │ └── chat.module.ts
 │ └── health/ # Health check endpoints
-├── app.module.ts # Root module
-└── main.ts # Application entry point
+├── app.module.ts # Root module with global auth guard
+└── main.ts # Application entry point with observability
 ```
 
 ### Technology Stack
 
 - **Framework**: NestJS v11
 - **Database**: MongoDB with TypeORM
-- **AI**: Vercel AI SDK with OpenAI
+- **AI**: Vercel AI SDK v5.0 with OpenAI
+  - GPT-4o-mini: Chat responses and message classification
+  - GPT-3.5-turbo: Conversation title generation
 - **Language**: TypeScript v5.7
-- **Validation**: class-validator & class-transformer
+- **Validation**: class-validator, class-transformer, Zod v4.0
+- **HTTP Client**: Axios via @nestjs/axios
+- **Date Utilities**: date-fns v4.1
 - **Documentation**: Swagger/OpenAPI
 - **Observability**: @paystackhq/nestjs-observability (metrics/logs/traces)
+- **Error Handling**: Custom Paystack error system with @paystackhq/pkg-response-code
 
 ## 🤖 AI Features
+
+### Chat Modes
+
+The API supports two distinct chat modes:
+
+#### Global Mode (Default)
+
+Global mode is for general dashboard queries across all resources. It provides:
+
+- Access to all available Paystack tools
+- General conversation about dashboard, transactions, customers, refunds, payouts, and disputes
+- Broad context understanding across the merchant's entire account
+
+**Example:**
+
+```json
+{
+  "conversationId": "550e8400-e29b-41d4-a716-446655440000",
+  "mode": "global",
+  "message": {
+    "role": "user",
+    "parts": [{ "type": "text", "text": "What's my revenue today?" }]
+  }
+}
+```
+
+#### Page-Scoped Mode
+
+Page-scoped mode locks conversations to specific resources (transactions, customers, refunds, payouts, or disputes). It provides:
+
+- **Context-aware responses**: AI knows the specific resource being discussed
+- **Automatic resource enrichment**: Fetches and formats resource data for enhanced understanding
+- **Filtered tools**: Only tools relevant to the resource type are available
+- **Out-of-page-scope protection**: Refuses queries unrelated to the specific resource
+- **Persistent context**: Conversations remain locked to the same resource
+
+**Example:**
+
+```json
+{
+  "conversationId": "550e8400-e29b-41d4-a716-446655440000",
+  "mode": "page",
+  "pageContext": {
+    "type": "transaction",
+    "resourceId": "123456"
+  },
+  "message": {
+    "role": "user",
+    "parts": [{ "type": "text", "text": "What's the status of this transaction?" }]
+  }
+}
+```
 
 ### Chat Streaming
 
 The API provides real-time AI chat capabilities with streaming responses:
 
-```typescript
+```http
 POST /chat/stream
 Content-Type: application/json
-
-{
-  "conversationId": "550e8400-e29b-41d4-a716-446655440000",
-  "message": {
-    "role": "user",
-    "parts": [
-      {
-        "type": "text",
-        "text": "How do I integrate the payment API?"
-      }
-    ]
-  }
-}
+Authorization: Bearer <token>
 ```
 
 **Features:**
 
 - Streams AI responses in real-time using UIMessageStream format
 - Includes reasoning steps in the response
-- Automatically generates conversation titles for new conversations
-- Maintains full conversation history context (last 40 messages by default)
+- Automatically generates conversation titles for new conversations using GPT-3.5-turbo
+- Maintains conversation history context (last 40 messages by default, configurable via `MESSAGE_HISTORY_LIMIT`)
 - Supports AI tools for dynamic actions
-- Requires `pageKey` when starting a new conversation via stream (keeps threads scoped per page/surface)
+- Dual-mode support: global or resource-scoped
 
 ### Paystack Tools & Data Scope
 
 The assistant can only operate on merchant data exposed by these tools (all requests reuse the caller's JWT):
 
-- `getTransactions` – filter by status, channel, customer, date (max 30-day window)
-- `getCustomers` – list/search customers with pagination
-- `getRefunds` – status/date/amount filters
-- `getPayouts` – payout lookup with status/date filters
-- `getDisputes` – dispute lookup with status/date filters
-- `generateChartData` – streams Recharts-ready data for trends and breakdowns
+- `getTransactions` – filter by status, channel, customer, date (max 30-day window), amount, currency
+- `getCustomers` – list/search customers with pagination, email, and account number filters
+- `getRefunds` – status/date/amount filters with operator support (gt, lt, eq)
+- `getPayouts` – payout lookup with status/date/subaccount filters
+- `getDisputes` – dispute lookup with status/date/transaction filters
+- `generateChartData` – streams Recharts-ready data for trends and breakdowns (fetches up to 500 transactions)
 
 All date filters are limited to 30 days; helper validation returns clear errors when exceeded.
 
+### Resource-Specific Tool Filtering
+
+In page-scoped mode, tools are automatically filtered based on the resource type to ensure relevance:
+
+| Resource Type   | Available Tools                                 |
+| --------------- | ----------------------------------------------- |
+| **Transaction** | `getCustomers`, `getRefunds`, `getDisputes`     |
+| **Customer**    | `getTransactions`, `getRefunds`                 |
+| **Refund**      | `getTransactions`, `getCustomers`               |
+| **Payout**      | `getTransactions`                               |
+| **Dispute**     | `getTransactions`, `getCustomers`, `getRefunds` |
+
+This filtering ensures the AI only suggests actions that make sense in the current context. For example, on a transaction details page, the AI can't suggest generating chart data, but can help you look up the customer or related refunds.
+
 ### Charting & Aggregation
 
-- Aggregations: by day, hour, week, month, or status
-- Outputs include count, volume, average, per-currency summaries, suggested chart type
-- Streams progress while fetching up to 500 transactions (5 pages × 100)
+The `generateChartData` tool provides powerful analytics capabilities:
+
+**Aggregation Types:**
+
+- **by-day**: Daily transaction trends
+- **by-hour**: Hourly patterns for detailed analysis
+- **by-week**: Weekly performance overview
+- **by-month**: Monthly trends and comparisons
+- **by-status**: Status distribution (success, failed, abandoned)
+
+**Output Format (Recharts-compatible):**
+
+```json
+{
+  "success": true,
+  "label": "Transaction Trends (Dec 1 - Dec 15, 2024)",
+  "chartType": "line",
+  "chartData": [
+    {
+      "label": "Dec 1",
+      "count": 45,
+      "volume": 2500000,
+      "average": 55555,
+      "currencies": { "NGN": { "count": 40, "volume": 2000000 }, "USD": { "count": 5, "volume": 500000 } }
+    }
+  ],
+  "summary": {
+    "totalCount": 450,
+    "totalVolume": 25000000,
+    "overallAverage": 55555,
+    "dateRange": { "from": "Dec 1, 2024", "to": "Dec 15, 2024" }
+  }
+}
+```
+
+**Features:**
+
+- Streams progress updates while fetching data (up to 500 transactions across 5 pages)
+- Multi-currency support with per-currency breakdowns
+- Automatic chart type suggestion based on aggregation
+- Comprehensive summary statistics
+- Date range validation (30-day maximum)
 
 ### Guardrails & Classification
 
-- Classifier runs on conversation history to keep answers in-scope (dashboard insights, Paystack FAQs, account help, assistant capabilities)
-- Out-of-scope requests return a refusal message from policy
-- System prompt injects current date to handle relative time phrases accurately
+The system employs a dual-layer classification mechanism using GPT-4o-mini:
+
+#### Out-of-Scope Protection (Global)
+
+- Classifier ensures conversations stay within allowed intents:
+  - Dashboard insights
+  - Paystack product FAQs
+  - Account help
+  - Assistant capabilities
+- Out-of-scope requests (e.g., general knowledge, unrelated topics) receive a polite refusal
+- **Refusal message**: "I can only help with questions about your Paystack merchant dashboard (transactions, refunds, customers, disputes, payouts) and Paystack product usage. Ask me something like 'What's my revenue today?'"
+
+#### Out-of-Page-Scope Protection (Page Mode)
+
+- Additional classification layer for resource-scoped conversations
+- Ensures questions are relevant to the specific resource being viewed
+- Prevents context confusion across different resource types
+- **Refusal message**: "I can only help with questions about this specific {resource_type}. Ask me something like 'What's the status of this {resource_type}?'"
+
+#### Additional Features
+
+- System prompt includes current date for accurate relative time understanding
+- Classification considers full conversation history for context
+- Graceful error handling with helpful suggestions for reformulating queries
+
+### Resource Context Enrichment
+
+When using page-scoped mode, the system automatically enriches conversations with resource-specific data:
+
+#### How It Works
+
+1. **Resource Fetching**: `PageContextService` fetches the specific resource data from Paystack API using the provided `resourceId`
+2. **Data Formatting**: Resource data is formatted into a human-readable structure
+3. **Prompt Injection**: Formatted data is injected into the system prompt for AI context
+4. **Enhanced Understanding**: AI can answer questions about the specific resource with full context
+
+#### Supported Resources
+
+- **Transactions**: ID, reference, amount, status, channel, customer details, payment info
+- **Customers**: ID, customer code, email, name, phone, risk action, saved cards
+- **Refunds**: ID, amount, status, transaction reference, refund type, notes
+- **Payouts**: ID, total amount, effective amount, status, settlement date, fees
+- **Disputes**: ID, refund amount, status, resolution, category, due date, notes
+
+#### Example
+
+When viewing transaction ID `123456`, the AI receives formatted context like:
+
+```text
+Transaction Details:
+  - ID: 123456
+  - Reference: ref_abc123xyz
+  - Amount: NGN 50000
+  - Status: success
+  - Channel: card
+  - Customer Email: customer@example.com
+  - Created At: 2024-12-15T10:30:00Z
+```
+
+This allows the AI to answer questions like "What payment method was used?" without needing to fetch additional data.
 
 ### Extending Tools
 
 To add a new AI tool, create it in `src/common/ai/tools.ts` with `tool({ description, inputSchema, execute })`, then export it from `createTools`. Keep inputs validated with `zod` and ensure execution uses the caller's JWT for Paystack API access.
 
+To add resource-specific tool filtering, update the `RESOURCE_TOOL_MAP` in `tools.ts` to specify which tools should be available for each resource type.
+
 ### Automatic Title Generation
 
-When a new conversation starts, the first message automatically generates a descriptive title using GPT-3.5-turbo:
+When a new conversation starts (via the `/chat/stream` endpoint without an existing conversation), the system automatically generates a descriptive title using GPT-3.5-turbo:
 
 ```typescript
 import { generateConversationTitle } from './common/ai';
 
 const title = await generateConversationTitle(message);
-// Returns: "Payment API Integration" (or similar)
+// Example output: "Payment API Integration"
+// Example output: "Transaction Status Inquiry"
 ```
+
+The title generation:
+
+- Runs asynchronously during the first streaming request
+- Uses GPT-3.5-turbo for fast, cost-effective generation
+- Extracts key topics from the first user message
+- Generates concise, descriptive titles (typically 3-6 words)
+- Falls back gracefully if generation fails
 
 ## 📡 API Endpoints
 
@@ -208,25 +440,59 @@ All `/chat` endpoints require `Authorization: Bearer <jwt>` and use the authenti
 POST /chat/stream
 ```
 
-Streams AI responses for a conversation.
+Streams AI responses for a conversation. Supports both global and page-scoped modes.
 
-**Request Body:**
+**Request Body (Global Mode):**
 
 ```json
 {
   "conversationId": "uuid",
-  "pageKey": "dashboard/payments",
+  "mode": "global",
   "message": {
     "role": "user",
-    "parts": [{ "type": "text", "text": "Your message" }]
+    "parts": [{ "type": "text", "text": "What's my revenue today?" }]
   }
 }
 ```
 
+**Request Body (Page-Scoped Mode):**
+
+```json
+{
+  "conversationId": "uuid",
+  "mode": "page",
+  "pageContext": {
+    "type": "transaction",
+    "resourceId": "123456"
+  },
+  "message": {
+    "role": "user",
+    "parts": [{ "type": "text", "text": "What's the status of this transaction?" }]
+  }
+}
+```
+
+**Parameters:**
+
+- `conversationId` (required): UUID of the conversation
+- `mode` (optional): Chat mode - `"global"` (default) or `"page"`
+- `pageContext` (required when mode is "page"): Resource context
+  - `type`: One of `"transaction"`, `"customer"`, `"refund"`, `"payout"`, `"dispute"`
+  - `resourceId`: Resource identifier (transaction ID, customer code, etc.)
+- `message` (required): User message object
+
 **Response:** Server-sent events stream with UIMessage format
+
+**Important Notes:**
+
+- Once a conversation is created with a specific mode and pageContext, it cannot be changed
+- Page-scoped conversations remain locked to the original resource
+- Global conversations cannot be converted to page-scoped
 
 **Error Responses:**
 
+- `400 Bad Request` - Invalid mode or missing pageContext
+- `404 Not Found` - Conversation or resource not found
 - `429 Too Many Requests` - Rate limit exceeded
 
 ```json
@@ -249,15 +515,29 @@ Streams AI responses for a conversation.
 POST /chat/conversations
 ```
 
-Creates a new conversation.
+Creates a new conversation. Conversations are typically auto-created when streaming starts, but this endpoint allows manual creation with custom titles.
 
-**Request Body:**
+**Request Body (Global Mode):**
 
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
   "title": "Payment Integration Help",
-  "pageKey": "dashboard/payments"
+  "mode": "global"
+}
+```
+
+**Request Body (Page-Scoped Mode):**
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "title": "Transaction Inquiry",
+  "mode": "page",
+  "pageContext": {
+    "type": "transaction",
+    "resourceId": "123456"
+  }
 }
 ```
 
@@ -286,11 +566,31 @@ Retrieves a conversation by ID.
 GET /chat/conversations
 ```
 
-Retrieves all conversations for the authenticated user.
+Retrieves all conversations for the authenticated user with optional filtering.
 
-**Query Params (optional):**
+**Query Parameters (all optional):**
 
-- `pageKey` — when provided, only conversations for that surface are returned
+- `mode` — Filter by chat mode: `"global"` or `"page"`
+- `contextType` — Filter by resource type: `"transaction"`, `"customer"`, `"refund"`, `"payout"`, or `"dispute"`
+
+**Examples:**
+
+```http
+# Get all conversations
+GET /chat/conversations
+
+# Get only global conversations
+GET /chat/conversations?mode=global
+
+# Get only page-scoped conversations
+GET /chat/conversations?mode=page
+
+# Get all transaction-related conversations
+GET /chat/conversations?contextType=transaction
+
+# Get page-scoped transaction conversations
+GET /chat/conversations?mode=page&contextType=transaction
+```
 
 #### Delete Conversation
 
@@ -354,9 +654,20 @@ Returns application health status. This endpoint is public (no authentication re
   id: string,           // UUID
   title: string,
   userId: string,
+  mode: 'global' | 'page',  // Chat mode
+  pageContext: {       // Optional, only for page-scoped conversations
+    type: 'transaction' | 'customer' | 'refund' | 'payout' | 'dispute',
+    resourceId: string
+  },
   createdAt: Date
 }
 ```
+
+**Indexes:**
+
+- `id` - Unique index for UUID lookups
+- `userId` - Index for user-scoped queries
+- `mode` - Index for filtering by chat mode
 
 #### Messages
 
@@ -394,7 +705,7 @@ pnpm run migration:revert
 
 The API implements a sliding window rate limiting mechanism to prevent abuse and ensure fair usage across all users.
 
-### How It Works
+### Mechanism
 
 - **Sliding Window**: The rate limit uses a sliding time window, not a fixed period
 - **User-Based**: Limits are applied per user ID
@@ -412,12 +723,12 @@ RATE_LIMIT_PERIOD_HOURS=24    # Time window in hours (default: 24)
 
 ### Example Scenarios
 
-**Scenario 1: Within Limits**
+#### Scenario 1: Within Limits
 
 - User sends 50 messages in 12 hours
 - User can still send 50 more messages before hitting the limit
 
-**Scenario 2: Limit Exceeded**
+#### Scenario 2: Limit Exceeded
 
 - User sends 100 messages in 24 hours
 - Next request returns HTTP 429 with details:
@@ -425,7 +736,7 @@ RATE_LIMIT_PERIOD_HOURS=24    # Time window in hours (default: 24)
   - Time period
   - Maximum allowed
 
-**Scenario 3: Sliding Window**
+#### Scenario 3: Sliding Window
 
 - User sends 100 messages starting at 12:00 PM on Day 1
 - At 1:00 PM on Day 2 (25 hours later), messages from 12:00 PM on Day 1 have expired
@@ -542,9 +853,9 @@ OTEL_SERVICE_NAME=command-centre-api
 PAYSTACK_API_BASE_URL=https://studio-api.paystack.co
 
 # Rate Limiting
-MESSAGE_LIMIT=100
-RATE_LIMIT_PERIOD_HOURS=24
-MESSAGE_HISTORY_LIMIT=40  # Number of past messages kept in context (default: 40)
+MESSAGE_LIMIT=100              # Maximum messages per user per period
+RATE_LIMIT_PERIOD_HOURS=24    # Sliding window period in hours
+MESSAGE_HISTORY_LIMIT=40      # Number of past messages kept in AI context (default: 40)
 
 # Logging
 LOG_LEVEL=info
@@ -557,7 +868,7 @@ OTEL_TRACES_EXPORTER=console
 OTEL_METRICS_EXPORTER=console
 ```
 
-See `.env.example` for the complete list of available environment variables.
+**Note:** The project uses environment-specific configurations. In test/e2e environments, `.env` files are ignored to allow programmatic config overrides.
 
 ## 🐳 Docker Support
 
@@ -628,40 +939,124 @@ The project includes GitHub Actions workflows for:
 
 ### Code Style
 
-- Follow the existing ESLint configuration
+- Follow the existing ESLint configuration (ESLint v9 with flat config)
 - Use Prettier for code formatting
-- Write meaningful commit messages
-- Add tests for new features
+- Write meaningful commit messages (Commitlint enforces conventional commits)
+- Add tests for new features (Jest for unit tests, Supertest for E2E)
 - Update documentation as needed
+
+### Adding New Features
+
+**Adding AI Tools:**
+
+1. Define tool in `src/common/ai/tools.ts` using Vercel AI SDK's `tool()` function
+2. Add Zod schema for input validation
+3. Implement execute function with JWT-authenticated Paystack API calls
+4. Export from `createTools()` function
+5. Optionally add to resource-specific tool map for page-scoped filtering
+
+**Adding Resource Types:**
+
+1. Add new type to `PageContextType` enum in `src/common/ai/types/index.ts`
+2. Implement fetching logic in `PageContextService.fetchResourceData()`
+3. Add formatting logic in `PageContextService.formatResourceData()`
+4. Update `RESOURCE_TOOL_MAP` in `tools.ts` with relevant tools
+5. Add TypeScript interface for resource in `types/index.ts`
+
+**Testing:**
+
+- Unit tests: Mock services and test business logic
+- E2E tests: Test full request/response cycles with test database
+- Run `pnpm run test:all` before submitting PR
 
 ## 🔧 Troubleshooting
 
 ### OpenAI API Errors
 
-**"OPENAI_API_KEY is not configured"**
+#### "OPENAI_API_KEY is not configured"
 
 - Ensure `OPENAI_API_KEY` is set in your `.env` file
 - Verify the API key is valid and has credits
+- Check that the API key starts with `sk-`
+
+#### AI responses are slow or timing out
+
+- Verify your OpenAI account has sufficient credits
+- Check network connectivity to OpenAI API
+- Consider increasing request timeout settings
 
 ### Database Connection Issues
 
-**"Cannot connect to MongoDB"**
+#### "Cannot connect to MongoDB"
 
 - Verify MongoDB is running: `docker ps`
 - Check connection string in `.env`
 - Ensure database credentials are correct
+- Verify MongoDB port (default: 27017) is accessible
+
+#### Migration errors
+
+- Ensure database exists before running migrations
+- Check TypeORM connection settings in `datasource.ts`
+- Run migrations manually: `pnpm run migration:run`
+
+### Paystack API Issues
+
+#### "Authentication token not available"
+
+- Ensure JWT token is included in Authorization header
+- Verify token format: `Bearer <token>`
+- Check token expiration and renewal
+
+#### "Failed to fetch [resource] data"
+
+- Verify `PAYSTACK_API_BASE_URL` is correctly configured
+- Check that the JWT token has proper Paystack permissions
+- Ensure the resource ID/reference is valid
+- Check Paystack API status
 
 ### Build Errors
 
-**"Module not found"**
+#### "Module not found"
 
 - Run `pnpm install` to ensure all dependencies are installed
 - Clear build cache: `rm -rf dist && pnpm run build`
+- Clear node_modules and reinstall: `rm -rf node_modules && pnpm install`
+
+### Rate Limiting Issues
+
+#### Hitting rate limits during testing
+
+- Adjust `MESSAGE_LIMIT` in `.env` for development
+- Clear message history in database for test users
+- Use different test user IDs to avoid shared rate limits
+
+### Page-Scoped Conversation Errors
+
+#### "Conversation is locked to a different page context"
+
+- Page-scoped conversations cannot change resource context
+- Create a new conversation for different resources
+- Verify `pageContext.type` and `pageContext.resourceId` match the conversation
+
+#### "Cannot change an existing conversation to a page-scoped context"
+
+- Global conversations cannot be converted to page-scoped
+- Create a new conversation with `mode: "page"` from the start
 
 ## 📚 Additional Resources
+
+### Project Documentation
+
+- [Authentication Guide](./AUTHENTICATION.md) - JWT authentication implementation details
+- [Error Handling Guide](./docs/error-handling.md) - Comprehensive error handling patterns and best practices
+- [Redis Configuration](./docs/redis-configuration.md) - Redis setup and usage (if applicable)
+
+### External Documentation
 
 - [NestJS Documentation](https://docs.nestjs.com/)
 - [Vercel AI SDK Documentation](https://sdk.vercel.ai/docs)
 - [OpenAI API Documentation](https://platform.openai.com/docs)
 - [MongoDB Documentation](https://docs.mongodb.com/)
 - [TypeORM Documentation](https://typeorm.io/)
+- [Zod Documentation](https://zod.dev/) - Schema validation used in AI tools

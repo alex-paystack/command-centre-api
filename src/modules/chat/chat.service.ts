@@ -9,7 +9,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
-import { ChatMode, PageContext } from '../../common/ai/types';
+import { ChatMode, PageContext, PageContextType } from '../../common/ai/types';
 import { MessageRole } from './entities/message.entity';
 import {
   generateConversationTitle,
@@ -28,6 +28,7 @@ import {
 import { PaystackApiService } from '../../common/services/paystack-api.service';
 import { PageContextService } from '../../common/services/page-context.service';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
+import { Conversation } from './entities/conversation.entity';
 
 @Injectable()
 export class ChatService {
@@ -89,21 +90,32 @@ export class ChatService {
     return ConversationResponseDto.fromEntity(conversation);
   }
 
-  async getConversationsByUserId(userId: string, pageKey?: string) {
-    const conversations = pageKey
-      ? await this.conversationRepository.findByUserIdAndPageKey(userId, pageKey)
-      : await this.conversationRepository.findByUserId(userId);
+  async getConversationsByUserId(userId: string, contextType?: PageContextType, mode?: ChatMode) {
+    const resolvedMode = mode && Object.values(ChatMode).includes(mode) ? mode : undefined;
+    const resolvedContext =
+      contextType && Object.values(PageContextType).includes(contextType) ? contextType : undefined;
+
+    let conversations: Conversation[];
+
+    if (resolvedMode && resolvedContext) {
+      conversations = await this.conversationRepository.findByUserIdAndModeAndContextType(
+        userId,
+        resolvedMode,
+        resolvedContext,
+      );
+    } else if (resolvedMode) {
+      conversations = await this.conversationRepository.findByUserIdAndMode(userId, resolvedMode);
+    } else if (resolvedContext) {
+      conversations = await this.conversationRepository.findByUserIdAndContextType(userId, resolvedContext);
+    } else {
+      conversations = await this.conversationRepository.findByUserId(userId);
+    }
 
     return ConversationResponseDto.fromEntities(conversations);
   }
 
   async saveConversation(dto: CreateConversationDto) {
-    const conversation = await this.conversationRepository.createConversation({
-      id: dto.id,
-      title: dto.title,
-      userId: dto.userId,
-      pageKey: dto.pageKey,
-    });
+    const conversation = await this.conversationRepository.createConversation(dto);
 
     return ConversationResponseDto.fromEntity(conversation);
   }
@@ -192,17 +204,13 @@ export class ChatService {
   }
 
   async handleStreamingChat(dto: ChatRequestDto, userId: string, jwtToken: string) {
-    const { conversationId, message, pageKey, pageContext } = dto;
+    const { conversationId, message, mode, pageContext } = dto;
 
     await this.checkUserEntitlement(userId);
 
     let conversation = await this.conversationRepository.findById(conversationId);
 
     if (!conversation) {
-      if (!pageKey) {
-        throw new BadRequestException('pageKey is required when starting a new conversation');
-      }
-
       try {
         const title = await generateConversationTitle(message);
 
@@ -210,7 +218,8 @@ export class ChatService {
           id: conversationId,
           title,
           userId,
-          pageKey,
+          mode,
+          pageContext,
         });
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -219,6 +228,26 @@ export class ChatService {
       }
     } else if (conversation.userId !== userId) {
       throw new NotFoundException(`Conversation with ID ${conversationId} not found`);
+    }
+
+    if (conversation.pageContext) {
+      if (mode !== ChatMode.PAGE) {
+        throw new BadRequestException('Conversation is page-scoped and must use mode "page"');
+      }
+
+      if (!pageContext) {
+        throw new BadRequestException('pageContext is required when mode is "page"');
+      }
+
+      if (
+        pageContext.type !== conversation.pageContext.type ||
+        pageContext.resourceId !== conversation.pageContext.resourceId
+      ) {
+        throw new BadRequestException('Conversation is locked to a different page context');
+      }
+    } else if (mode === ChatMode.PAGE) {
+      // Do not allow turning an existing global conversation into page-scoped
+      throw new BadRequestException('Cannot change an existing conversation to a page-scoped context');
     }
 
     const allMessages = await this.getMessagesByConversationId(conversationId, userId);

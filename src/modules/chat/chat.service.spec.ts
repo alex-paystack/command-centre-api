@@ -5,7 +5,6 @@ import { ConfigService } from '@nestjs/config';
 import { ChatService } from './chat.service';
 import { ConversationRepository } from './repositories/conversation.repository';
 import { MessageRepository } from './repositories/message.repository';
-import { CreateConversationDto } from './dto/create-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { ChatMode } from '../../common/ai/types';
 import { Conversation } from './entities/conversation.entity';
@@ -32,9 +31,10 @@ describe('ChatService', () => {
     id: '123e4567-e89b-12d3-a456-426614174000',
     title: 'Test Conversation',
     userId: 'user_123',
-    pageKey: 'dashboard/payments',
+    pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_abc123' },
     createdAt: new Date('2024-01-01'),
     messages: [],
+    mode: ChatMode.PAGE,
   };
 
   const mockMessage: Message = {
@@ -53,7 +53,9 @@ describe('ChatService', () => {
       findById: jest.fn(),
       findByIdAndUserId: jest.fn(),
       findByUserId: jest.fn(),
-      findByUserIdAndPageKey: jest.fn(),
+      findByUserIdAndMode: jest.fn(),
+      findByUserIdAndContextType: jest.fn(),
+      findByUserIdAndModeAndContextType: jest.fn(),
       createConversation: jest.fn(),
       deleteById: jest.fn(),
       deleteByIdForUser: jest.fn(),
@@ -110,12 +112,7 @@ describe('ChatService', () => {
 
   describe('saveConversation', () => {
     it('should create and return a conversation', async () => {
-      const dto: CreateConversationDto = {
-        id: mockConversation.id,
-        title: mockConversation.title,
-        userId: mockConversation.userId,
-        pageKey: mockConversation.pageKey,
-      };
+      const dto = mockConversation;
 
       jest.spyOn(conversationRepository, 'createConversation').mockResolvedValue(mockConversation);
 
@@ -126,7 +123,8 @@ describe('ChatService', () => {
           id: dto.id,
           title: dto.title,
           userId: dto.userId,
-          pageKey: dto.pageKey,
+          pageContext: dto.pageContext,
+          mode: dto.mode,
         }),
       );
       expect(result.id).toBe(mockConversation.id);
@@ -182,14 +180,44 @@ describe('ChatService', () => {
       expect(result).toEqual([]);
     });
 
-    it('should filter conversations by page key when provided', async () => {
-      jest.spyOn(conversationRepository, 'findByUserIdAndPageKey').mockResolvedValue([mockConversation]);
+    it('should filter conversations by context type when provided', async () => {
+      jest.spyOn(conversationRepository, 'findByUserIdAndContextType').mockResolvedValue([mockConversation]);
 
-      const result = await service.getConversationsByUserId('user_123', 'dashboard/payments');
+      const result = await service.getConversationsByUserId('user_123', PageContextType.TRANSACTION);
 
-      expect(conversationRepository.findByUserIdAndPageKey).toHaveBeenCalledWith('user_123', 'dashboard/payments');
+      expect(conversationRepository.findByUserIdAndContextType).toHaveBeenCalledWith(
+        'user_123',
+        PageContextType.TRANSACTION,
+      );
       expect(result).toHaveLength(1);
-      expect(result[0].pageKey).toBe('dashboard/payments');
+      expect(result[0].pageContext?.type).toBe(PageContextType.TRANSACTION);
+      expect(result[0].pageContext?.resourceId).toBe('ref_abc123');
+    });
+
+    it('should filter conversations by mode when provided', async () => {
+      jest.spyOn(conversationRepository, 'findByUserIdAndMode').mockResolvedValue([mockConversation]);
+
+      const result = await service.getConversationsByUserId('user_123', undefined, ChatMode.PAGE);
+
+      expect(conversationRepository.findByUserIdAndMode).toHaveBeenCalledWith('user_123', ChatMode.PAGE);
+      expect(result).toHaveLength(1);
+      expect(result[0].mode).toBe(ChatMode.PAGE);
+    });
+
+    it('should filter conversations by context type and mode when provided', async () => {
+      jest.spyOn(conversationRepository, 'findByUserIdAndModeAndContextType').mockResolvedValue([mockConversation]);
+
+      const result = await service.getConversationsByUserId('user_123', PageContextType.TRANSACTION, ChatMode.PAGE);
+
+      expect(conversationRepository.findByUserIdAndModeAndContextType).toHaveBeenCalledWith(
+        'user_123',
+        ChatMode.PAGE,
+        PageContextType.TRANSACTION,
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].pageContext?.type).toBe(PageContextType.TRANSACTION);
+      expect(result[0].pageContext?.resourceId).toBe('ref_abc123');
+      expect(result[0].mode).toBe(ChatMode.PAGE);
     });
   });
 
@@ -467,7 +495,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
       expect(result).toBeDefined();
       expect(result?.type).toBe(ChatResponseType.REFUSAL);
       expect(result?.responseStream).toBeDefined();
@@ -480,6 +508,10 @@ describe('ChatService', () => {
         parts: [{ type: 'text' as const, text: 'How many terminals have I created?' }],
       };
       const mockHistory = [mockUIMessage];
+      const mockPageContext = {
+        type: PageContextType.TRANSACTION,
+        resourceId: 'ref_123',
+      };
 
       classifyMessage.mockResolvedValue({
         intent: MessageClassificationIntent.OUT_OF_PAGE_SCOPE,
@@ -487,12 +519,9 @@ describe('ChatService', () => {
         needsMerchantData: false,
       });
 
-      const result = await service.handleMessageClassification(mockHistory, {
-        type: PageContextType.TRANSACTION,
-        resourceId: 'ref_123',
-      });
+      const result = await service.handleMessageClassification(mockHistory, mockPageContext);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, mockPageContext);
       expect(result).toBeDefined();
       expect(result?.type).toBe(ChatResponseType.REFUSAL);
       expect(result?.responseStream).toBeDefined();
@@ -507,7 +536,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
       expect(result).toBeNull();
     });
 
@@ -520,7 +549,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
       expect(result).toBeNull();
     });
 
@@ -533,7 +562,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
       expect(result).toBeNull();
     });
 
@@ -546,7 +575,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
       expect(result).toBeNull();
     });
   });

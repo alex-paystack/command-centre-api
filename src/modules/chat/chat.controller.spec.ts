@@ -9,6 +9,7 @@ import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
 import { MessageRole } from './entities/message.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ChatMode, PageContextType } from 'src/common';
 
 describe('ChatController', () => {
   let controller: ChatController;
@@ -20,7 +21,8 @@ describe('ChatController', () => {
     id: '123e4567-e89b-12d3-a456-426614174000',
     title: 'Test Conversation',
     userId: mockUserId,
-    pageKey: 'dashboard/payments',
+    pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_abc123' },
+    mode: ChatMode.PAGE,
     createdAt: new Date('2024-01-01'),
   };
 
@@ -71,7 +73,8 @@ describe('ChatController', () => {
       const dto: CreateConversationDto = {
         id: mockConversationResponse.id,
         title: mockConversationResponse.title,
-        pageKey: mockConversationResponse.pageKey,
+        mode: mockConversationResponse.mode,
+        pageContext: mockConversationResponse.pageContext,
       };
 
       jest.spyOn(service, 'saveConversation').mockResolvedValue(mockConversationResponse);
@@ -116,12 +119,34 @@ describe('ChatController', () => {
       });
     });
 
-    it('should filter conversations by pageKey when provided', async () => {
+    it('should filter conversations by context type when provided', async () => {
       jest.spyOn(service, 'getConversationsByUserId').mockResolvedValue([mockConversationResponse]);
 
-      const result = await controller.getConversationsByUserId(mockUserId, 'dashboard/payments');
+      const result = await controller.getConversationsByUserId(mockUserId, PageContextType.TRANSACTION);
 
-      expect(service.getConversationsByUserId).toHaveBeenCalledWith(mockUserId, 'dashboard/payments');
+      expect(service.getConversationsByUserId).toHaveBeenCalledWith(mockUserId, PageContextType.TRANSACTION);
+      expect(result.data).toEqual([mockConversationResponse]);
+    });
+
+    it('should filter conversations by mode when provided', async () => {
+      jest.spyOn(service, 'getConversationsByUserId').mockResolvedValue([mockConversationResponse]);
+
+      const result = await controller.getConversationsByUserId(mockUserId, undefined, ChatMode.PAGE);
+
+      expect(service.getConversationsByUserId).toHaveBeenCalledWith(mockUserId, undefined, ChatMode.PAGE);
+      expect(result.data).toEqual([mockConversationResponse]);
+    });
+
+    it('should filter conversations by context type and mode when provided', async () => {
+      jest.spyOn(service, 'getConversationsByUserId').mockResolvedValue([mockConversationResponse]);
+
+      const result = await controller.getConversationsByUserId(mockUserId, PageContextType.TRANSACTION, ChatMode.PAGE);
+
+      expect(service.getConversationsByUserId).toHaveBeenCalledWith(
+        mockUserId,
+        PageContextType.TRANSACTION,
+        ChatMode.PAGE,
+      );
       expect(result.data).toEqual([mockConversationResponse]);
     });
   });

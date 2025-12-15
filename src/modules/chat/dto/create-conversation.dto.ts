@@ -1,5 +1,8 @@
-import { IsString, IsNotEmpty, IsUUID, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsUUID, IsOptional, IsEnum, ValidateNested, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ChatMode, PageContextType } from 'src/common/ai/types';
+import { Type } from 'class-transformer';
+import { PageContextDto } from './page-context.dto';
 
 export class CreateConversationDto {
   @ApiProperty({
@@ -18,13 +21,28 @@ export class CreateConversationDto {
   @IsNotEmpty()
   title: string;
 
-  @ApiProperty({
-    description: 'Page key where the conversation is scoped (e.g. dashboard route or surface identifier)',
-    example: 'dashboard/payments',
+  @ApiPropertyOptional({
+    description: 'Page context for resource-scoped chat. Required when mode is "page".',
+    example: {
+      type: PageContextType.TRANSACTION,
+      resourceId: '123456',
+    },
   })
-  @IsString()
+  @ValidateIf((dto: CreateConversationDto) => dto.mode === ChatMode.PAGE)
+  @IsNotEmpty({ message: 'pageContext is required when mode is "page"' })
+  @ValidateNested()
+  @Type(() => PageContextDto)
+  pageContext?: PageContextDto;
+
+  @ApiProperty({
+    description: 'Chat mode: global (command centre page) or page (scoped to specific resource)',
+    enum: ChatMode,
+    default: ChatMode.GLOBAL,
+    example: ChatMode.PAGE,
+  })
+  @IsEnum(ChatMode)
   @IsNotEmpty()
-  pageKey: string;
+  mode: ChatMode;
 
   @ApiPropertyOptional({
     description: 'User ID who owns the conversation (automatically set from authenticated user)',
