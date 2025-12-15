@@ -1,5 +1,5 @@
 import { type UIMessage } from 'ai';
-import { differenceInCalendarDays, isAfter, isValid, parseISO } from 'date-fns';
+import { isAfter, isValid, parseISO } from 'date-fns';
 import { MessageResponseDto } from 'src/modules/chat/dto/message-response.dto';
 
 export function getTextFromMessage(message: UIMessage) {
@@ -24,6 +24,14 @@ export function convertToUIMessages(messages: MessageResponseDto[]): UIMessage[]
     role: message.role,
     parts: message.parts,
   }));
+}
+
+function toUtcDayNumber(date: Date) {
+  return Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / (24 * 60 * 60 * 1000));
+}
+
+function differenceInUtcDays(firstDate: Date, secondDate: Date) {
+  return Math.abs(toUtcDayNumber(firstDate) - toUtcDayNumber(secondDate));
 }
 
 /**
@@ -70,7 +78,7 @@ export function validateDateRange(
       };
     }
 
-    const diffInDays = Math.abs(differenceInCalendarDays(toDate, fromDate));
+    const diffInDays = differenceInUtcDays(toDate, fromDate);
 
     if (diffInDays > MAX_DAYS) {
       return {
@@ -85,7 +93,7 @@ export function validateDateRange(
 
   // Only 'from' date provided (defaults to today as end)
   if (fromDate && !toDate) {
-    const diffInDays = Math.abs(differenceInCalendarDays(today, fromDate));
+    const diffInDays = differenceInUtcDays(today, fromDate);
 
     if (diffInDays > MAX_DAYS) {
       return {
@@ -100,7 +108,7 @@ export function validateDateRange(
 
   // Only 'to' date provided (defaults to today as start)
   if (!fromDate && toDate) {
-    const diffInDays = Math.abs(differenceInCalendarDays(toDate, today));
+    const diffInDays = differenceInUtcDays(toDate, today);
 
     if (diffInDays > MAX_DAYS) {
       return {

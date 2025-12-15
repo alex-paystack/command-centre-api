@@ -1,6 +1,7 @@
 import { Exclude, Expose } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { Conversation } from '../entities/conversation.entity';
+import { ChatMode, PageContextType, PageContext } from '../../../common/ai/types';
 
 @Exclude()
 export class ConversationResponseDto {
@@ -27,10 +28,22 @@ export class ConversationResponseDto {
 
   @ApiProperty({
     description: 'Page key where the conversation is scoped',
-    example: 'dashboard/payments',
+    example: {
+      type: PageContextType.TRANSACTION,
+      resourceId: 'ref_abc123',
+    },
   })
   @Expose()
-  pageKey: string;
+  pageContext?: PageContext;
+
+  @ApiProperty({
+    description: 'Chat mode: global (command centre page) or page (scoped to specific resource)',
+    enum: ChatMode,
+    default: ChatMode.GLOBAL,
+    example: ChatMode.GLOBAL,
+  })
+  @Expose()
+  mode: ChatMode;
 
   @ApiProperty({
     description: 'Timestamp when the conversation was created',
@@ -44,8 +57,9 @@ export class ConversationResponseDto {
     dto.id = conversation.id;
     dto.title = conversation.title;
     dto.userId = conversation.userId;
-    dto.pageKey = conversation.pageKey;
+    dto.pageContext = conversation.pageContext;
     dto.createdAt = conversation.createdAt;
+    dto.mode = conversation.mode;
     return dto;
   }
 

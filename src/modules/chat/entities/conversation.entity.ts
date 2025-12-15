@@ -1,6 +1,7 @@
 import { Entity, ObjectIdColumn, Column, CreateDateColumn, Index, OneToMany } from 'typeorm';
 import { ObjectId } from 'mongodb';
 import { Message } from './message.entity';
+import { ChatMode, PageContext } from '../../../common/ai/types';
 
 @Entity('conversations')
 export class Conversation {
@@ -18,9 +19,12 @@ export class Conversation {
   @Index()
   userId: string;
 
+  @Column('json', { nullable: true })
+  pageContext: PageContext;
+
   @Column()
   @Index()
-  pageKey: string;
+  mode: ChatMode;
 
   @CreateDateColumn()
   createdAt: Date;

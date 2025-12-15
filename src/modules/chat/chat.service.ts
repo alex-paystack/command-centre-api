@@ -9,20 +9,26 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
+import { ChatMode, PageContext, PageContextType } from '../../common/ai/types';
 import { MessageRole } from './entities/message.entity';
 import {
   generateConversationTitle,
   convertToUIMessages,
   createTools,
+  createPageScopedTools,
   CHAT_AGENT_SYSTEM_PROMPT,
+  PAGE_SCOPED_SYSTEM_PROMPT,
   classifyMessage,
   MessageClassificationIntent,
   policy,
   ChatResponseType,
   ClassificationUIMessage,
+  EnrichedPageContext,
 } from '../../common/ai';
 import { PaystackApiService } from '../../common/services/paystack-api.service';
+import { PageContextService } from '../../common/services/page-context.service';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
+import { Conversation } from './entities/conversation.entity';
 
 @Injectable()
 export class ChatService {
@@ -31,6 +37,7 @@ export class ChatService {
     private readonly messageRepository: MessageRepository,
     private readonly configService: ConfigService,
     private readonly paystackApiService: PaystackApiService,
+    private readonly pageContextService: PageContextService,
   ) {}
 
   async getMessagesByConversationId(conversationId: string, userId: string) {
@@ -83,21 +90,32 @@ export class ChatService {
     return ConversationResponseDto.fromEntity(conversation);
   }
 
-  async getConversationsByUserId(userId: string, pageKey?: string) {
-    const conversations = pageKey
-      ? await this.conversationRepository.findByUserIdAndPageKey(userId, pageKey)
-      : await this.conversationRepository.findByUserId(userId);
+  async getConversationsByUserId(userId: string, contextType?: PageContextType, mode?: ChatMode) {
+    const resolvedMode = mode && Object.values(ChatMode).includes(mode) ? mode : undefined;
+    const resolvedContext =
+      contextType && Object.values(PageContextType).includes(contextType) ? contextType : undefined;
+
+    let conversations: Conversation[];
+
+    if (resolvedMode && resolvedContext) {
+      conversations = await this.conversationRepository.findByUserIdAndModeAndContextType(
+        userId,
+        resolvedMode,
+        resolvedContext,
+      );
+    } else if (resolvedMode) {
+      conversations = await this.conversationRepository.findByUserIdAndMode(userId, resolvedMode);
+    } else if (resolvedContext) {
+      conversations = await this.conversationRepository.findByUserIdAndContextType(userId, resolvedContext);
+    } else {
+      conversations = await this.conversationRepository.findByUserId(userId);
+    }
 
     return ConversationResponseDto.fromEntities(conversations);
   }
 
   async saveConversation(dto: CreateConversationDto) {
-    const conversation = await this.conversationRepository.createConversation({
-      id: dto.id,
-      title: dto.title,
-      userId: dto.userId,
-      pageKey: dto.pageKey,
-    });
+    const conversation = await this.conversationRepository.createConversation(dto);
 
     return ConversationResponseDto.fromEntity(conversation);
   }
@@ -137,11 +155,32 @@ export class ChatService {
     }
   }
 
-  async handleMessageClassification(messages: UIMessage[]) {
-    const messageClassification = await classifyMessage(messages);
+  async handleMessageClassification(messages: UIMessage[], pageContext?: PageContext) {
+    const messageClassification = await classifyMessage(messages, pageContext);
 
     if (messageClassification?.intent === MessageClassificationIntent.OUT_OF_SCOPE) {
-      const refusalText = policy.refusalText;
+      const refusalText = policy.outOfScopeRefusalText;
+
+      const refusalStream = createUIMessageStream<ClassificationUIMessage>({
+        execute: ({ writer }) => {
+          writer.write({
+            type: 'data-refusal',
+            data: {
+              text: refusalText,
+            },
+          });
+        },
+      });
+
+      return {
+        type: ChatResponseType.REFUSAL,
+        responseStream: refusalStream,
+        text: refusalText,
+      };
+    }
+
+    if (messageClassification?.intent === MessageClassificationIntent.OUT_OF_PAGE_SCOPE) {
+      const refusalText = policy.outOfPageScopeRefusalText.replace(/\{\{RESOURCE_TYPE\}\}/g, pageContext?.type || '');
 
       const refusalStream = createUIMessageStream<ClassificationUIMessage>({
         execute: ({ writer }) => {
@@ -165,17 +204,13 @@ export class ChatService {
   }
 
   async handleStreamingChat(dto: ChatRequestDto, userId: string, jwtToken: string) {
-    const { conversationId, message, pageKey } = dto;
+    const { conversationId, message, mode, pageContext } = dto;
 
     await this.checkUserEntitlement(userId);
 
     let conversation = await this.conversationRepository.findById(conversationId);
 
     if (!conversation) {
-      if (!pageKey) {
-        throw new BadRequestException('pageKey is required when starting a new conversation');
-      }
-
       try {
         const title = await generateConversationTitle(message);
 
@@ -183,7 +218,8 @@ export class ChatService {
           id: conversationId,
           title,
           userId,
-          pageKey,
+          mode,
+          pageContext,
         });
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -194,13 +230,33 @@ export class ChatService {
       throw new NotFoundException(`Conversation with ID ${conversationId} not found`);
     }
 
+    if (conversation.pageContext) {
+      if (mode !== ChatMode.PAGE) {
+        throw new BadRequestException('Conversation is page-scoped and must use mode "page"');
+      }
+
+      if (!pageContext) {
+        throw new BadRequestException('pageContext is required when mode is "page"');
+      }
+
+      if (
+        pageContext.type !== conversation.pageContext.type ||
+        pageContext.resourceId !== conversation.pageContext.resourceId
+      ) {
+        throw new BadRequestException('Conversation is locked to a different page context');
+      }
+    } else if (mode === ChatMode.PAGE) {
+      // Do not allow turning an existing global conversation into page-scoped
+      throw new BadRequestException('Cannot change an existing conversation to a page-scoped context');
+    }
+
     const allMessages = await this.getMessagesByConversationId(conversationId, userId);
     // TDDO: Revisit this
     const historyLimit = this.configService.get<number>('MESSAGE_HISTORY_LIMIT', 40);
     const limitedHistory = allMessages.slice(-historyLimit);
     const uiMessages = [...convertToUIMessages(limitedHistory), message];
 
-    const messageClassification = await this.handleMessageClassification(uiMessages);
+    const messageClassification = await this.handleMessageClassification(uiMessages, pageContext);
 
     await this.messageRepository.createMessage({
       conversationId,
@@ -228,11 +284,23 @@ export class ChatService {
 
     const getJwtToken = () => jwtToken;
 
-    const tools = createTools(this.paystackApiService, getJwtToken);
+    const chatMode = dto.mode || ChatMode.GLOBAL;
+    let systemPrompt: string;
+    let tools: ReturnType<typeof createTools>;
 
-    // Inject current date into system prompt
-    const currentDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
-    const systemPrompt = CHAT_AGENT_SYSTEM_PROMPT.replace(/\{\{CURRENT_DATE\}\}/g, currentDate);
+    if (chatMode === ChatMode.PAGE) {
+      if (!dto.pageContext) {
+        throw new BadRequestException('pageContext is required when mode is "page"');
+      }
+
+      const enrichedContext = await this.pageContextService.enrichContext(dto.pageContext, jwtToken);
+      systemPrompt = this.buildPageScopedPrompt(enrichedContext);
+      tools = createPageScopedTools(this.paystackApiService, getJwtToken, dto.pageContext.type);
+    } else {
+      const currentDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+      systemPrompt = CHAT_AGENT_SYSTEM_PROMPT.replace(/\{\{CURRENT_DATE\}\}/g, currentDate);
+      tools = createTools(this.paystackApiService, getJwtToken);
+    }
 
     const stream = createUIMessageStream({
       execute: ({ writer }) => {
@@ -262,5 +330,14 @@ export class ChatService {
     });
 
     return { type: ChatResponseType.CHAT_RESPONSE, responseStream: stream };
+  }
+
+  private buildPageScopedPrompt(enrichedContext: EnrichedPageContext) {
+    const currentDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    const resourceType = enrichedContext.type.charAt(0).toUpperCase() + enrichedContext.type.slice(1);
+
+    return PAGE_SCOPED_SYSTEM_PROMPT.replace(/\{\{CURRENT_DATE\}\}/g, currentDate)
+      .replace(/\{\{RESOURCE_TYPE\}\}/g, resourceType)
+      .replace(/\{\{RESOURCE_DATA\}\}/g, enrichedContext.formattedData);
   }
 }

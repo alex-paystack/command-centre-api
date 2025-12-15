@@ -6,11 +6,11 @@ import { MongoClient } from 'mongodb';
  * with appropriate indexes for query performance.
  *
  * Collections:
- * - conversations: Stores conversation metadata (id, title, userId, createdAt)
+ * - conversations: Stores conversation metadata (id, title, userId, mode, pageContext, createdAt)
  * - messages: Stores individual messages within conversations (id, conversationId, role, parts, createdAt)
  *
  * Indexes:
- * - conversations: id (unique), userId, createdAt
+ * - conversations: id (unique), userId, mode, createdAt
  * - messages: id (unique), conversationId, createdAt, compound (conversationId + createdAt)
  */
 export class CreateChatCollections1734000000000 implements MigrationInterface {
@@ -29,7 +29,11 @@ export class CreateChatCollections1734000000000 implements MigrationInterface {
     // Create indexes for conversations collection
     await db.collection('conversations').createIndex({ id: 1 }, { unique: true });
     await db.collection('conversations').createIndex({ userId: 1 });
+    await db.collection('conversations').createIndex({ mode: 1 });
     await db.collection('conversations').createIndex({ createdAt: -1 });
+    await db.collection('conversations').createIndex({ 'pageContext.type': 1 });
+    await db.collection('conversations').createIndex({ userId: 1, 'pageContext.type': 1 });
+    await db.collection('conversations').createIndex({ userId: 1, mode: 1, 'pageContext.type': 1 });
 
     // Create messages collection
     await db.createCollection('messages');

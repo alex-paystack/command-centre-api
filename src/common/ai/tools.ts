@@ -7,6 +7,7 @@ import type {
   PaystackRefund,
   PaystackPayout,
   PaystackDispute,
+  PageContextType,
 } from './types/index';
 import { DisputeStatusSlug, PaymentChannel, PayoutStatus, RefundStatus, TransactionStatus } from './types/data';
 import { amountInBaseUnitToSubUnit, validateDateRange } from './utils';
@@ -533,4 +534,33 @@ export function createTools(
     getDisputes: createGetDisputesTool(paystackService, getJwtToken),
     generateChartData: createGenerateChartDataTool(paystackService, getJwtToken),
   };
+}
+
+/**
+ * Resource-specific tool mapping for page-scoped chat
+ * Maps each resource type to the relevant tools for that context
+ */
+const RESOURCE_TOOL_MAP: Record<PageContextType, string[]> = {
+  transaction: ['getCustomers', 'getRefunds', 'getDisputes'],
+  customer: ['getTransactions', 'getRefunds'],
+  refund: ['getTransactions', 'getCustomers'],
+  payout: ['getTransactions'],
+  dispute: ['getTransactions', 'getCustomers', 'getRefunds'],
+};
+
+/**
+ * Create page-scoped tools based on resource type
+ * Returns a filtered set of tools relevant to the specific resource context
+ * @param paystackService - The Paystack API service instance
+ * @param getJwtToken - Function to retrieve the user's JWT authentication token
+ * @param contextType - The type of resource context (transaction, customer, etc.)
+ */
+export function createPageScopedTools(
+  paystackService: PaystackApiService,
+  getJwtToken: () => string | undefined,
+  contextType: PageContextType,
+): Record<string, Tool<unknown, unknown>> {
+  const allTools = createTools(paystackService, getJwtToken);
+  const allowedTools = RESOURCE_TOOL_MAP[contextType];
+  return Object.fromEntries(Object.entries(allTools).filter(([name]) => allowedTools.includes(name)));
 }

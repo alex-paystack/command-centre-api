@@ -5,13 +5,14 @@ import { ConfigService } from '@nestjs/config';
 import { ChatService } from './chat.service';
 import { ConversationRepository } from './repositories/conversation.repository';
 import { MessageRepository } from './repositories/message.repository';
-import { CreateConversationDto } from './dto/create-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { ChatMode } from '../../common/ai/types';
 import { Conversation } from './entities/conversation.entity';
 import { Message, MessageRole } from './entities/message.entity';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
 import { PaystackApiService } from '../../common/services/paystack-api.service';
-import { MessageClassificationIntent, ChatResponseType } from '../../common/ai/types';
+import { PageContextService } from '../../common/services/page-context.service';
+import { MessageClassificationIntent, ChatResponseType, PageContextType } from '../../common/ai/types';
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-return
 jest.mock('../../common/ai/actions', () => ({
@@ -30,9 +31,10 @@ describe('ChatService', () => {
     id: '123e4567-e89b-12d3-a456-426614174000',
     title: 'Test Conversation',
     userId: 'user_123',
-    pageKey: 'dashboard/payments',
+    pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_abc123' },
     createdAt: new Date('2024-01-01'),
     messages: [],
+    mode: ChatMode.PAGE,
   };
 
   const mockMessage: Message = {
@@ -51,7 +53,9 @@ describe('ChatService', () => {
       findById: jest.fn(),
       findByIdAndUserId: jest.fn(),
       findByUserId: jest.fn(),
-      findByUserIdAndPageKey: jest.fn(),
+      findByUserIdAndMode: jest.fn(),
+      findByUserIdAndContextType: jest.fn(),
+      findByUserIdAndModeAndContextType: jest.fn(),
       createConversation: jest.fn(),
       deleteById: jest.fn(),
       deleteByIdForUser: jest.fn(),
@@ -81,6 +85,12 @@ describe('ChatService', () => {
           },
         },
         {
+          provide: PageContextService,
+          useValue: {
+            enrichContext: jest.fn(),
+          },
+        },
+        {
           provide: ConversationRepository,
           useValue: mockConversationRepository,
         },
@@ -100,18 +110,9 @@ describe('ChatService', () => {
     messageRepository = module.get(MessageRepository);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
   describe('saveConversation', () => {
     it('should create and return a conversation', async () => {
-      const dto: CreateConversationDto = {
-        id: mockConversation.id,
-        title: mockConversation.title,
-        userId: mockConversation.userId,
-        pageKey: mockConversation.pageKey,
-      };
+      const dto = mockConversation;
 
       jest.spyOn(conversationRepository, 'createConversation').mockResolvedValue(mockConversation);
 
@@ -122,7 +123,8 @@ describe('ChatService', () => {
           id: dto.id,
           title: dto.title,
           userId: dto.userId,
-          pageKey: dto.pageKey,
+          pageContext: dto.pageContext,
+          mode: dto.mode,
         }),
       );
       expect(result.id).toBe(mockConversation.id);
@@ -178,14 +180,44 @@ describe('ChatService', () => {
       expect(result).toEqual([]);
     });
 
-    it('should filter conversations by page key when provided', async () => {
-      jest.spyOn(conversationRepository, 'findByUserIdAndPageKey').mockResolvedValue([mockConversation]);
+    it('should filter conversations by context type when provided', async () => {
+      jest.spyOn(conversationRepository, 'findByUserIdAndContextType').mockResolvedValue([mockConversation]);
 
-      const result = await service.getConversationsByUserId('user_123', 'dashboard/payments');
+      const result = await service.getConversationsByUserId('user_123', PageContextType.TRANSACTION);
 
-      expect(conversationRepository.findByUserIdAndPageKey).toHaveBeenCalledWith('user_123', 'dashboard/payments');
+      expect(conversationRepository.findByUserIdAndContextType).toHaveBeenCalledWith(
+        'user_123',
+        PageContextType.TRANSACTION,
+      );
       expect(result).toHaveLength(1);
-      expect(result[0].pageKey).toBe('dashboard/payments');
+      expect(result[0].pageContext?.type).toBe(PageContextType.TRANSACTION);
+      expect(result[0].pageContext?.resourceId).toBe('ref_abc123');
+    });
+
+    it('should filter conversations by mode when provided', async () => {
+      jest.spyOn(conversationRepository, 'findByUserIdAndMode').mockResolvedValue([mockConversation]);
+
+      const result = await service.getConversationsByUserId('user_123', undefined, ChatMode.PAGE);
+
+      expect(conversationRepository.findByUserIdAndMode).toHaveBeenCalledWith('user_123', ChatMode.PAGE);
+      expect(result).toHaveLength(1);
+      expect(result[0].mode).toBe(ChatMode.PAGE);
+    });
+
+    it('should filter conversations by context type and mode when provided', async () => {
+      jest.spyOn(conversationRepository, 'findByUserIdAndModeAndContextType').mockResolvedValue([mockConversation]);
+
+      const result = await service.getConversationsByUserId('user_123', PageContextType.TRANSACTION, ChatMode.PAGE);
+
+      expect(conversationRepository.findByUserIdAndModeAndContextType).toHaveBeenCalledWith(
+        'user_123',
+        ChatMode.PAGE,
+        PageContextType.TRANSACTION,
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].pageContext?.type).toBe(PageContextType.TRANSACTION);
+      expect(result[0].pageContext?.resourceId).toBe('ref_abc123');
+      expect(result[0].mode).toBe(ChatMode.PAGE);
     });
   });
 
@@ -463,7 +495,33 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
+      expect(result).toBeDefined();
+      expect(result?.type).toBe(ChatResponseType.REFUSAL);
+      expect(result?.responseStream).toBeDefined();
+    });
+
+    it('should return refusal response when message is OUT_OF_PAGE_SCOPE', async () => {
+      const mockUIMessage = {
+        id: 'msg_123',
+        role: 'user' as const,
+        parts: [{ type: 'text' as const, text: 'How many terminals have I created?' }],
+      };
+      const mockHistory = [mockUIMessage];
+      const mockPageContext = {
+        type: PageContextType.TRANSACTION,
+        resourceId: 'ref_123',
+      };
+
+      classifyMessage.mockResolvedValue({
+        intent: MessageClassificationIntent.OUT_OF_PAGE_SCOPE,
+        confidence: 0.95,
+        needsMerchantData: false,
+      });
+
+      const result = await service.handleMessageClassification(mockHistory, mockPageContext);
+
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, mockPageContext);
       expect(result).toBeDefined();
       expect(result?.type).toBe(ChatResponseType.REFUSAL);
       expect(result?.responseStream).toBeDefined();
@@ -478,7 +536,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
       expect(result).toBeNull();
     });
 
@@ -491,7 +549,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
       expect(result).toBeNull();
     });
 
@@ -504,7 +562,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
       expect(result).toBeNull();
     });
 
@@ -517,7 +575,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
       expect(result).toBeNull();
     });
   });
@@ -536,6 +594,78 @@ describe('ChatService', () => {
           'mock-jwt-token',
         ),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('Page-Scoped Chat', () => {
+    describe('buildPageScopedPrompt', () => {
+      it('should build prompt with transaction context', () => {
+        const enrichedContext = {
+          type: PageContextType.TRANSACTION,
+          resourceId: 'ref_123',
+          resourceData: { id: 123, reference: 'ref_123' },
+          formattedData: 'Transaction Details:\n- Reference: ref_123\n- Amount: NGN 1000.00',
+        };
+
+        const prompt = service['buildPageScopedPrompt'](enrichedContext);
+
+        expect(prompt).toContain('Transaction');
+        expect(prompt).toContain('Transaction Details');
+        expect(prompt).toContain('ref_123');
+      });
+
+      it('should build prompt with customer context', () => {
+        const enrichedContext = {
+          type: PageContextType.CUSTOMER,
+          resourceId: 'CUS_123',
+          resourceData: { customer_code: 'CUS_123', email: 'test@example.com' },
+          formattedData: 'Customer Details:\n- Customer Code: CUS_123\n- Email: test@example.com',
+        };
+
+        const prompt = service['buildPageScopedPrompt'](enrichedContext);
+
+        expect(prompt).toContain('Customer');
+        expect(prompt).toContain('Customer Details');
+        expect(prompt).toContain('CUS_123');
+      });
+
+      it('should include current date in prompt', () => {
+        const enrichedContext = {
+          type: PageContextType.TRANSACTION,
+          resourceId: 'ref_123',
+          resourceData: {},
+          formattedData: 'Transaction Details',
+        };
+
+        const prompt = service['buildPageScopedPrompt'](enrichedContext);
+        const currentDate = new Date().toISOString().split('T')[0];
+
+        expect(prompt).toContain(currentDate);
+      });
+    });
+
+    describe('handleStreamingChat with ChatMode', () => {
+      beforeEach(() => {
+        jest.spyOn(conversationRepository, 'findById').mockResolvedValue(mockConversation);
+        jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(mockConversation);
+        jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue([]);
+        jest.spyOn(messageRepository, 'createMessage').mockResolvedValue(mockMessage);
+        jest.spyOn(messageRepository, 'countUserMessagesInPeriod').mockResolvedValue(0);
+      });
+
+      it('should throw BadRequestException when mode is PAGE but pageContext is missing', async () => {
+        await expect(
+          service.handleStreamingChat(
+            {
+              conversationId: mockConversation.id,
+              message: { id: '123', role: MessageRole.USER, parts: [{ type: 'text', text: 'hi' }] },
+              mode: ChatMode.PAGE,
+            },
+            mockConversation.userId,
+            'mock-jwt-token',
+          ),
+        ).rejects.toThrow('pageContext is required when mode is "page"');
+      });
     });
   });
 });
