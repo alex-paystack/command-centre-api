@@ -1,6 +1,6 @@
 import { IsString, IsNotEmpty, IsUUID, IsOptional, IsEnum, ValidateNested, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ChatMode, PageContextType } from '../../../common/ai/types';
+import { ChatMode, PageContextType } from '~/common/ai/types';
 import { Type } from 'class-transformer';
 import { PageContextDto } from './page-context.dto';
 

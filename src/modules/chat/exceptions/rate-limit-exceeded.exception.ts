@@ -1,6 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import { ResponseCode, ResponseType } from '@paystackhq/pkg-response-code';
-import { PaystackError } from '../../../common/helpers/paystack.error';
+import { PaystackError } from '~/common/helpers/paystack.error';
 
 export class RateLimitExceededException extends PaystackError {
   constructor(limit: number, periodHours: number, currentCount: number) {

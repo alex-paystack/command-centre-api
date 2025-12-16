@@ -1,7 +1,7 @@
 import { Exclude, Expose } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { Conversation } from '../entities/conversation.entity';
-import { ChatMode, PageContextType, PageContext } from '../../../common/ai/types';
+import { ChatMode, PageContextType, PageContext } from '~/common/ai/types';
 
 @Exclude()
 export class ConversationResponseDto {

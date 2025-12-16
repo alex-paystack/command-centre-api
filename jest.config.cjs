@@ -29,4 +29,7 @@ module.exports = {
   },
   testEnvironment: 'node',
   setupFilesAfterEnv: ['<rootDir>/test/jest.setup.ts'],
+  moduleNameMapper: {
+    '^~/(.*)$': '<rootDir>/src/$1',
+  },
 };

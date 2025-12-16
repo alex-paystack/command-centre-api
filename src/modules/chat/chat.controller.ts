@@ -21,7 +21,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
-import { ChatMode, PageContextType, PaystackResponse } from '../../common';
+import { ChatMode, PageContextType, PaystackResponse } from '~/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { createUIMessageStreamResponse } from 'ai';
 

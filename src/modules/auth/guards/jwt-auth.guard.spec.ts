@@ -3,7 +3,7 @@ import { ExecutionContext, HttpStatus } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { AuthService } from '../auth.service';
-import { APIError } from '../../../common';
+import { APIError } from '~/common';
 
 interface RequestWithUser extends Request {
   user?: {

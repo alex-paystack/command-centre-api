@@ -1,7 +1,7 @@
 import { Injectable, CanActivate, ExecutionContext, HttpStatus } from '@nestjs/common';
 import { ResponseCode } from '@paystackhq/pkg-response-code';
 import { Request } from 'express';
-import { APIError } from '../../../common';
+import { APIError } from '~/common';
 import { AuthService } from '../auth.service';
 
 interface RequestWithUser extends Request {

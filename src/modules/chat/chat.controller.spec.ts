@@ -9,7 +9,7 @@ import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
 import { MessageRole } from './entities/message.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ChatMode, PageContextType } from '../../common/ai/types';
+import { ChatMode, PageContextType } from '~/common/ai/types';
 
 describe('ChatController', () => {
   let controller: ChatController;

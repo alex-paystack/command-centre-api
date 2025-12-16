@@ -1,8 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { App } from 'supertest/types';
-import { AppModule } from '../../src/app.module';
-import { configureApp } from '../../src/app.setup';
+import { AppModule } from '~/app.module';
+import { configureApp } from '~/app.setup';
 
 export async function createTestApp(
   overrides?: (builder: TestingModuleBuilder) => void,

@@ -2,7 +2,7 @@ import { Controller, Get, HttpStatus } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { NoLogClass, NoTraceClass } from '@paystackhq/nestjs-observability';
 import { HealthCheckService, HttpHealthIndicator, TypeOrmHealthIndicator } from '@nestjs/terminus';
-import { PaystackResponse, APIError } from '../../common';
+import { PaystackResponse, APIError } from '~/common';
 
 export type HealthDetails = {
   application: { status: 'up'; message: string };
