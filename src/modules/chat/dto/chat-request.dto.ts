@@ -3,7 +3,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { type UIMessage } from 'ai';
 import { PageContextDto } from './page-context.dto';
-import { ChatMode, PageContextType } from '../../../common/ai/types';
+import { ChatMode, PageContextType } from '~/common/ai/types';
 
 export class ChatRequestDto {
   @ApiProperty({

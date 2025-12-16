@@ -6,17 +6,17 @@ import { ChatService } from './chat.service';
 import { ConversationRepository } from './repositories/conversation.repository';
 import { MessageRepository } from './repositories/message.repository';
 import { CreateMessageDto } from './dto/create-message.dto';
-import { ChatMode } from '../../common/ai/types';
+import { ChatMode } from '~/common/ai/types';
 import { Conversation } from './entities/conversation.entity';
 import { Message, MessageRole } from './entities/message.entity';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
-import { PaystackApiService } from '../../common/services/paystack-api.service';
-import { PageContextService } from '../../common/services/page-context.service';
-import { MessageClassificationIntent, ChatResponseType, PageContextType } from '../../common/ai/types';
+import { PaystackApiService } from '~/common/services/paystack-api.service';
+import { PageContextService } from '~/common/services/page-context.service';
+import { MessageClassificationIntent, ChatResponseType, PageContextType } from '~/common/ai/types';
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-jest.mock('../../common/ai/actions', () => ({
-  ...jest.requireActual('../../common/ai/actions'),
+jest.mock('~/common/ai/actions', () => ({
+  ...jest.requireActual('~/common/ai/actions'),
   classifyMessage: jest.fn(),
 }));
 
@@ -480,7 +480,7 @@ describe('ChatService', () => {
 
     beforeEach(async () => {
       // Get the mocked classifyMessage function
-      const aiActions = await import('../../common/ai/actions');
+      const aiActions = await import('~/common/ai/actions');
       classifyMessage = aiActions.classifyMessage as jest.Mock;
       jest.clearAllMocks();
     });

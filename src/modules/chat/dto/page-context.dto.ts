@@ -1,6 +1,6 @@
 import { IsEnum, IsNotEmpty, IsString, IsOptional, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PageContextType } from '../../../common/ai/types';
+import { PageContextType } from '~/common/ai/types';
 
 export class PageContextDto {
   @ApiProperty({

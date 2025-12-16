@@ -9,7 +9,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
-import { ChatMode, PageContext, PageContextType } from '../../common/ai/types';
+import { ChatMode, PageContext, PageContextType } from '~/common/ai/types';
 import { MessageRole } from './entities/message.entity';
 import {
   generateConversationTitle,
@@ -24,9 +24,9 @@ import {
   ChatResponseType,
   ClassificationUIMessage,
   EnrichedPageContext,
-} from '../../common/ai';
-import { PaystackApiService } from '../../common/services/paystack-api.service';
-import { PageContextService } from '../../common/services/page-context.service';
+} from '~/common/ai';
+import { PaystackApiService } from '~/common/services/paystack-api.service';
+import { PageContextService } from '~/common/services/page-context.service';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
 import { Conversation } from './entities/conversation.entity';
 

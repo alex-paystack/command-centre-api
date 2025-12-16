@@ -1,7 +1,7 @@
 import { Injectable, HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ResponseCode } from '@paystackhq/pkg-response-code';
-import { APIError } from '../../common';
+import { APIError } from '~/common';
 
 interface JwtPayload {
   id: string;

@@ -8,8 +8,8 @@ import { ConversationRepository } from './repositories/conversation.repository';
 import { MessageRepository } from './repositories/message.repository';
 import { ChatService } from './chat.service';
 import { ChatController } from './chat.controller';
-import { PaystackApiService } from '../../common/services/paystack-api.service';
-import { PageContextService } from '../../common/services/page-context.service';
+import { PaystackApiService } from '~/common/services/paystack-api.service';
+import { PageContextService } from '~/common/services/page-context.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Conversation, Message]), ConfigModule, HttpModule],
