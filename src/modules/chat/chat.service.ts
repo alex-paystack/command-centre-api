@@ -251,7 +251,7 @@ export class ChatService {
     }
 
     const allMessages = await this.getMessagesByConversationId(conversationId, userId);
-    // TDDO: Revisit this
+    // TODO: Review this limit
     const historyLimit = this.configService.get<number>('MESSAGE_HISTORY_LIMIT', 40);
     const limitedHistory = allMessages.slice(-historyLimit);
     const uiMessages = [...convertToUIMessages(limitedHistory), message];
