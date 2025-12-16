@@ -1,0 +1,208 @@
+# Database
+
+This document describes the MongoDB database schema and migration system.
+
+## Overview
+
+The application uses MongoDB with TypeORM for data persistence. The database stores conversations and messages for the AI chat functionality.
+
+## Collections
+
+### Conversations
+
+Stores chat conversation metadata and context.
+
+```typescript
+{
+  _id: ObjectId,
+  id: string,                    // UUID
+  title: string,
+  userId: string,
+  mode: 'global' | 'page',       // Chat mode
+  pageContext: {                 // Optional, only for page-scoped conversations
+    type: 'transaction' | 'customer' | 'refund' | 'payout' | 'dispute',
+    resourceId: string
+  },
+  createdAt: Date
+}
+```
+
+#### Indexes
+
+| Index    | Type    | Purpose                |
+| -------- | ------- | ---------------------- |
+| `id`     | Unique  | UUID lookups           |
+| `userId` | Regular | User-scoped queries    |
+| `mode`   | Regular | Filtering by chat mode |
+
+### Messages
+
+Stores individual chat messages within conversations.
+
+```typescript
+{
+  _id: ObjectId,
+  id: string,                    // UUID
+  conversationId: string,        // Reference to conversation
+  role: 'user' | 'assistant',
+  parts: {                       // Flexible JSON for multi-modal content
+    text?: string,
+    // ... other content types
+  },
+  createdAt: Date
+}
+```
+
+#### Indexes
+
+| Index            | Type    | Purpose                            |
+| ---------------- | ------- | ---------------------------------- |
+| `id`             | Unique  | UUID lookups                       |
+| `conversationId` | Regular | Fetching messages by conversation  |
+| `createdAt`      | Regular | Ordering and rate limiting queries |
+
+## Migrations
+
+The project uses TypeORM migrations for database schema management.
+
+### Running Migrations
+
+```bash
+# Create a new migration
+pnpm run migration:create
+
+# Generate migration from entity changes
+pnpm run migration:generate
+
+# Run pending migrations
+pnpm run migration:run
+
+# Revert the last migration
+pnpm run migration:revert
+
+# Show migration status
+pnpm run migration:show
+```
+
+### Migration Files
+
+Migrations are stored in `src/database/migrations/` and follow the naming convention:
+
+```
+{timestamp}-{MigrationName}.ts
+```
+
+Example: `1734000000000-CreateChatCollections.ts`
+
+### Creating Migrations
+
+1. **Manual Migration** (recommended for complex changes):
+
+   ```bash
+   pnpm run migration:create
+   ```
+
+   This creates an empty migration file that you can customize.
+
+2. **Auto-generated Migration** (for entity changes):
+
+   ```bash
+   pnpm run migration:generate
+   ```
+
+   This compares your entities with the current database schema and generates migration code.
+
+### Migration Best Practices
+
+1. **Always test migrations** in development before production
+2. **Keep migrations atomic** - one logical change per migration
+3. **Use transactions** when possible for rollback safety
+4. **Document breaking changes** in migration comments
+5. **Never modify** already-run migrations in production
+
+## Connection Configuration
+
+Database connection is configured via environment variables:
+
+```env
+DATABASE_HOST=mongodb
+DATABASE_USERNAME=root
+DATABASE_PASSWORD=root
+DATABASE_NAME=command-centre-api
+```
+
+### Connection Options
+
+The TypeORM datasource is configured in `src/database/datasource.ts`:
+
+```typescript
+{
+  type: 'mongodb',
+  host: process.env.DATABASE_HOST,
+  username: process.env.DATABASE_USERNAME,
+  password: process.env.DATABASE_PASSWORD,
+  database: process.env.DATABASE_NAME,
+  entities: [...],
+  migrations: [...],
+  synchronize: false,  // Always use migrations in production
+}
+```
+
+## Data Relationships
+
+```mermaid
+erDiagram
+    Conversation {
+        ObjectId _id
+        string id "UUID"
+        string title
+        string userId
+        string mode "global | page"
+        object pageContext "optional"
+        Date createdAt
+    }
+
+    Message {
+        ObjectId _id
+        string id "UUID"
+        string conversationId "FK"
+        string role "user | assistant"
+        object parts "JSON"
+        Date createdAt
+    }
+
+    Conversation ||--o{ Message : "has many"
+```
+
+## Query Patterns
+
+### User Conversations
+
+```typescript
+// Find all conversations for a user
+conversationRepository.find({ where: { userId } });
+
+// Find with mode filter
+conversationRepository.find({ where: { userId, mode: 'page' } });
+
+// Find with context type filter
+conversationRepository.find({
+  where: {
+    userId,
+    'pageContext.type': 'transaction',
+  },
+});
+```
+
+### Rate Limiting Queries
+
+```typescript
+// Count user messages in time period
+messageRepository.count({
+  where: {
+    conversationId: { $in: userConversationIds },
+    role: 'user',
+    createdAt: { $gte: windowStart },
+  },
+});
+```
