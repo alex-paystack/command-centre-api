@@ -47,7 +47,11 @@ export class ConversationRepository extends MongoRepository<Conversation> {
   }
 
   async createConversation(data: Partial<Conversation>) {
-    const conversation = this.create(data);
+    const conversation = this.create({
+      ...data,
+      summaryCount: data.summaryCount ?? 0,
+      isClosed: data.isClosed ?? false,
+    });
     return this.save(conversation);
   }
 

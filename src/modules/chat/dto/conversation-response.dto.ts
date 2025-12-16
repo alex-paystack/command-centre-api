@@ -46,6 +46,42 @@ export class ConversationResponseDto {
   mode: ChatMode;
 
   @ApiProperty({
+    description: 'Summary of the conversation (generated after reaching message threshold)',
+    example: 'The user asked about transaction failures. The assistant explained...',
+    required: false,
+  })
+  @Expose()
+  summary?: string;
+
+  @ApiProperty({
+    description: 'Number of times the conversation has been summarized (max 2)',
+    example: 0,
+  })
+  @Expose()
+  summaryCount: number;
+
+  @ApiProperty({
+    description: 'Summary carried over from a previous closed conversation',
+    required: false,
+  })
+  @Expose()
+  previousSummary?: string;
+
+  @ApiProperty({
+    description: 'ID of the last message included in the summary',
+    required: false,
+  })
+  @Expose()
+  lastSummarizedMessageId?: string;
+
+  @ApiProperty({
+    description: 'Whether the conversation is closed (after 2 summaries)',
+    example: false,
+  })
+  @Expose()
+  isClosed: boolean;
+
+  @ApiProperty({
     description: 'Timestamp when the conversation was created',
     example: '2024-01-01T12:00:00.000Z',
   })
@@ -60,6 +96,11 @@ export class ConversationResponseDto {
     dto.pageContext = conversation.pageContext;
     dto.createdAt = conversation.createdAt;
     dto.mode = conversation.mode;
+    dto.summary = conversation.summary;
+    dto.summaryCount = conversation.summaryCount;
+    dto.previousSummary = conversation.previousSummary;
+    dto.lastSummarizedMessageId = conversation.lastSummarizedMessageId;
+    dto.isClosed = conversation.isClosed;
     return dto;
   }
 

@@ -42,6 +42,10 @@ MESSAGE_LIMIT=100              # Maximum messages per user per period (default: 
 RATE_LIMIT_PERIOD_HOURS=24     # Sliding window period in hours (default: 24)
 MESSAGE_HISTORY_LIMIT=40       # Number of past messages kept in AI context (default: 40)
 
+# Conversation Summarization
+SUMMARIZATION_THRESHOLD=20     # User messages before triggering summarization (default: 20)
+MAX_SUMMARIES=2                # Maximum summaries per conversation before closing (default: 2)
+
 # Logging
 LOG_LEVEL=info
 USE_JSON_LOGGER=true
@@ -55,24 +59,26 @@ OTEL_METRICS_EXPORTER=console
 
 ### Variable Reference
 
-| Variable                  | Required | Default                          | Description                        |
-| ------------------------- | -------- | -------------------------------- | ---------------------------------- |
-| `DATABASE_HOST`           | Yes      | -                                | MongoDB host                       |
-| `DATABASE_USERNAME`       | Yes      | -                                | MongoDB username                   |
-| `DATABASE_PASSWORD`       | Yes      | -                                | MongoDB password                   |
-| `DATABASE_NAME`           | Yes      | -                                | Database name                      |
-| `OPENAI_API_KEY`          | Yes      | -                                | OpenAI API key (starts with `sk-`) |
-| `JWT_SECRET`              | Yes      | -                                | Secret for JWT signing             |
-| `JWT_EXPIRES_IN`          | No       | `24h`                            | JWT expiration time                |
-| `NODE_ENV`                | No       | `development`                    | Environment mode                   |
-| `APP_NAME`                | No       | `command-centre-api`             | Application name                   |
-| `APP_VERSION`             | No       | `1.0.0`                          | Application version                |
-| `PAYSTACK_API_BASE_URL`   | No       | `https://studio-api.paystack.co` | Paystack API base URL              |
-| `MESSAGE_LIMIT`           | No       | `100`                            | Rate limit message count           |
-| `RATE_LIMIT_PERIOD_HOURS` | No       | `24`                             | Rate limit time window             |
-| `MESSAGE_HISTORY_LIMIT`   | No       | `40`                             | AI context message limit           |
-| `LOG_LEVEL`               | No       | `info`                           | Logging verbosity                  |
-| `OTEL_SERVICE_NAME`       | No       | `command-centre-api`             | OpenTelemetry service name         |
+| Variable                  | Required | Default                          | Description                             |
+| ------------------------- | -------- | -------------------------------- | --------------------------------------- |
+| `DATABASE_HOST`           | Yes      | -                                | MongoDB host                            |
+| `DATABASE_USERNAME`       | Yes      | -                                | MongoDB username                        |
+| `DATABASE_PASSWORD`       | Yes      | -                                | MongoDB password                        |
+| `DATABASE_NAME`           | Yes      | -                                | Database name                           |
+| `OPENAI_API_KEY`          | Yes      | -                                | OpenAI API key (starts with `sk-`)      |
+| `JWT_SECRET`              | Yes      | -                                | Secret for JWT signing                  |
+| `JWT_EXPIRES_IN`          | No       | `24h`                            | JWT expiration time                     |
+| `NODE_ENV`                | No       | `development`                    | Environment mode                        |
+| `APP_NAME`                | No       | `command-centre-api`             | Application name                        |
+| `APP_VERSION`             | No       | `1.0.0`                          | Application version                     |
+| `PAYSTACK_API_BASE_URL`   | No       | `https://studio-api.paystack.co` | Paystack API base URL                   |
+| `MESSAGE_LIMIT`           | No       | `100`                            | Rate limit message count                |
+| `RATE_LIMIT_PERIOD_HOURS` | No       | `24`                             | Rate limit time window                  |
+| `MESSAGE_HISTORY_LIMIT`   | No       | `40`                             | AI context message limit                |
+| `SUMMARIZATION_THRESHOLD` | No       | `20`                             | User messages before summarization      |
+| `MAX_SUMMARIES`           | No       | `2`                              | Max summaries before conversation close |
+| `LOG_LEVEL`               | No       | `info`                           | Logging verbosity                       |
+| `OTEL_SERVICE_NAME`       | No       | `command-centre-api`             | OpenTelemetry service name              |
 
 ## Rate Limiting
 

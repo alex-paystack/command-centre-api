@@ -77,6 +77,16 @@ Server-sent events stream with UIMessage format.
 | 404    | `not_found`      | Conversation or resource not found  |
 | 429    | `rate_limited`   | Rate limit exceeded                 |
 
+**Conversation Closed Response:**
+
+When streaming to a closed conversation (after 2 summaries), the response will include a refusal message:
+
+```
+"This conversation has reached its limit and has been closed. Please start a new conversation or continue from this one to carry over the context."
+```
+
+Use `POST /chat/conversations/from-summary` to create a new conversation that carries over the summary context.
+
 **Rate Limit Error Example:**
 
 ```json
@@ -141,9 +151,80 @@ Creates a new conversation. Conversations are typically auto-created when stream
   "title": "Payment Integration Help",
   "userId": "user_123",
   "mode": "global",
+  "summary": null,
+  "summaryCount": 0,
+  "previousSummary": null,
+  "lastSummarizedMessageId": null,
+  "isClosed": false,
   "createdAt": "2024-01-01T00:00:00.000Z"
 }
 ```
+
+---
+
+### Create Conversation from Summary
+
+```http
+POST /chat/conversations/from-summary
+```
+
+Creates a new conversation that continues from a previously closed conversation, carrying over the summary context.
+
+#### Request Body
+
+```json
+{
+  "previousConversationId": "550e8400-e29b-41d4-a716-446655440000",
+  "mode": "global"
+}
+```
+
+#### Request Body (Page-Scoped)
+
+```json
+{
+  "previousConversationId": "550e8400-e29b-41d4-a716-446655440000",
+  "mode": "page",
+  "pageContext": {
+    "type": "transaction",
+    "resourceId": "123456"
+  }
+}
+```
+
+#### Parameters
+
+| Parameter                | Type   | Required             | Description                                                      |
+| ------------------------ | ------ | -------------------- | ---------------------------------------------------------------- |
+| `previousConversationId` | UUID   | Yes                  | ID of the closed conversation to continue from                   |
+| `mode`                   | string | Yes                  | Chat mode: `"global"` or `"page"`                                |
+| `pageContext`            | object | When mode is "page"  | Resource context                                                 |
+| `pageContext.type`       | string | Yes (if pageContext) | One of: `transaction`, `customer`, `refund`, `payout`, `dispute` |
+| `pageContext.resourceId` | string | Yes (if pageContext) | Resource identifier                                              |
+
+#### Response
+
+```json
+{
+  "id": "660e8400-e29b-41d4-a716-446655440001",
+  "title": "Payment Integration Help (continued)",
+  "userId": "user_123",
+  "mode": "global",
+  "summary": null,
+  "summaryCount": 0,
+  "previousSummary": "The user asked about transaction failures. The assistant explained common causes including insufficient funds...",
+  "lastSummarizedMessageId": null,
+  "isClosed": false,
+  "createdAt": "2024-01-02T00:00:00.000Z"
+}
+```
+
+#### Error Responses
+
+| Status | Code             | Description                              |
+| ------ | ---------------- | ---------------------------------------- |
+| 400    | `invalid_params` | Invalid input or conversation not closed |
+| 404    | `not_found`      | Previous conversation not found          |
 
 ---
 
@@ -169,6 +250,11 @@ Retrieves a conversation by ID.
   "title": "Payment Integration Help",
   "userId": "user_123",
   "mode": "global",
+  "summary": "The user asked about transaction failures...",
+  "summaryCount": 1,
+  "previousSummary": null,
+  "lastSummarizedMessageId": "message-uuid-123",
+  "isClosed": false,
   "createdAt": "2024-01-01T00:00:00.000Z"
 }
 ```
@@ -218,6 +304,11 @@ GET /chat/conversations?mode=page&contextType=transaction
     "title": "Payment Integration Help",
     "userId": "user_123",
     "mode": "global",
+    "summary": null,
+    "summaryCount": 0,
+    "previousSummary": null,
+    "lastSummarizedMessageId": null,
+    "isClosed": false,
     "createdAt": "2024-01-01T00:00:00.000Z"
   }
 ]

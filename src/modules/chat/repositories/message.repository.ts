@@ -63,4 +63,44 @@ export class MessageRepository extends MongoRepository<Message> {
 
     return result.length > 0 && result[0] ? result[0].total : 0;
   }
+
+  async countByConversationId(conversationId: string) {
+    return this.countBy({ conversationId });
+  }
+
+  async countUserMessagesByConversationId(conversationId: string) {
+    return this.countBy({ conversationId, role: MessageRole.USER });
+  }
+
+  async findMessagesAfterMessageId(conversationId: string, afterMessageId: string) {
+    const targetMessage = await this.findOneBy({ id: afterMessageId });
+
+    if (!targetMessage) {
+      return this.findBy({ conversationId });
+    }
+
+    // Find all messages in this conversation created after the target message
+    return this.find({
+      where: {
+        conversationId,
+        createdAt: { $gt: targetMessage.createdAt },
+      },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  async countUserMessagesAfterMessageId(conversationId: string, afterMessageId: string) {
+    const targetMessage = await this.findOneBy({ id: afterMessageId });
+
+    const filter: Parameters<typeof this.countBy>[0] = {
+      conversationId,
+      role: MessageRole.USER,
+    };
+
+    if (targetMessage) {
+      filter.createdAt = { $gt: targetMessage.createdAt };
+    }
+
+    return this.countBy(filter);
+  }
 }

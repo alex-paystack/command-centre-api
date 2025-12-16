@@ -249,6 +249,79 @@ const title = await generateConversationTitle(message);
 - Generates concise, descriptive titles (typically 3-6 words)
 - Falls back gracefully if generation fails
 
+## Message Summarization
+
+The system automatically summarizes long conversations to maintain context while managing token limits and conversation length.
+
+### How It Works
+
+1. **Threshold Monitoring**: After a configurable number of user messages (default: 20), summarization is triggered
+2. **Summary Generation**: GPT-4o-mini generates a comprehensive summary of the conversation
+3. **Context Preservation**: Key information, transaction IDs, customer details, and decisions are preserved
+4. **Incremental Updates**: Subsequent summaries incorporate previous summaries for continuity
+5. **Conversation Closure**: After reaching the maximum number of summaries (default: 2), the conversation is closed
+
+### Configuration
+
+```env
+SUMMARIZATION_THRESHOLD=20  # User messages before triggering summarization (default: 20)
+MAX_SUMMARIES=2             # Maximum summaries before conversation closes (default: 2)
+```
+
+### Conversation Lifecycle
+
+```mermaid
+flowchart TD
+    Start([New Conversation]) --> Messages[User sends messages]
+    Messages --> Check{20+ messages<br/>since last summary?}
+    Check -->|No| Messages
+    Check -->|Yes| Summarize[Generate Summary]
+    Summarize --> Count{Summary count < 2?}
+    Count -->|Yes| Continue[Continue conversation]
+    Continue --> Messages
+    Count -->|No| Close[Close conversation]
+    Close --> Continue2{User wants to continue?}
+    Continue2 -->|Yes| NewConv[Create new conversation<br/>with carried-over summary]
+    NewConv --> Messages
+    Continue2 -->|No| End([End])
+```
+
+### Summary Content
+
+Summaries include:
+
+- Main topics and user intents discussed
+- Important data points: transaction IDs, customer information, reference codes, dates, amounts
+- Key findings, insights, or recommendations provided
+- Recurring themes or patterns identified
+
+### Continuing Closed Conversations
+
+When a conversation is closed (after 2 summaries), users can continue with a new conversation that carries over the context:
+
+```http
+POST /chat/conversations/from-summary
+```
+
+```json
+{
+  "previousConversationId": "550e8400-e29b-41d4-a716-446655440000",
+  "mode": "global"
+}
+```
+
+The new conversation inherits the combined summary from the closed conversation, allowing seamless continuation without losing context.
+
+### Conversation Response Fields
+
+| Field                     | Description                                            |
+| ------------------------- | ------------------------------------------------------ |
+| `summary`                 | Current conversation summary (if generated)            |
+| `summaryCount`            | Number of summaries generated (0-2)                    |
+| `previousSummary`         | Summary carried over from a previous conversation      |
+| `lastSummarizedMessageId` | Watermark tracking last summarized message             |
+| `isClosed`                | Whether the conversation is closed (after 2 summaries) |
+
 ## Chat Streaming
 
 The API provides real-time AI chat capabilities with streaming responses using Server-Sent Events (SSE).
@@ -261,9 +334,12 @@ The API provides real-time AI chat capabilities with streaming responses using S
 - Maintains conversation history context (last 40 messages by default)
 - Supports AI tools for dynamic actions
 - Dual-mode support: global or resource-scoped
+- **Automatic summarization** for long conversations with context carry-over
 
 ### Configuration
 
 ```env
-MESSAGE_HISTORY_LIMIT=40  # Number of past messages kept in AI context
+MESSAGE_HISTORY_LIMIT=40    # Number of past messages kept in AI context
+SUMMARIZATION_THRESHOLD=20  # User messages before triggering summarization
+MAX_SUMMARIES=2             # Maximum summaries before conversation closes
 ```

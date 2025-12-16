@@ -20,11 +20,26 @@ export class Conversation {
   userId: string;
 
   @Column('json', { nullable: true })
-  pageContext: PageContext;
+  pageContext?: PageContext;
 
   @Column()
   @Index()
   mode: ChatMode;
+
+  @Column({ nullable: true })
+  summary?: string;
+
+  @Column({ default: 0 })
+  summaryCount: number;
+
+  @Column({ nullable: true })
+  previousSummary?: string;
+
+  @Column({ nullable: true })
+  lastSummarizedMessageId?: string;
+
+  @Column({ default: false })
+  isClosed: boolean;
 
   @CreateDateColumn()
   createdAt: Date;

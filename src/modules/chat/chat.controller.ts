@@ -17,6 +17,7 @@ import { Request, Response } from 'express';
 import { Readable } from 'stream';
 import { ChatService } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
+import { CreateConversationFromSummaryDto } from './dto/create-conversation-from-summary.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
@@ -41,6 +42,26 @@ export class ChatController {
     const conversationDto = { ...dto, userId };
     const conversation = await this.chatService.saveConversation(conversationDto);
     return PaystackResponse.success(conversation, 'Conversation created successfully');
+  }
+
+  @Post('conversations/from-summary')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Create a new conversation continuing from a closed conversation',
+    description:
+      'Creates a new conversation that carries over the summary from a previously closed conversation. This allows users to continue their conversation with context after reaching the 2-summary limit.',
+  })
+  @ApiBody({ type: CreateConversationFromSummaryDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Conversation created successfully with carried-over context',
+    type: ConversationResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Bad request - invalid input or conversation not closed' })
+  @ApiResponse({ status: 404, description: 'Previous conversation not found' })
+  async createConversationFromSummary(@Body() dto: CreateConversationFromSummaryDto, @CurrentUser() userId: string) {
+    const conversation = await this.chatService.createConversationFromSummary(dto, userId);
+    return PaystackResponse.success(conversation, 'Conversation created successfully with carried-over context');
   }
 
   @Get('conversations')

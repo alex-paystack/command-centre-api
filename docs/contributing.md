@@ -53,17 +53,18 @@ docs(readme): update installation instructions
 
 Unit test files follow the `*.spec.ts` naming convention:
 
-| Test File                          | Description                      |
-| ---------------------------------- | -------------------------------- |
-| `chat.controller.spec.ts`          | Chat controller tests            |
-| `chat.service.spec.ts`             | Chat service layer tests         |
-| `aggregation.spec.ts`              | Chart aggregation logic tests    |
-| `page-scoped-tools.spec.ts`        | Page-scoped tool filtering tests |
-| `tools.count-transactions.spec.ts` | Transaction counting tool tests  |
-| `utils.spec.ts`                    | AI utility function tests        |
-| `jwt-auth.guard.spec.ts`           | Authentication guard tests       |
-| `page-context.service.spec.ts`     | Page context enrichment tests    |
-| `app.service.spec.ts`              | Application service tests        |
+| Test File                            | Description                      |
+| ------------------------------------ | -------------------------------- |
+| `chat.controller.spec.ts`            | Chat controller tests            |
+| `chat.service.spec.ts`               | Chat service layer tests         |
+| `chat.service.summarization.spec.ts` | Conversation summarization tests |
+| `aggregation.spec.ts`                | Chart aggregation logic tests    |
+| `page-scoped-tools.spec.ts`          | Page-scoped tool filtering tests |
+| `tools.count-transactions.spec.ts`   | Transaction counting tool tests  |
+| `utils.spec.ts`                      | AI utility function tests        |
+| `jwt-auth.guard.spec.ts`             | Authentication guard tests       |
+| `page-context.service.spec.ts`       | Page context enrichment tests    |
+| `app.service.spec.ts`                | Application service tests        |
 
 E2E tests are located in `test/e2e/` directory.
 
@@ -230,6 +231,21 @@ export const myResourceFieldConfig: ResourceFieldConfig<MyResource> = {
 
 - Global conversations cannot be converted to page-scoped
 - Create a new conversation with `mode: "page"` from the start
+
+### Conversation Summarization Issues
+
+#### "This conversation has reached its limit and has been closed"
+
+- Conversations are closed after 2 summarization cycles (approximately 40+ user messages)
+- Use `POST /chat/conversations/from-summary` to continue with carried-over context
+- The new conversation will inherit the summary from the closed conversation
+
+#### Summaries not being generated
+
+- Check `SUMMARIZATION_THRESHOLD` setting (default: 20 user messages)
+- Summarization runs asynchronously after the stream completes
+- Check logs for summarization errors
+- Verify OpenAI API key has sufficient credits
 
 ## Pull Request Guidelines
 
