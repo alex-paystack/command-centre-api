@@ -11,6 +11,23 @@ Requirements:
 
 Return only the title text, nothing else.`;
 
+export const CONVERSATION_SUMMARY_PROMPT = `You are a helpful assistant that generates concise conversation summaries.
+
+Given the full conversation history between a user and a Paystack payments assistant, create a comprehensive summary that preserves the essential context for continuing the conversation.
+
+Requirements:
+- Capture the main topics and user intents discussed
+- Preserve important data points: transaction IDs, customer information, reference codes, dates, amounts
+- Include key findings, insights, or recommendations provided
+- Note any recurring themes or patterns identified
+- Keep it concise but comprehensive (aim for 200-400 words)
+- Use clear, structured formatting with sections if helpful
+- Write in third person ("The user asked about...", "The assistant explained...")
+
+Focus on information that would be useful context for continuing this conversation. Omit pleasantries and focus on substantive content.
+
+Return only the summary text, nothing else.`;
+
 export const CHAT_AGENT_SYSTEM_PROMPT = `You are an expert Paystack payments assistant with deep knowledge of the Paystack platform and payment processing.
 
 ## Current Context

@@ -14,6 +14,7 @@ Command Centre API is a NestJS-based backend service that powers an AI-driven me
 - 📊 **Analytics & Charts** — Multi-resource charting with time-based and categorical aggregations
 - 🧭 **Guardrails** — Dual-layer classification for out-of-scope protection
 - 🛡️ **Rate Limiting** — Configurable message entitlement with sliding window enforcement
+- 📝 **Smart Summarization** — Automatic conversation summarization with context carry-over
 
 ## Quick Start
 
@@ -104,15 +105,16 @@ pnpm run migration:run  # Run migrations
 
 All `/chat` endpoints require `Authorization: Bearer <jwt>`.
 
-| Method | Endpoint                         | Description              |
-| ------ | -------------------------------- | ------------------------ |
-| POST   | `/chat/stream`                   | Stream AI chat responses |
-| POST   | `/chat/conversations`            | Create conversation      |
-| GET    | `/chat/conversations`            | List user conversations  |
-| GET    | `/chat/conversations/:id`        | Get conversation         |
-| DELETE | `/chat/conversations/:id`        | Delete conversation      |
-| GET    | `/chat/messages/:conversationId` | Get messages             |
-| GET    | `/health`                        | Health check (public)    |
+| Method | Endpoint                           | Description                       |
+| ------ | ---------------------------------- | --------------------------------- |
+| POST   | `/chat/stream`                     | Stream AI chat responses          |
+| POST   | `/chat/conversations`              | Create conversation               |
+| POST   | `/chat/conversations/from-summary` | Continue from closed conversation |
+| GET    | `/chat/conversations`              | List user conversations           |
+| GET    | `/chat/conversations/:id`          | Get conversation                  |
+| DELETE | `/chat/conversations/:id`          | Delete conversation               |
+| GET    | `/chat/messages/:conversationId`   | Get messages                      |
+| GET    | `/health`                          | Health check (public)             |
 
 See [API Reference](./docs/api-reference.md) for complete documentation.
 

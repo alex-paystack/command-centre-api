@@ -38,6 +38,7 @@ export enum MessageClassificationIntent {
 export enum ChatResponseType {
   CHAT_RESPONSE = 'CHAT_RESPONSE',
   REFUSAL = 'REFUSAL',
+  CONVERSATION_CLOSED = 'CONVERSATION_CLOSED',
 }
 
 export enum ChatMode {

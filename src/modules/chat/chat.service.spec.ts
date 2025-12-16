@@ -35,6 +35,8 @@ describe('ChatService', () => {
     createdAt: new Date('2024-01-01'),
     messages: [],
     mode: ChatMode.PAGE,
+    summaryCount: 0,
+    isClosed: false,
   };
 
   const mockMessage: Message = {
@@ -68,6 +70,8 @@ describe('ChatService', () => {
       createMessages: jest.fn(),
       deleteAllByConversationId: jest.fn(),
       countUserMessagesInPeriod: jest.fn().mockResolvedValue(0),
+      countUserMessagesByConversationId: jest.fn(),
+      countUserMessagesAfterMessageId: jest.fn(),
     };
 
     configService = {

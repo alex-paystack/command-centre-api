@@ -2,9 +2,11 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { ConfigService } from '@nestjs/config';
 import { convertToModelMessages, createUIMessageStream, stepCountIs, streamText, UIMessage } from 'ai';
 import { openai } from '@ai-sdk/openai';
+import { randomUUID } from 'crypto';
 import { ConversationRepository } from './repositories/conversation.repository';
 import { MessageRepository } from './repositories/message.repository';
 import { CreateConversationDto } from './dto/create-conversation.dto';
+import { CreateConversationFromSummaryDto } from './dto/create-conversation-from-summary.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
@@ -13,6 +15,7 @@ import { ChatMode, PageContext, PageContextType } from '~/common/ai/types';
 import { MessageRole } from './entities/message.entity';
 import {
   generateConversationTitle,
+  summarizeConversation,
   convertToUIMessages,
   createTools,
   createPageScopedTools,
@@ -118,6 +121,38 @@ export class ChatService {
     const conversation = await this.conversationRepository.createConversation(dto);
 
     return ConversationResponseDto.fromEntity(conversation);
+  }
+
+  async createConversationFromSummary(dto: CreateConversationFromSummaryDto, userId: string) {
+    const previousConversation = await this.conversationRepository.findByIdAndUserId(
+      dto.previousConversationId,
+      userId,
+    );
+
+    if (!previousConversation) {
+      throw new NotFoundException(`Conversation with ID ${dto.previousConversationId} not found`);
+    }
+
+    if (!previousConversation.isClosed) {
+      throw new BadRequestException('Can only continue from a closed conversation');
+    }
+
+    // Combine all summaries from the previous conversation
+    const combinedSummary = [previousConversation.previousSummary, previousConversation.summary]
+      .filter(Boolean)
+      .join('\n\n---\n\n');
+
+    // Create new conversation with carried-over summary
+    const newConversation = await this.conversationRepository.createConversation({
+      id: randomUUID(),
+      title: `${previousConversation.title} (continued)`,
+      userId,
+      mode: dto.mode,
+      pageContext: dto.pageContext,
+      previousSummary: combinedSummary,
+    });
+
+    return ConversationResponseDto.fromEntity(newConversation);
   }
 
   async deleteConversationById(id: string, userId: string) {
@@ -230,6 +265,27 @@ export class ChatService {
       throw new NotFoundException(`Conversation with ID ${conversationId} not found`);
     }
 
+    if (conversation.isClosed) {
+      const closedConversationMessage =
+        'This conversation has reached its limit and has been closed. Please start a new conversation or continue from this one to carry over the context.';
+
+      const closedStream = createUIMessageStream<ClassificationUIMessage>({
+        execute: ({ writer }) => {
+          writer.write({
+            type: 'data-refusal',
+            data: {
+              text: closedConversationMessage,
+            },
+          });
+        },
+      });
+
+      return {
+        type: ChatResponseType.CONVERSATION_CLOSED,
+        responseStream: closedStream,
+      };
+    }
+
     if (conversation.pageContext) {
       if (mode !== ChatMode.PAGE) {
         throw new BadRequestException('Conversation is page-scoped and must use mode "page"');
@@ -250,11 +306,8 @@ export class ChatService {
       throw new BadRequestException('Cannot change an existing conversation to a page-scoped context');
     }
 
-    const allMessages = await this.getMessagesByConversationId(conversationId, userId);
-    // TODO: Review this limit
-    const historyLimit = this.configService.get<number>('MESSAGE_HISTORY_LIMIT', 40);
-    const limitedHistory = allMessages.slice(-historyLimit);
-    const uiMessages = [...convertToUIMessages(limitedHistory), message];
+    // Build messages with summary support
+    const uiMessages = await this.buildMessagesForLLM(conversation, conversationId, userId, message);
 
     const messageClassification = await this.handleMessageClassification(uiMessages, pageContext);
 
@@ -325,7 +378,72 @@ export class ChatService {
           parts: message.parts,
         }));
 
-        await this.saveMessages(formattedMessages, userId);
+        const savedMessages = await this.saveMessages(formattedMessages, userId);
+
+        // Check if summarization is needed
+        const summarizationThreshold = this.configService.get<number>('SUMMARIZATION_THRESHOLD', 20);
+        const maxSummaries = this.configService.get<number>('MAX_SUMMARIES', 2);
+
+        let messageCount: number;
+
+        if (conversation.lastSummarizedMessageId) {
+          messageCount = await this.messageRepository.countUserMessagesAfterMessageId(
+            conversationId,
+            conversation.lastSummarizedMessageId,
+          );
+        } else {
+          messageCount = await this.messageRepository.countUserMessagesByConversationId(conversationId);
+        }
+
+        const currentSummaryCount = conversation.summaryCount;
+
+        if (messageCount >= summarizationThreshold && currentSummaryCount < maxSummaries) {
+          try {
+            // Only summarize messages that haven't been summarized yet to avoid reprocessing full history
+            const messagesNeedingSummary = conversation.lastSummarizedMessageId
+              ? MessageResponseDto.fromEntities(
+                  await this.messageRepository.findMessagesAfterMessageId(
+                    conversationId,
+                    conversation.lastSummarizedMessageId,
+                  ),
+                )
+              : await this.getMessagesByConversationId(conversationId, userId);
+
+            if (messagesNeedingSummary.length > 0) {
+              const newSummary = await summarizeConversation(
+                convertToUIMessages(messagesNeedingSummary),
+                conversation.summary,
+              );
+
+              if (newSummary) {
+                // Track the newest user message as the watermark for next summarization
+                const lastUserMessageId = [...messagesNeedingSummary]
+                  .reverse()
+                  .find((msg) => msg.role === MessageRole.USER)?.id;
+
+                const lastMessageId =
+                  lastUserMessageId || (savedMessages.length > 0 ? savedMessages[savedMessages.length - 1].id : null);
+
+                const newSummaryCount = currentSummaryCount + 1;
+                const updates: Partial<Conversation> = {
+                  summary: newSummary,
+                  summaryCount: newSummaryCount,
+                  lastSummarizedMessageId: lastMessageId || conversation.lastSummarizedMessageId,
+                  isClosed: newSummaryCount >= maxSummaries,
+                };
+
+                await this.conversationRepository.save({
+                  ...conversation,
+                  ...updates,
+                });
+              }
+            }
+          } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error generating conversation summary:', error);
+            // Don't fail the entire request if summarization fails
+          }
+        }
       },
     });
 
@@ -339,5 +457,58 @@ export class ChatService {
     return PAGE_SCOPED_SYSTEM_PROMPT.replace(/\{\{CURRENT_DATE\}\}/g, currentDate)
       .replace(/\{\{RESOURCE_TYPE\}\}/g, resourceType)
       .replace(/\{\{RESOURCE_DATA\}\}/g, enrichedContext.formattedData);
+  }
+
+  private async buildMessagesForLLM(
+    conversation: Conversation,
+    conversationId: string,
+    userId: string,
+    currentUserMessage: UIMessage,
+  ): Promise<UIMessage[]> {
+    const messages: UIMessage[] = [];
+
+    // If summary exists, inject it as first assistant message
+    if (conversation.previousSummary || conversation.summary) {
+      const summaryParts: string[] = [];
+
+      if (conversation.previousSummary) {
+        summaryParts.push(`**Carried over from previous conversation:**\n${conversation.previousSummary}`);
+      }
+
+      if (conversation.summary) {
+        summaryParts.push(`**Earlier in this conversation:**\n${conversation.summary}`);
+      }
+
+      messages.push({
+        id: 'summary-context',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'text',
+            text: `[Conversation Summary]\n\nHere's what we've discussed so far:\n\n${summaryParts.join('\n\n')}`,
+          },
+        ],
+      });
+    }
+
+    // Get recent messages (after lastSummarizedMessageId if summary exists)
+    let recentMessages: MessageResponseDto[];
+
+    if (conversation.lastSummarizedMessageId) {
+      const messagesAfterSummary = await this.messageRepository.findMessagesAfterMessageId(
+        conversationId,
+        conversation.lastSummarizedMessageId,
+      );
+      recentMessages = MessageResponseDto.fromEntities(messagesAfterSummary);
+    } else {
+      // No summary yet, get all messages with history limit
+      const allMessages = await this.getMessagesByConversationId(conversationId, userId);
+      const historyLimit = this.configService.get<number>('MESSAGE_HISTORY_LIMIT', 40);
+      recentMessages = allMessages.slice(-historyLimit);
+    }
+
+    messages.push(...convertToUIMessages(recentMessages), currentUserMessage);
+
+    return messages;
   }
 }

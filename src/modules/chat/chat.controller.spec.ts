@@ -4,6 +4,7 @@ import { ExecutionContext } from '@nestjs/common';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
+import { CreateConversationFromSummaryDto } from './dto/create-conversation-from-summary.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
@@ -24,6 +25,8 @@ describe('ChatController', () => {
     pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_abc123' },
     mode: ChatMode.PAGE,
     createdAt: new Date('2024-01-01'),
+    summaryCount: 0,
+    isClosed: false,
   };
 
   const mockMessageResponse: MessageResponseDto = {
@@ -37,6 +40,7 @@ describe('ChatController', () => {
   beforeEach(async () => {
     const mockChatService = {
       saveConversation: jest.fn(),
+      createConversationFromSummary: jest.fn(),
       getConversationById: jest.fn(),
       getConversationsByUserId: jest.fn(),
       deleteConversationById: jest.fn(),
@@ -215,6 +219,62 @@ describe('ChatController', () => {
         status: true,
         message: 'Messages retrieved successfully',
         data: [mockMessageResponse],
+      });
+    });
+  });
+
+  describe('createConversationFromSummary', () => {
+    it('should create a conversation from a closed conversation summary', async () => {
+      const dto: CreateConversationFromSummaryDto = {
+        previousConversationId: 'closed-conversation-id',
+        mode: ChatMode.GLOBAL,
+      };
+
+      const newConversationResponse: ConversationResponseDto = {
+        ...mockConversationResponse,
+        id: 'new-conversation-id',
+        title: 'Test Conversation (continued)',
+        mode: ChatMode.GLOBAL,
+        pageContext: undefined,
+        previousSummary: 'This is the carried over summary.',
+      };
+
+      jest.spyOn(service, 'createConversationFromSummary').mockResolvedValue(newConversationResponse);
+
+      const result = await controller.createConversationFromSummary(dto, mockUserId);
+
+      expect(service.createConversationFromSummary).toHaveBeenCalledWith(dto, mockUserId);
+      expect(result).toEqual({
+        status: true,
+        message: 'Conversation created successfully with carried-over context',
+        data: newConversationResponse,
+      });
+      expect(result.data?.previousSummary).toBe('This is the carried over summary.');
+    });
+
+    it('should create page-scoped conversation from summary', async () => {
+      const dto: CreateConversationFromSummaryDto = {
+        previousConversationId: 'closed-conversation-id',
+        mode: ChatMode.PAGE,
+        pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_123' },
+      };
+
+      const newConversationResponse: ConversationResponseDto = {
+        ...mockConversationResponse,
+        id: 'new-conversation-id',
+        title: 'Test Conversation (continued)',
+        previousSummary: 'This is the carried over summary.',
+      };
+
+      jest.spyOn(service, 'createConversationFromSummary').mockResolvedValue(newConversationResponse);
+
+      const result = await controller.createConversationFromSummary(dto, mockUserId);
+
+      expect(service.createConversationFromSummary).toHaveBeenCalledWith(dto, mockUserId);
+      expect(result).toEqual({
+        status: true,
+        message: 'Conversation created successfully with carried-over context',
+        data: newConversationResponse,
       });
     });
   });

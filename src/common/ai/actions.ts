@@ -2,6 +2,7 @@ import { generateObject, generateText, type UIMessage } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import {
   CONVERSATION_TITLE_GENERATION_PROMPT,
+  CONVERSATION_SUMMARY_PROMPT,
   CLASSIFIER_SYSTEM_PROMPT,
   getClassifierUserPrompt,
   PAGE_SCOPED_CLASSIFIER_SYSTEM_PROMPT,
@@ -31,6 +32,37 @@ export async function generateConversationTitle(message: UIMessage) {
     // eslint-disable-next-line no-console
     console.error('Error generating conversation title:', error);
     return 'New Conversation';
+  }
+}
+
+/**
+ * Generate a summary of a conversation
+ * Uses GPT-4o-mini for cost efficiency while maintaining quality
+ *
+ * @param messages - The full conversation history to summarize
+ * @param existingSummary - Optional existing summary to build upon
+ * @returns A generated summary or empty string if generation fails
+ */
+export async function summarizeConversation(messages: UIMessage[], existingSummary?: string) {
+  try {
+    const conversationText = getTextFromMessages(messages);
+    let prompt = conversationText;
+
+    if (existingSummary) {
+      prompt = `Previous Summary:\n${existingSummary}\n\n---\n\nNew Messages to Incorporate:\n${conversationText}`;
+    }
+
+    const { text } = await generateText({
+      model: openai('gpt-4o-mini'),
+      system: CONVERSATION_SUMMARY_PROMPT,
+      prompt,
+    });
+
+    return text.trim();
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error generating conversation summary:', error);
+    return '';
   }
 }
 
