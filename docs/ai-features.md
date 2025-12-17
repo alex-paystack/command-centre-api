@@ -134,7 +134,7 @@ The `generateChartData` tool provides powerful analytics capabilities across mul
 ```json
 {
   "success": true,
-  "label": "Daily Transaction Metrics (Dec 1, 2024 - Dec 15, 2024)",
+  "label": "Daily Transaction Metrics",
   "chartType": "area",
   "chartSeries": [
     {

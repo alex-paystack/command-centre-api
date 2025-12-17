@@ -82,6 +82,65 @@ Stores individual chat messages within conversations.
 | `conversationId` | Regular | Fetching messages by conversation  |
 | `createdAt`      | Regular | Ordering and rate limiting queries |
 
+### Saved Charts
+
+Stores user-saved chart configurations that can be regenerated with fresh data. Charts are standalone resources not tied to conversations.
+
+```typescript
+{
+  _id: ObjectId,
+  id: string,                            // UUID
+  userId: string,                        // Chart owner
+  name: string,                          // User-provided chart name
+  description: string | undefined,       // Optional description
+  createdFromConversationId: string | undefined, // Optional conversation reference
+  resourceType: 'transaction' | 'refund' | 'payout' | 'dispute',
+  aggregationType: string,               // by-day, by-week, by-status, etc.
+  from: string | undefined,              // Start date (ISO format)
+  to: string | undefined,                // End date (ISO format)
+  status: string | undefined,            // Filter by status
+  currency: string | undefined,          // Filter by currency
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+#### Fields
+
+| Field                       | Type   | Default | Description                                  |
+| --------------------------- | ------ | ------- | -------------------------------------------- |
+| `id`                        | string | -       | UUID (auto-generated)                        |
+| `userId`                    | string | -       | Owner user ID                                |
+| `name`                      | string | -       | Chart name (max 200 chars)                   |
+| `description`               | string | null    | Chart description (max 500 chars)            |
+| `createdFromConversationId` | string | null    | Optional reference to source conversation    |
+| `resourceType`              | enum   | -       | Resource type being charted                  |
+| `aggregationType`           | string | -       | Aggregation method (by-day, by-status, etc.) |
+| `from`                      | string | null    | Start date for time-based aggregations       |
+| `to`                        | string | null    | End date for time-based aggregations         |
+| `status`                    | string | null    | Status filter                                |
+| `currency`                  | string | null    | Currency filter                              |
+| `createdAt`                 | Date   | -       | Creation timestamp                           |
+| `updatedAt`                 | Date   | -       | Last update timestamp                        |
+
+#### Indexes
+
+| Index                       | Type     | Purpose                                 |
+| --------------------------- | -------- | --------------------------------------- |
+| `id`                        | Unique   | UUID lookups                            |
+| `userId`                    | Regular  | User-scoped queries                     |
+| `userId + createdAt`        | Compound | Efficient user queries sorted by date   |
+| `createdFromConversationId` | Sparse   | Optional conversation reference lookups |
+| `createdAt`                 | Regular  | Ordering by creation date               |
+
+#### Key Features
+
+- **Standalone Resource**: Charts are not tied to conversations; optional `createdFromConversationId` tracks source for reference only
+- **Fresh Data**: Charts store configuration but regenerate data on retrieval
+- **User Ownership**: All queries filter by `userId` for security
+- **Flexible Filters**: Supports date ranges, status, and currency filtering
+- **Immutable Configuration**: Only name and description can be updated after creation
+
 ## Migrations
 
 The project uses TypeORM migrations for database schema management.
@@ -197,7 +256,25 @@ erDiagram
         Date createdAt
     }
 
+    SavedChart {
+        ObjectId _id
+        string id "UUID"
+        string userId
+        string name
+        string description "optional"
+        string createdFromConversationId "optional FK"
+        string resourceType
+        string aggregationType
+        string from "optional"
+        string to "optional"
+        string status "optional"
+        string currency "optional"
+        Date createdAt
+        Date updatedAt
+    }
+
     Conversation ||--o{ Message : "has many"
+    Conversation ||--o{ SavedChart : "optionally referenced by"
 ```
 
 ## Query Patterns
@@ -230,5 +307,25 @@ messageRepository.count({
     role: 'user',
     createdAt: { $gte: windowStart },
   },
+});
+```
+
+### Saved Chart Queries
+
+```typescript
+// Find all charts for a user
+savedChartRepository.find({
+  where: { userId },
+  order: { createdAt: 'DESC' },
+});
+
+// Find chart by ID with ownership verification
+savedChartRepository.findOne({
+  where: { id: chartId, userId },
+});
+
+// Find charts created from a specific conversation
+savedChartRepository.find({
+  where: { createdFromConversationId: conversationId },
 });
 ```

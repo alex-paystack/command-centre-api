@@ -9,9 +9,10 @@ Command Centre API is a NestJS-based backend service that powers an AI-driven me
 ### Key Features
 
 - 🤖 **AI-Powered Chat** — Streaming responses with GPT-4o-mini and live reasoning
-- 🔒 **JWT-Protected** — All `/chat` endpoints require Bearer tokens; Paystack calls reuse the user's JWT
+- 🔒 **JWT-Protected** — All `/chat` and `/charts` endpoints require Bearer tokens; Paystack calls reuse the user's JWT
 - 🌍 **Dual Chat Modes** — Global mode for dashboard queries, page-scoped mode for resource-specific conversations
 - 📊 **Analytics & Charts** — Multi-resource charting with time-based and categorical aggregations
+- 💾 **Saved Charts** — Save chart configurations with custom names and regenerate with fresh data
 - 📤 **Data Export** — Export transactions, refunds, payouts, and disputes to email or direct download
 - 🧭 **Guardrails** — Dual-layer classification for out-of-scope protection
 - 🛡️ **Rate Limiting** — Configurable message entitlement with sliding window enforcement
@@ -104,7 +105,7 @@ pnpm run migration:run  # Run migrations
 
 ## API Overview
 
-All `/chat` endpoints require `Authorization: Bearer <jwt>`.
+All `/chat` and `/charts` endpoints require `Authorization: Bearer <jwt>`.
 
 | Method | Endpoint                           | Description                       |
 | ------ | ---------------------------------- | --------------------------------- |
@@ -115,6 +116,11 @@ All `/chat` endpoints require `Authorization: Bearer <jwt>`.
 | GET    | `/chat/conversations/:id`          | Get conversation                  |
 | DELETE | `/chat/conversations/:id`          | Delete conversation               |
 | GET    | `/chat/messages/:conversationId`   | Get messages                      |
+| POST   | `/charts`                          | Save chart configuration          |
+| GET    | `/charts`                          | Get all saved charts              |
+| GET    | `/charts/:id`                      | Get chart with fresh data         |
+| PUT    | `/charts/:id`                      | Update chart metadata             |
+| DELETE | `/charts/:id`                      | Delete chart                      |
 | GET    | `/health`                          | Health check (public)             |
 
 See [API Reference](./docs/api-reference.md) for complete documentation.

@@ -17,6 +17,15 @@ Orchestrates the entire conversation flow:
 - Manages conversation history with configurable limits
 - Handles both global and page-scoped conversation modes
 
+### PaystackModule
+
+Shared module that provides PaystackApiService across the application:
+
+- **Single Instance**: Ensures one PaystackApiService instance across all modules
+- **Encapsulates Dependencies**: Bundles ConfigModule and HttpModule
+- **Prevents Duplication**: Avoids duplicate providers with separate HTTP/Config instances
+- **Exports**: PaystackApiService for use in importing modules
+
 ### PaystackApiService
 
 Provides authenticated access to Paystack APIs:
@@ -45,6 +54,17 @@ Manages JWT authentication:
 - User ID extraction from token claims
 - Integration with NestJS guard system
 - Configurable token expiration
+
+### SavedChartService
+
+Manages saved chart configurations and regeneration:
+
+- Saves chart configurations with custom names and descriptions
+- Retrieves saved charts for authenticated users
+- Regenerates charts with fresh data from Paystack API
+- Updates chart metadata (name, description)
+- Deletes saved charts with ownership verification
+- Validates chart configurations (aggregation types, date ranges)
 
 ## Project Structure
 
@@ -75,6 +95,7 @@ src/
 │ ├── interfaces/ # Common interfaces
 │ └── services/
 │ ├── paystack-api.service.ts # Paystack API integration
+│ ├── paystack.module.ts # Shared Paystack module
 │ └── page-context.service.ts # Resource enrichment service
 ├── config/ # Configuration modules
 │ ├── database.config.ts
@@ -101,6 +122,19 @@ src/
 │ │ ├── chat.controller.ts
 │ │ ├── chat.service.ts # Orchestrates AI, tools, and classification
 │ │ └── chat.module.ts
+│ ├── charts/ # Saved charts module
+│ │ ├── dto/ # Data transfer objects
+│ │ │ ├── save-chart.dto.ts # Chart creation
+│ │ │ ├── update-chart.dto.ts # Chart metadata updates
+│ │ │ ├── saved-chart-response.dto.ts # Response format
+│ │ │ └── saved-chart-with-data-response.dto.ts # With regenerated data
+│ │ ├── entities/ # TypeORM entities
+│ │ │ └── saved-chart.entity.ts
+│ │ ├── repositories/ # Database repositories
+│ │ │ └── saved-chart.repository.ts
+│ │ ├── charts.controller.ts
+│ │ ├── saved-chart.service.ts # Chart CRUD and regeneration
+│ │ └── charts.module.ts
 │ └── health/ # Health check endpoints
 ├── app.module.ts # Root module with global auth guard
 └── main.ts # Application entry point with observability
@@ -127,6 +161,25 @@ src/
 - **GPT-4o-mini**: Chat responses and message classification
 - **GPT-3.5-turbo**: Conversation title generation
 
+## Shared Module Pattern
+
+The application uses NestJS shared modules for cross-cutting concerns:
+
+### PaystackModule (Shared)
+
+The `PaystackModule` is a shared module that:
+
+- **Centralizes** Paystack API access across multiple modules
+- **Prevents** duplicate HTTP and Config module instances
+- **Ensures** a single PaystackApiService instance app-wide
+- **Imported by**: ChatModule, ChartsModule
+
+This pattern avoids common pitfalls like:
+
+- Multiple HTTP client instances with different configurations
+- Inconsistent error handling across modules
+- Configuration drift between similar services
+
 ## Request Flow
 
 ```mermaid
@@ -152,6 +205,7 @@ flowchart TD
 flowchart TD
     AppModule --> AuthModule
     AppModule --> ChatModule
+    AppModule --> ChartsModule
     AppModule --> HealthModule
     AppModule --> DatabaseModule
 
@@ -160,9 +214,23 @@ flowchart TD
     end
 
     subgraph ChatModule[ChatModule]
-        PaystackApiService[PaystackApiService]
         PageContextService[PageContextService]
         ChatDB[DatabaseModule]
+    end
+
+    ChatModule --> PaystackModule
+
+    subgraph ChartsModule[ChartsModule]
+        SavedChartService[SavedChartService]
+        ChartsDB[DatabaseModule]
+    end
+
+    ChartsModule --> PaystackModule
+
+    subgraph PaystackModule[PaystackModule - shared]
+        PaystackApiService[PaystackApiService]
+        HttpModule[HttpModule]
+        ConfigModule[ConfigModule]
     end
 
     subgraph DatabaseModule[DatabaseModule]

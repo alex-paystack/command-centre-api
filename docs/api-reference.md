@@ -423,6 +423,300 @@ Retrieves all messages in a conversation.
 
 ---
 
+## Charts Module
+
+### Save Chart
+
+```http
+POST /charts
+```
+
+Saves a chart configuration with custom name and description. Charts are standalone resources that can be regenerated with fresh data.
+
+#### Request Body
+
+```json
+{
+  "name": "Daily Revenue Trends",
+  "description": "Transaction revenue breakdown by day",
+  "createdFromConversationId": "550e8400-e29b-41d4-a716-446655440000",
+  "resourceType": "transaction",
+  "aggregationType": "by-day",
+  "from": "2024-01-01",
+  "to": "2024-01-31",
+  "status": "success",
+  "currency": "NGN"
+}
+```
+
+#### Parameters
+
+| Parameter                   | Type   | Required | Description                                               |
+| --------------------------- | ------ | -------- | --------------------------------------------------------- |
+| `name`                      | string | Yes      | Chart name (max 200 chars)                                |
+| `description`               | string | No       | Chart description (max 500 chars)                         |
+| `createdFromConversationId` | UUID   | No       | Optional reference to source conversation                 |
+| `resourceType`              | string | Yes      | One of: `transaction`, `refund`, `payout`, `dispute`      |
+| `aggregationType`           | string | Yes      | Aggregation type (e.g., `by-day`, `by-week`, `by-status`) |
+| `from`                      | string | No       | Start date (ISO format)                                   |
+| `to`                        | string | No       | End date (ISO format)                                     |
+| `status`                    | string | No       | Filter by status                                          |
+| `currency`                  | string | No       | Filter by currency                                        |
+
+#### Response
+
+```json
+{
+  "status": true,
+  "message": "Chart saved successfully",
+  "data": {
+    "id": "chart-123",
+    "name": "Daily Revenue Trends",
+    "description": "Transaction revenue breakdown by day",
+    "createdFromConversationId": "550e8400-e29b-41d4-a716-446655440000",
+    "resourceType": "transaction",
+    "aggregationType": "by-day",
+    "from": "2024-01-01",
+    "to": "2024-01-31",
+    "status": "success",
+    "currency": "NGN",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  }
+}
+```
+
+#### Error Responses
+
+| Status | Code             | Description                            |
+| ------ | ---------------- | -------------------------------------- |
+| 400    | `invalid_params` | Invalid aggregation type or date range |
+
+---
+
+### Get All Saved Charts
+
+```http
+GET /charts
+```
+
+Retrieves all saved charts for the authenticated user, ordered by creation date (newest first).
+
+#### Response
+
+```json
+{
+  "status": true,
+  "message": "Saved charts retrieved successfully",
+  "data": [
+    {
+      "id": "chart-123",
+      "name": "Daily Revenue Trends",
+      "description": "Transaction revenue breakdown by day",
+      "createdFromConversationId": "550e8400-e29b-41d4-a716-446655440000",
+      "resourceType": "transaction",
+      "aggregationType": "by-day",
+      "from": "2024-01-01",
+      "to": "2024-01-31",
+      "status": "success",
+      "currency": "NGN",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+### Get Saved Chart with Fresh Data
+
+```http
+GET /charts/:id
+```
+
+Retrieves a saved chart and regenerates it with fresh data from the Paystack API using the saved configuration. Query parameters can override filter values for flexible date ranges and filtering.
+
+#### Path Parameters
+
+| Parameter | Type   | Description |
+| --------- | ------ | ----------- |
+| `id`      | string | Chart ID    |
+
+#### Query Parameters (Optional)
+
+All query parameters are optional. If provided, they override the saved configuration values. The `resourceType` and `aggregationType` are immutable and cannot be changed.
+
+| Parameter  | Type   | Description                      | Example      |
+| ---------- | ------ | -------------------------------- | ------------ |
+| `from`     | string | Override start date (ISO format) | `2024-01-01` |
+| `to`       | string | Override end date (ISO format)   | `2024-01-31` |
+| `status`   | string | Override status filter           | `success`    |
+| `currency` | string | Override currency filter         | `NGN`        |
+
+**Example Request:**
+
+```http
+GET /charts/chart-123?from=2024-02-01&to=2024-02-29&status=success&currency=USD
+```
+
+This will regenerate the chart with February 2024 data, success status filter, and USD currency, while keeping the original resourceType and aggregationType.
+
+#### Response
+
+```json
+{
+  "status": true,
+  "message": "Chart data retrieved successfully",
+  "data": {
+    "id": "chart-123",
+    "name": "Daily Revenue Trends",
+    "description": "Transaction revenue breakdown by day",
+    "createdFromConversationId": "550e8400-e29b-41d4-a716-446655440000",
+    "resourceType": "transaction",
+    "aggregationType": "by-day",
+    "from": "2024-01-01",
+    "to": "2024-01-31",
+    "status": "success",
+    "currency": "NGN",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z",
+    "label": "Daily Transaction Metrics",
+    "chartType": "area",
+    "chartSeries": [
+      {
+        "currency": "NGN",
+        "points": [
+          {
+            "name": "Monday, Jan 1",
+            "count": 100,
+            "volume": 1000000,
+            "average": 10000,
+            "currency": "NGN"
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "totalCount": 3100,
+      "totalVolume": 31000000,
+      "overallAverage": 10000,
+      "perCurrency": [
+        {
+          "currency": "NGN",
+          "totalCount": 3100,
+          "totalVolume": 31000000,
+          "overallAverage": 10000
+        }
+      ],
+      "dateRange": {
+        "from": "Jan 1, 2024",
+        "to": "Jan 31, 2024"
+      }
+    },
+    "message": "Generated chart data with 31 data points from 3100 transactions"
+  }
+}
+```
+
+#### Error Responses
+
+| Status | Code             | Description                      |
+| ------ | ---------------- | -------------------------------- |
+| 404    | `not_found`      | Chart not found or access denied |
+| 400    | `invalid_params` | Chart data generation failed     |
+
+---
+
+### Update Saved Chart
+
+```http
+PUT /charts/:id
+```
+
+Updates a saved chart's metadata (name and/or description). Chart configuration (resourceType, aggregationType, filters) cannot be changed.
+
+#### Parameters
+
+| Parameter | Type   | Description |
+| --------- | ------ | ----------- |
+| `id`      | string | Chart ID    |
+
+#### Request Body
+
+```json
+{
+  "name": "Updated Chart Name",
+  "description": "Updated description"
+}
+```
+
+| Parameter     | Type   | Required | Description                     |
+| ------------- | ------ | -------- | ------------------------------- |
+| `name`        | string | No       | New chart name (max 200 chars)  |
+| `description` | string | No       | New description (max 500 chars) |
+
+At least one field must be provided.
+
+#### Response
+
+```json
+{
+  "status": true,
+  "message": "Chart updated successfully",
+  "data": {
+    "id": "chart-123",
+    "name": "Updated Chart Name",
+    "description": "Updated description",
+    "resourceType": "transaction",
+    "aggregationType": "by-day",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-02T00:00:00.000Z"
+  }
+}
+```
+
+#### Error Responses
+
+| Status | Code             | Description                      |
+| ------ | ---------------- | -------------------------------- |
+| 400    | `invalid_params` | No fields provided for update    |
+| 404    | `not_found`      | Chart not found or access denied |
+
+---
+
+### Delete Saved Chart
+
+```http
+DELETE /charts/:id
+```
+
+Deletes a saved chart. Only the owner can delete their charts.
+
+#### Parameters
+
+| Parameter | Type   | Description |
+| --------- | ------ | ----------- |
+| `id`      | string | Chart ID    |
+
+#### Response
+
+```json
+{
+  "status": true,
+  "message": "Chart deleted successfully",
+  "data": null
+}
+```
+
+#### Error Responses
+
+| Status | Code        | Description                      |
+| ------ | ----------- | -------------------------------- |
+| 404    | `not_found` | Chart not found or access denied |
+
+---
+
 ## Health Module
 
 ### Health Check

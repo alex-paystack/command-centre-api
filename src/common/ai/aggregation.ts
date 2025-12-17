@@ -86,11 +86,10 @@ export function getChartType(aggregationType: AggregationType): ChartType {
 }
 
 /**
- * Generate a descriptive label for the chart based on aggregation type, resource type, and date range
+ * Generate a descriptive label for the chart based on aggregation type and resource type
  */
 export function generateChartLabel(
   aggregationType: AggregationType,
-  dateRange?: { from?: string; to?: string },
   resourceType: ChartResourceType = ChartResourceType.TRANSACTION,
 ): string {
   const resourceName = getResourceDisplayName(resourceType);
@@ -106,20 +105,7 @@ export function generateChartLabel(
     [AggregationType.BY_RESOLUTION]: `${resourceName} Metrics by Resolution`,
   };
 
-  let label = labelMap[aggregationType];
-
-  // Add date range if provided
-  if ((dateRange?.from && isValid(parseISO(dateRange.from))) || (dateRange?.to && isValid(parseISO(dateRange.to)))) {
-    if (dateRange.from && dateRange.to) {
-      label += ` (${formatDate(dateRange.from)} - ${formatDate(dateRange.to)})`;
-    } else if (dateRange.from) {
-      label += ` (from ${formatDate(dateRange.from)})`;
-    } else if (dateRange.to) {
-      label += ` (until ${formatDate(dateRange.to)})`;
-    }
-  }
-
-  return label;
+  return labelMap[aggregationType] ?? '';
 }
 
 /**
