@@ -4,7 +4,7 @@ Complete API documentation for the Command Centre API endpoints.
 
 ## Authentication
 
-All `/chat` endpoints require `Authorization: Bearer <jwt>` header. See [Authentication.md](./authentication.md) for details.
+All `/chat` and `charts` endpoints require `Authorization: Bearer <jwt>` header. See [Authentication.md](./user-authentication.md) for details.
 
 ## Base URL
 
