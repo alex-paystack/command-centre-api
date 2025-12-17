@@ -31,6 +31,7 @@ export enum MessageClassificationIntent {
   PAYSTACK_PRODUCT_FAQ = 'PAYSTACK_PRODUCT_FAQ',
   ACCOUNT_HELP = 'ACCOUNT_HELP',
   ASSISTANT_CAPABILITIES = 'ASSISTANT_CAPABILITIES',
+  DATA_EXPORT = 'DATA_EXPORT',
   OUT_OF_SCOPE = 'OUT_OF_SCOPE',
   OUT_OF_PAGE_SCOPE = 'OUT_OF_PAGE_SCOPE',
 }
@@ -225,4 +226,20 @@ export interface PaystackPayout {
     primary_contact_name: string;
     primary_contact_phone: string;
   };
+}
+
+/**
+ * Paystack Export Response object
+ */
+export interface PaystackExportResponse {
+  path?: string;
+  expiresAt?: string;
+}
+
+/**
+ * Authenticated User object
+ */
+export interface AuthenticatedUser {
+  userId: string;
+  jwtToken: string;
 }

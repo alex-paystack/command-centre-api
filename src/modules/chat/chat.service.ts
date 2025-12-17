@@ -238,6 +238,7 @@ export class ChatService {
     return null;
   }
 
+  // TODO: Consider decoding the JWT here to get the userId
   async handleStreamingChat(dto: ChatRequestDto, userId: string, jwtToken: string) {
     const { conversationId, message, mode, pageContext } = dto;
 
@@ -335,7 +336,10 @@ export class ChatService {
       };
     }
 
-    const getJwtToken = () => jwtToken;
+    const getAuthenticatedUser = () => ({
+      userId,
+      jwtToken,
+    });
 
     const chatMode = dto.mode || ChatMode.GLOBAL;
     let systemPrompt: string;
@@ -348,11 +352,11 @@ export class ChatService {
 
       const enrichedContext = await this.pageContextService.enrichContext(dto.pageContext, jwtToken);
       systemPrompt = this.buildPageScopedPrompt(enrichedContext);
-      tools = createPageScopedTools(this.paystackApiService, getJwtToken, dto.pageContext.type);
+      tools = createPageScopedTools(this.paystackApiService, getAuthenticatedUser, dto.pageContext.type);
     } else {
       const currentDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
       systemPrompt = CHAT_AGENT_SYSTEM_PROMPT.replace(/\{\{CURRENT_DATE\}\}/g, currentDate);
-      tools = createTools(this.paystackApiService, getJwtToken);
+      tools = createTools(this.paystackApiService, getAuthenticatedUser);
     }
 
     const stream = createUIMessageStream({

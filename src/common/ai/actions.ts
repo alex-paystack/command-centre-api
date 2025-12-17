@@ -72,6 +72,7 @@ const ClassifierSchema = z.object({
     MessageClassificationIntent.PAYSTACK_PRODUCT_FAQ,
     MessageClassificationIntent.ACCOUNT_HELP,
     MessageClassificationIntent.ASSISTANT_CAPABILITIES,
+    MessageClassificationIntent.DATA_EXPORT,
     MessageClassificationIntent.OUT_OF_SCOPE,
     MessageClassificationIntent.OUT_OF_PAGE_SCOPE,
   ]),

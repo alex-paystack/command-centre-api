@@ -59,8 +59,9 @@ Unit test files follow the `*.spec.ts` naming convention:
 | `chat.service.spec.ts`               | Chat service layer tests         |
 | `chat.service.summarization.spec.ts` | Conversation summarization tests |
 | `aggregation.spec.ts`                | Chart aggregation logic tests    |
-| `page-scoped-tools.spec.ts`          | Page-scoped tool filtering tests |
-| `tools.count-transactions.spec.ts`   | Transaction counting tool tests  |
+| `tools/export-tools.spec.ts`         | Export tools tests               |
+| `tools/retrieval-tools.spec.ts`      | Data retrieval tools tests       |
+| `tools/page-scoped-tools.spec.ts`    | Page-scoped tool filtering tests |
 | `utils.spec.ts`                      | AI utility function tests        |
 | `jwt-auth.guard.spec.ts`             | Authentication guard tests       |
 | `page-context.service.spec.ts`       | Page context enrichment tests    |
@@ -88,30 +89,48 @@ pnpm run test:all       # Run all tests
 
 ### Adding AI Tools
 
-1. Define tool in `src/common/ai/tools.ts` using Vercel AI SDK's `tool()` function
+AI tools are organized by category in `src/common/ai/tools/`:
+
+- **`retrieval.ts`** - Data retrieval tools (get\*)
+- **`export.ts`** - Data export tools (export\*)
+- **`visualization.ts`** - Chart generation tools
+
+**Steps**:
+
+1. Add tool factory function in the appropriate category file using Vercel AI SDK's `tool()` function
 2. Add Zod schema for input validation
 3. Implement execute function with JWT-authenticated Paystack API calls
-4. Export from `createTools()` function
-5. Optionally add to resource-specific tool map for page-scoped filtering
+4. Export the factory function from the category file
+5. Import and add to `createTools()` in `tools/index.ts`
+6. Optionally add to `RESOURCE_TOOL_MAP` in `tools/index.ts` for page-scoped filtering
+7. Write comprehensive tests in the corresponding `*-tools.spec.ts` file
 
-**Example**:
+**Example** (adding a retrieval tool in `tools/retrieval.ts`):
 
 ```typescript
-export function createMyNewTool(paystackService: PaystackApiService, getJwtToken: () => string | undefined) {
+export function createMyNewTool(paystackService: PaystackApiService, getAuthenticatedUser: () => AuthenticatedUser) {
   return tool({
     description: 'Description of what this tool does',
     inputSchema: z.object({
+      perPage: z.number().optional().default(50),
+      page: z.number().optional().default(1),
       param1: z.string().describe('Parameter description'),
       param2: z.number().optional().describe('Optional parameter'),
     }),
-    execute: async ({ param1, param2 }) => {
-      const jwtToken = getJwtToken();
+    execute: async ({ perPage, page, param1, param2 }) => {
+      const { jwtToken } = getAuthenticatedUser();
+
       if (!jwtToken) {
         return { error: 'Authentication token not available' };
       }
 
       try {
-        const response = await paystackService.get('/endpoint', jwtToken, { param1, param2 });
+        const response = await paystackService.get('/endpoint', jwtToken, {
+          perPage,
+          page,
+          param1,
+          param2,
+        });
         return { success: true, data: response.data };
       } catch (error) {
         return { error: error.message };
@@ -126,7 +145,7 @@ export function createMyNewTool(paystackService: PaystackApiService, getJwtToken
 1. Add new type to `PageContextType` enum in `src/common/ai/types/index.ts`
 2. Implement fetching logic in `PageContextService.fetchResourceData()`
 3. Add formatting logic in `PageContextService.formatResourceData()`
-4. Update `RESOURCE_TOOL_MAP` in `tools.ts` with relevant tools
+4. Update `RESOURCE_TOOL_MAP` in `src/common/ai/tools/index.ts` with relevant tools
 5. Add TypeScript interface for resource in `types/index.ts`
 
 ### Adding Chart Resource Types
