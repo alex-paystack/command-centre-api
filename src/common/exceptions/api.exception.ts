@@ -57,3 +57,21 @@ export class ProcessorError extends PaystackError {
     });
   }
 }
+
+/**
+ * Custom exception for resource not found errors
+ * Used when a requested resource does not exist
+ * Default HTTP status: 404 Not Found
+ */
+export class NotFoundError extends PaystackError {
+  constructor(message: string, code?: ResponseCode, data?: object, statusOverride?: HttpStatus) {
+    super({
+      httpStatusCode: statusOverride ?? HttpStatus.NOT_FOUND,
+      status: false,
+      type: ResponseType.API_ERROR,
+      code: code ?? ResponseCode.NOT_FOUND,
+      message,
+      data,
+    });
+  }
+}

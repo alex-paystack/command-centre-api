@@ -3,6 +3,7 @@ export * from './exceptions/types';
 export * from './exceptions/api.exception';
 export * from './exceptions/global.filter';
 export * from './exceptions/response.dto';
+export * from './exceptions/error-codes';
 
 // Error handling
 export * from './helpers/paystack.error';

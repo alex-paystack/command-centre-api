@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PaystackApiService } from './paystack-api.service';
 import { PageContextType } from '../ai/types';
 import type {
@@ -11,6 +11,8 @@ import type {
   PaystackDispute,
 } from '../ai/types';
 import { amountInSubUnitToBaseUnit } from '../ai/utils';
+import { NotFoundError, ValidationError } from '../exceptions/api.exception';
+import { ErrorCodes } from '../exceptions/error-codes';
 
 @Injectable()
 export class PageContextService {
@@ -39,83 +41,47 @@ export class PageContextService {
     try {
       switch (resourceType) {
         case PageContextType.TRANSACTION: {
-          try {
-            const response = await this.paystackApiService.get<PaystackTransaction>(
-              `/transaction/${resourceId}`,
-              jwtToken,
-              {},
-            );
-            return response.data;
-          } catch (error) {
-            if (error instanceof BadRequestException) {
-              throw error;
-            }
-            throw new BadRequestException(`Transaction with ID ${resourceId} not found`);
-          }
+          const response = await this.paystackApiService.get<PaystackTransaction>(
+            `/transaction/${resourceId}`,
+            jwtToken,
+            {},
+          );
+          return response.data;
         }
 
         case PageContextType.CUSTOMER: {
-          try {
-            const response = await this.paystackApiService.get<PaystackCustomer>(
-              `/customer/${resourceId}`,
-              jwtToken,
-              {},
-            );
-            return response.data;
-          } catch (error) {
-            if (error instanceof BadRequestException) {
-              throw error;
-            }
-            throw new BadRequestException(`Customer with ID ${resourceId} not found`);
-          }
+          const response = await this.paystackApiService.get<PaystackCustomer>(`/customer/${resourceId}`, jwtToken, {});
+          return response.data;
         }
 
         case PageContextType.REFUND: {
-          try {
-            const response = await this.paystackApiService.get<PaystackRefund>(`/refund/${resourceId}`, jwtToken, {});
-            return response.data;
-          } catch (error) {
-            if (error instanceof BadRequestException) {
-              throw error;
-            }
-            throw new BadRequestException(`Refund with ID ${resourceId} not found`);
-          }
+          const response = await this.paystackApiService.get<PaystackRefund>(`/refund/${resourceId}`, jwtToken, {});
+          return response.data;
         }
 
         case PageContextType.PAYOUT: {
-          try {
-            const params = { id: resourceId };
-            const response = await this.paystackApiService.get<PaystackPayout>('/settlement', jwtToken, params);
-            return response.data;
-          } catch (error) {
-            if (error instanceof BadRequestException) {
-              throw error;
-            }
-            throw new BadRequestException(`Payout with ID ${resourceId} not found`);
-          }
+          const params = { id: resourceId };
+          const response = await this.paystackApiService.get<PaystackPayout>('/settlement', jwtToken, params);
+          return response.data;
         }
 
         case PageContextType.DISPUTE: {
-          try {
-            const response = await this.paystackApiService.get<PaystackDispute>(`/dispute/${resourceId}`, jwtToken, {});
-            return response.data;
-          } catch (error) {
-            if (error instanceof BadRequestException) {
-              throw error;
-            }
-            throw new BadRequestException(`Dispute with ID ${resourceId} not found`);
-          }
+          const response = await this.paystackApiService.get<PaystackDispute>(`/dispute/${resourceId}`, jwtToken, {});
+          return response.data;
         }
 
         default:
-          throw new BadRequestException(`Unsupported resource type: ${String(resourceType)}`);
+          throw new ValidationError(
+            `Unsupported resource type: ${String(resourceType)}`,
+            ErrorCodes.INVALID_RESOURCE_TYPE,
+          );
       }
     } catch (error) {
-      if (error instanceof BadRequestException) {
+      if (error instanceof NotFoundError || error instanceof ValidationError) {
         throw error;
       }
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      throw new BadRequestException(`Failed to fetch ${resourceType} data: ${message}`);
+
+      throw new NotFoundError(`${resourceType} with ID ${resourceId} not found`, ErrorCodes.RESOURCE_NOT_FOUND);
     }
   }
 

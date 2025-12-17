@@ -1,7 +1,10 @@
+import { HttpStatus } from '@nestjs/common';
+import { ResponseCode } from '@paystackhq/pkg-response-code';
 import { format, getISOWeek, getISOWeekYear, isValid, parseISO } from 'date-fns';
 import type { ChartableRecord } from './chart-config';
 import { AggregationType, ChartResourceType, getResourceDisplayName } from './chart-config';
 import { amountInSubUnitToBaseUnit } from './utils';
+import { APIError } from '../exceptions/api.exception';
 
 export { AggregationType } from './chart-config';
 
@@ -420,7 +423,12 @@ export function aggregateRecords(records: ChartableRecord[], aggregationType: Ag
     case AggregationType.BY_RESOLUTION:
       return { chartData: aggregateByResolution(records) };
     default: {
-      throw new Error(`Unknown aggregation type: ${String(aggregationType)}`);
+      throw new APIError(
+        `Unknown aggregation type: ${String(aggregationType)}`,
+        ResponseCode.INVALID_PARAMS,
+        undefined,
+        HttpStatus.BAD_REQUEST,
+      );
     }
   }
 }

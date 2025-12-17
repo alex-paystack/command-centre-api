@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChatService } from './chat.service';
 import { ConversationRepository } from './repositories/conversation.repository';
@@ -13,6 +12,7 @@ import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exc
 import { PaystackApiService } from '~/common/services/paystack-api.service';
 import { PageContextService } from '~/common/services/page-context.service';
 import { MessageClassificationIntent, ChatResponseType, PageContextType } from '~/common/ai/types';
+import { NotFoundError } from '~/common';
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-return
 jest.mock('~/common/ai/actions', () => ({
@@ -150,18 +150,18 @@ describe('ChatService', () => {
       expect(result.id).toBe(mockConversation.id);
     });
 
-    it('should throw NotFoundException when conversation not found', async () => {
+    it('should throw NotFoundError when conversation not found', async () => {
       jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(null);
 
       await expect(service.getConversationById('non-existent-id', mockConversation.userId)).rejects.toThrow(
-        NotFoundException,
+        NotFoundError,
       );
     });
 
-    it('should throw NotFoundException when conversation belongs to another user', async () => {
+    it('should throw NotFoundError when conversation belongs to another user', async () => {
       jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(null); // repo is user-scoped, so returns null
 
-      await expect(service.getConversationById(mockConversation.id, 'other-user')).rejects.toThrow(NotFoundException);
+      await expect(service.getConversationById(mockConversation.id, 'other-user')).rejects.toThrow(NotFoundError);
     });
   });
 
@@ -244,20 +244,18 @@ describe('ChatService', () => {
       );
     });
 
-    it('should throw NotFoundException when conversation not found', async () => {
+    it('should throw NotFoundError when conversation not found', async () => {
       jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(null);
 
       await expect(service.deleteConversationById('non-existent-id', mockConversation.userId)).rejects.toThrow(
-        NotFoundException,
+        NotFoundError,
       );
     });
 
-    it('should throw NotFoundException when deleting another user’s conversation', async () => {
+    it('should throw NotFoundError when deleting another user’s conversation', async () => {
       jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(null);
 
-      await expect(service.deleteConversationById(mockConversation.id, 'other-user')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.deleteConversationById(mockConversation.id, 'other-user')).rejects.toThrow(NotFoundError);
     });
   });
 
@@ -333,7 +331,7 @@ describe('ChatService', () => {
       );
     });
 
-    it('should throw NotFoundException when conversation not found', async () => {
+    it('should throw NotFoundError when conversation not found', async () => {
       const dtos: CreateMessageDto[] = [
         {
           conversationId: 'non-existent-id',
@@ -344,10 +342,10 @@ describe('ChatService', () => {
 
       jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(null);
 
-      await expect(service.saveMessages(dtos, mockConversation.userId)).rejects.toThrow(NotFoundException);
+      await expect(service.saveMessages(dtos, mockConversation.userId)).rejects.toThrow(NotFoundError);
     });
 
-    it('should throw NotFoundException when trying to save to another user’s conversation', async () => {
+    it('should throw NotFoundError when trying to save to another user’s conversation', async () => {
       const dtos: CreateMessageDto[] = [
         {
           conversationId: mockConversation.id,
@@ -358,7 +356,7 @@ describe('ChatService', () => {
 
       jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(null);
 
-      await expect(service.saveMessages(dtos, 'other-user')).rejects.toThrow(NotFoundException);
+      await expect(service.saveMessages(dtos, 'other-user')).rejects.toThrow(NotFoundError);
     });
 
     it('should enforce rate limits and throw RateLimitExceededException', async () => {
@@ -407,11 +405,11 @@ describe('ChatService', () => {
       expect(result).toEqual([]);
     });
 
-    it('should throw NotFoundException when accessing another user’s conversation', async () => {
+    it('should throw NotFoundError when accessing another user’s conversation', async () => {
       jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(null);
 
       await expect(service.getMessagesByConversationId(mockConversation.id, 'other-user')).rejects.toThrow(
-        NotFoundException,
+        NotFoundError,
       );
     });
   });
@@ -616,7 +614,7 @@ describe('ChatService', () => {
   });
 
   describe('handleStreamingChat', () => {
-    it('should throw NotFoundException when conversation exists but belongs to another user', async () => {
+    it('should throw NotFoundError when conversation exists but belongs to another user', async () => {
       jest.spyOn(conversationRepository, 'findById').mockResolvedValue({ ...mockConversation, userId: 'someone-else' });
 
       await expect(
@@ -628,7 +626,7 @@ describe('ChatService', () => {
           mockConversation.userId,
           'mock-jwt-token',
         ),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
     });
   });
 
@@ -688,7 +686,7 @@ describe('ChatService', () => {
         jest.spyOn(messageRepository, 'countUserMessagesInPeriod').mockResolvedValue(0);
       });
 
-      it('should throw BadRequestException when mode is PAGE but pageContext is missing', async () => {
+      it('should throw ValidationError when mode is PAGE but pageContext is missing', async () => {
         await expect(
           service.handleStreamingChat(
             {

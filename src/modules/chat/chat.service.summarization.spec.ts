@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { NotFoundError, ValidationError } from '~/common';
 import { ChatService } from './chat.service';
 import { ConversationRepository } from './repositories/conversation.repository';
 import { MessageRepository } from './repositories/message.repository';
@@ -183,7 +183,7 @@ describe('ChatService - Summarization', () => {
       );
     });
 
-    it('should throw NotFoundException when previous conversation not found', async () => {
+    it('should throw NotFoundError when previous conversation is not found', async () => {
       const dto: CreateConversationFromSummaryDto = {
         previousConversationId: 'non-existent-id',
         mode: ChatMode.GLOBAL,
@@ -191,11 +191,11 @@ describe('ChatService - Summarization', () => {
 
       jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(null);
 
-      await expect(service.createConversationFromSummary(dto, 'user_123')).rejects.toThrow(NotFoundException);
+      await expect(service.createConversationFromSummary(dto, 'user_123')).rejects.toThrow(NotFoundError);
       expect(conversationRepository.findByIdAndUserId).toHaveBeenCalledWith('non-existent-id', 'user_123');
     });
 
-    it('should throw BadRequestException when previous conversation is not closed', async () => {
+    it('should throw ValidationError when previous conversation is not closed', async () => {
       const dto: CreateConversationFromSummaryDto = {
         previousConversationId: 'open-conversation-id',
         mode: ChatMode.GLOBAL,
@@ -203,7 +203,7 @@ describe('ChatService - Summarization', () => {
 
       jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(mockOpenConversation);
 
-      await expect(service.createConversationFromSummary(dto, 'user_123')).rejects.toThrow(BadRequestException);
+      await expect(service.createConversationFromSummary(dto, 'user_123')).rejects.toThrow(ValidationError);
       await expect(service.createConversationFromSummary(dto, 'user_123')).rejects.toThrow(
         'Can only continue from a closed conversation',
       );

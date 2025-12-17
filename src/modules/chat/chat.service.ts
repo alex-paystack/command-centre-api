@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { convertToModelMessages, createUIMessageStream, stepCountIs, streamText, UIMessage } from 'ai';
 import { openai } from '@ai-sdk/openai';
@@ -32,6 +32,7 @@ import { PaystackApiService } from '~/common/services/paystack-api.service';
 import { PageContextService } from '~/common/services/page-context.service';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
 import { Conversation } from './entities/conversation.entity';
+import { NotFoundError, ValidationError, APIError, ErrorCodes } from '~/common';
 
 @Injectable()
 export class ChatService {
@@ -46,7 +47,7 @@ export class ChatService {
   async getMessagesByConversationId(conversationId: string, userId: string) {
     const conversation = await this.conversationRepository.findByIdAndUserId(conversationId, userId);
     if (!conversation) {
-      throw new NotFoundException(`Conversation with ID ${conversationId} not found`);
+      throw new NotFoundError(`Conversation with ID ${conversationId} not found`, ErrorCodes.CONVERSATION_NOT_FOUND);
     }
 
     const messages = await this.messageRepository.findByConversationId(conversationId);
@@ -62,12 +63,12 @@ export class ChatService {
     const allSameConversation = dtos.every((dto) => dto.conversationId === conversationId);
 
     if (!allSameConversation) {
-      throw new Error('All messages must belong to the same conversation');
+      throw new ValidationError('All messages must belong to the same conversation', ErrorCodes.INVALID_PARAMS);
     }
 
     const conversation = await this.conversationRepository.findByIdAndUserId(conversationId, userId);
     if (!conversation) {
-      throw new NotFoundException(`Conversation with ID ${conversationId} not found`);
+      throw new NotFoundError(`Conversation with ID ${conversationId} not found`, ErrorCodes.CONVERSATION_NOT_FOUND);
     }
 
     await this.checkUserEntitlement(userId);
@@ -87,7 +88,7 @@ export class ChatService {
     const conversation = await this.conversationRepository.findByIdAndUserId(id, userId);
 
     if (!conversation) {
-      throw new NotFoundException(`Conversation with ID ${id} not found`);
+      throw new NotFoundError(`Conversation with ID ${id} not found`, ErrorCodes.CONVERSATION_NOT_FOUND);
     }
 
     return ConversationResponseDto.fromEntity(conversation);
@@ -130,11 +131,14 @@ export class ChatService {
     );
 
     if (!previousConversation) {
-      throw new NotFoundException(`Conversation with ID ${dto.previousConversationId} not found`);
+      throw new NotFoundError(
+        `Conversation with ID ${dto.previousConversationId} not found`,
+        ErrorCodes.CONVERSATION_NOT_FOUND,
+      );
     }
 
     if (!previousConversation.isClosed) {
-      throw new BadRequestException('Can only continue from a closed conversation');
+      throw new ValidationError('Can only continue from a closed conversation', ErrorCodes.INVALID_PARAMS);
     }
 
     // Combine all summaries from the previous conversation
@@ -158,14 +162,14 @@ export class ChatService {
   async deleteConversationById(id: string, userId: string) {
     const conversation = await this.conversationRepository.findByIdAndUserId(id, userId);
     if (!conversation) {
-      throw new NotFoundException(`Conversation with ID ${id} not found`);
+      throw new NotFoundError(`Conversation with ID ${id} not found`, ErrorCodes.CONVERSATION_NOT_FOUND);
     }
 
     await this.messageRepository.deleteAllByConversationId(id);
 
     const deleted = await this.conversationRepository.deleteByIdForUser(id, userId);
     if (!deleted) {
-      throw new NotFoundException(`Conversation with ID ${id} not found`);
+      throw new NotFoundError(`Conversation with ID ${id} not found`, ErrorCodes.CONVERSATION_NOT_FOUND);
     }
   }
 
@@ -271,10 +275,10 @@ export class ChatService {
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Error creating conversation:', error);
-        throw new Error('Failed to create conversation');
+        throw new APIError('Failed to create conversation', ErrorCodes.INTERNAL_ERROR);
       }
     } else if (conversation.userId !== userId) {
-      throw new NotFoundException(`Conversation with ID ${conversationId} not found`);
+      throw new NotFoundError(`Conversation with ID ${conversationId} not found`, ErrorCodes.CONVERSATION_NOT_FOUND);
     }
 
     if (conversation.isClosed) {
@@ -300,22 +304,28 @@ export class ChatService {
 
     if (conversation.pageContext) {
       if (mode !== ChatMode.PAGE) {
-        throw new BadRequestException('Conversation is page-scoped and must use mode "page"');
+        throw new ValidationError(
+          'Conversation is page-scoped and must use mode "page"',
+          ErrorCodes.CONVERSATION_MODE_LOCKED,
+        );
       }
 
       if (!pageContext) {
-        throw new BadRequestException('pageContext is required when mode is "page"');
+        throw new ValidationError('pageContext is required when mode is "page"', ErrorCodes.MISSING_REQUIRED_FIELD);
       }
 
       if (
         pageContext.type !== conversation.pageContext.type ||
         pageContext.resourceId !== conversation.pageContext.resourceId
       ) {
-        throw new BadRequestException('Conversation is locked to a different page context');
+        throw new ValidationError('Conversation is locked to a different page context', ErrorCodes.CONTEXT_MISMATCH);
       }
     } else if (mode === ChatMode.PAGE) {
       // Do not allow turning an existing global conversation into page-scoped
-      throw new BadRequestException('Cannot change an existing conversation to a page-scoped context');
+      throw new ValidationError(
+        'Cannot change an existing conversation to a page-scoped context',
+        ErrorCodes.CONVERSATION_MODE_LOCKED,
+      );
     }
 
     // Build messages with summary support
@@ -358,7 +368,7 @@ export class ChatService {
 
     if (chatMode === ChatMode.PAGE) {
       if (!dto.pageContext) {
-        throw new BadRequestException('pageContext is required when mode is "page"');
+        throw new ValidationError('pageContext is required when mode is "page"', ErrorCodes.MISSING_REQUIRED_FIELD);
       }
 
       const enrichedContext = await this.pageContextService.enrichContext(dto.pageContext, jwtToken);
