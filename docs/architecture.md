@@ -57,8 +57,15 @@ src/
 │ │ ├── chart-config.ts # Resource-specific chart configuration
 │ │ ├── policy.ts # Classification policy and refusal messages
 │ │ ├── prompts.ts # AI system prompts (global & page-scoped)
-│ │ ├── tools.ts # AI tools definitions & resource-specific filtering
 │ │ ├── utils.ts # Helper functions for AI (date validation, conversions)
+│ │ ├── tools/ # AI tools (organized by category)
+│ │ │ ├── index.ts # Main tool exports & page-scoped filtering
+│ │ │ ├── retrieval.ts # Data retrieval tools (get*)
+│ │ │ ├── export.ts # Data export tools (export*)
+│ │ │ ├── visualization.ts # Chart generation tools
+│ │ │ ├── export-tools.spec.ts # Export tools tests
+│ │ │ ├── retrieval-tools.spec.ts # Retrieval tools tests
+│ │ │ └── page-scoped-tools.spec.ts # Page-scoped filtering tests
 │ │ ├── types/ # TypeScript types for Paystack resources
 │ │ │ ├── index.ts # Main type exports
 │ │ │ └── data.ts # Enums and data types

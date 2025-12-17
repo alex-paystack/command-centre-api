@@ -39,7 +39,7 @@ Perform a thorough analysis of the current project:
   - Identify new or modified API functionality
   - Check for new DTOs, entities, or validation rules
 - **Check AI features**
-  - Review tools in `src/common/ai/tools.ts`
+  - Review tools in `src/common/ai/tools/` directory (retrieval.ts, export.ts, visualization.ts)
   - Check for new aggregation types in `chart-config.ts`
   - Identify new prompts or classification logic
 - **Examine test coverage**

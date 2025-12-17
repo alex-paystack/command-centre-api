@@ -235,3 +235,11 @@ export interface PaystackExportResponse {
   path?: string;
   expiresAt?: string;
 }
+
+/**
+ * Authenticated User object
+ */
+export interface AuthenticatedUser {
+  userId: string;
+  jwtToken: string;
+}

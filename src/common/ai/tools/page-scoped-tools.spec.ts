@@ -1,6 +1,6 @@
-import { createPageScopedTools } from './tools';
-import { PageContextType } from './types';
-import { PaystackApiService } from '../services/paystack-api.service';
+import { createPageScopedTools } from '.';
+import { PageContextType } from '../types';
+import { PaystackApiService } from '../../services/paystack-api.service';
 
 describe('createPageScopedTools', () => {
   let mockPaystackService: jest.Mocked<PaystackApiService>;
@@ -26,12 +26,13 @@ describe('createPageScopedTools', () => {
     expect(toolNames).not.toContain('generateChartData');
   });
 
-  it('should return only transaction and refund tools for customer context', () => {
+  it('should return transaction, refund, and export transaction tools for customer context', () => {
     const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, PageContextType.CUSTOMER);
 
     const toolNames = Object.keys(tools);
     expect(toolNames).toContain('getTransactions');
     expect(toolNames).toContain('getRefunds');
+    expect(toolNames).toContain('exportTransactions');
     expect(toolNames).not.toContain('getCustomers');
     expect(toolNames).not.toContain('getDisputes');
     expect(toolNames).not.toContain('getPayouts');

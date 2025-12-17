@@ -84,7 +84,6 @@ The assistant can only operate on merchant data exposed by these tools (all requ
 - Payout exports return an S3 download URL immediately (no email)
 - All export tools validate data exists before triggering export
 - Support similar filters as their corresponding GET tools
-- Subject to the same 30-day date range limitation
 
 **Important**: All date filters are limited to 30 days; helper validation returns clear errors when exceeded.
 
