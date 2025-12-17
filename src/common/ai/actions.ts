@@ -7,7 +7,7 @@ import {
   getClassifierUserPrompt,
   PAGE_SCOPED_CLASSIFIER_SYSTEM_PROMPT,
 } from './prompts';
-import { getTextFromMessage, getTextFromMessages } from './utils';
+import { getTextFromMessage, getTextFromMessages, buildClassifierConversation } from './utils';
 import { z } from 'zod';
 import { MessageClassificationIntent, PageContext } from './types';
 
@@ -97,11 +97,14 @@ export async function classifyMessage(messages: UIMessage[], pageContext?: PageC
       systemPrompt = PAGE_SCOPED_CLASSIFIER_SYSTEM_PROMPT.replace(/\{\{RESOURCE_TYPE\}\}/g, pageContext.type);
     }
 
+    const { formattedConversation, latestUserMessage } = buildClassifierConversation(messages);
+
     const { object } = await generateObject({
       model: openai('gpt-4o-mini'),
+      temperature: 0,
       schema: ClassifierSchema,
       system: systemPrompt,
-      prompt: getClassifierUserPrompt(getTextFromMessages(messages)),
+      prompt: getClassifierUserPrompt(formattedConversation, latestUserMessage),
     });
 
     return object;
@@ -110,6 +113,8 @@ export async function classifyMessage(messages: UIMessage[], pageContext?: PageC
     console.error('Error classifying message:', error);
     return {
       intent: MessageClassificationIntent.OUT_OF_SCOPE,
+      confidence: 0,
+      needsMerchantData: false,
     };
   }
 }
