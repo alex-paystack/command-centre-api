@@ -12,6 +12,7 @@ Command Centre API is a NestJS-based backend service that powers an AI-driven me
 - 🔒 **JWT-Protected** — All `/chat` endpoints require Bearer tokens; Paystack calls reuse the user's JWT
 - 🌍 **Dual Chat Modes** — Global mode for dashboard queries, page-scoped mode for resource-specific conversations
 - 📊 **Analytics & Charts** — Multi-resource charting with time-based and categorical aggregations
+- 📤 **Data Export** — Export transactions, refunds, payouts, and disputes to email or direct download
 - 🧭 **Guardrails** — Dual-layer classification for out-of-scope protection
 - 🛡️ **Rate Limiting** — Configurable message entitlement with sliding window enforcement
 - 📝 **Smart Summarization** — Automatic conversation summarization with context carry-over

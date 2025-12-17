@@ -97,7 +97,7 @@ pnpm run test:all       # Run all tests
 **Example**:
 
 ```typescript
-export function createMyNewTool(paystackService: PaystackApiService, getJwtToken: () => string | undefined) {
+export function createMyNewTool(paystackService: PaystackApiService, getAuthenticatedUser: () => AuthenticatedUser) {
   return tool({
     description: 'Description of what this tool does',
     inputSchema: z.object({
@@ -105,7 +105,8 @@ export function createMyNewTool(paystackService: PaystackApiService, getJwtToken
       param2: z.number().optional().describe('Optional parameter'),
     }),
     execute: async ({ param1, param2 }) => {
-      const jwtToken = getJwtToken();
+      const { jwtToken } = getAuthenticatedUser();
+
       if (!jwtToken) {
         return { error: 'Authentication token not available' };
       }

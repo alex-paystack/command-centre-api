@@ -58,14 +58,33 @@ Page-scoped mode locks conversations to specific resources (transactions, custom
 
 The assistant can only operate on merchant data exposed by these tools (all requests reuse the caller's JWT):
 
+### Data Retrieval Tools
+
 | Tool                | Description                    | Key Filters                                       |
 | ------------------- | ------------------------------ | ------------------------------------------------- |
 | `getTransactions`   | Fetch payment transactions     | status, channel, customer, date, amount, currency |
 | `getCustomers`      | List/search customers          | email, account_number, pagination                 |
 | `getRefunds`        | Fetch refund data              | status, date, amount (with operators: gt, lt, eq) |
 | `getPayouts`        | Fetch payout/settlement data   | status, date, subaccount                          |
-| `getDisputes`       | Fetch dispute data             | status, date, transaction                         |
+| `getDisputes`       | Fetch dispute data             | status, date, transaction, category               |
 | `generateChartData` | Generate chart-ready analytics | resourceType, aggregationType, date range         |
+
+### Data Export Tools
+
+| Tool                 | Description                                           | Key Filters                                       | Delivery Method    |
+| -------------------- | ----------------------------------------------------- | ------------------------------------------------- | ------------------ |
+| `exportTransactions` | Export transaction data to email                      | status, channel, customer, date, amount, currency | Email              |
+| `exportRefunds`      | Export refund data to email                           | status, date, search                              | Email              |
+| `exportPayouts`      | Export payout data and receive immediate download URL | status, date, subaccount                          | S3 URL (immediate) |
+| `exportDisputes`     | Export dispute data to email                          | status, date, transaction, category               | Email              |
+
+**Export Features:**
+
+- Email exports are sent to the authenticated user's email address
+- Payout exports return an S3 download URL immediately (no email)
+- All export tools validate data exists before triggering export
+- Support similar filters as their corresponding GET tools
+- Subject to the same 30-day date range limitation
 
 **Important**: All date filters are limited to 30 days; helper validation returns clear errors when exceeded.
 
@@ -73,13 +92,13 @@ The assistant can only operate on merchant data exposed by these tools (all requ
 
 In page-scoped mode, tools are automatically filtered based on the resource type:
 
-| Resource Type   | Available Tools                                 |
-| --------------- | ----------------------------------------------- |
-| **Transaction** | `getCustomers`, `getRefunds`, `getDisputes`     |
-| **Customer**    | `getTransactions`, `getRefunds`                 |
-| **Refund**      | `getTransactions`, `getCustomers`               |
-| **Payout**      | `getTransactions`                               |
-| **Dispute**     | `getTransactions`, `getCustomers`, `getRefunds` |
+| Resource Type   | Available Tools                                       |
+| --------------- | ----------------------------------------------------- |
+| **Transaction** | `getCustomers`, `getRefunds`, `getDisputes`           |
+| **Customer**    | `getTransactions`, `getRefunds`, `exportTransactions` |
+| **Refund**      | `getTransactions`, `getCustomers`                     |
+| **Payout**      | `getTransactions`                                     |
+| **Dispute**     | `getTransactions`, `getCustomers`, `getRefunds`       |
 
 This filtering ensures the AI only suggests actions that make sense in the current context.
 
