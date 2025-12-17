@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { SavedChartService } from './saved-chart.service';
+import { NotFoundError, ValidationError } from '~/common';
 import { SavedChartRepository } from './repositories/saved-chart.repository';
 import { PaystackApiService } from '~/common/services/paystack-api.service';
 import { SavedChart } from './entities/saved-chart.entity';
@@ -127,34 +127,34 @@ describe('SavedChartService', () => {
       expect(result.createdFromConversationId).toBeUndefined();
     });
 
-    it('should throw BadRequestException for invalid aggregation type', async () => {
+    it('should throw ValidationError for invalid aggregation type', async () => {
       const invalidDto = {
         ...saveChartDto,
         aggregationType: AggregationType.BY_TYPE, // Invalid for transactions
       };
 
-      await expect(service.saveChart(invalidDto, 'user-123')).rejects.toThrow(BadRequestException);
+      await expect(service.saveChart(invalidDto, 'user-123')).rejects.toThrow(ValidationError);
       expect(savedChartRepository.createSavedChart).not.toHaveBeenCalled();
     });
 
-    it('should throw BadRequestException for invalid status', async () => {
+    it('should throw ValidationError for invalid status', async () => {
       const invalidDto = {
         ...saveChartDto,
         status: 'invalid-status',
       };
 
-      await expect(service.saveChart(invalidDto, 'user-123')).rejects.toThrow(BadRequestException);
+      await expect(service.saveChart(invalidDto, 'user-123')).rejects.toThrow(ValidationError);
       expect(savedChartRepository.createSavedChart).not.toHaveBeenCalled();
     });
 
-    it('should throw BadRequestException for date range exceeding 30 days', async () => {
+    it('should throw ValidationError for date range exceeding 30 days', async () => {
       const invalidDto = {
         ...saveChartDto,
         from: '2024-01-01',
         to: '2024-02-15', // More than 30 days
       };
 
-      await expect(service.saveChart(invalidDto, 'user-123')).rejects.toThrow(BadRequestException);
+      await expect(service.saveChart(invalidDto, 'user-123')).rejects.toThrow(ValidationError);
       expect(savedChartRepository.createSavedChart).not.toHaveBeenCalled();
     });
   });
@@ -216,15 +216,13 @@ describe('SavedChartService', () => {
       );
     });
 
-    it('should throw NotFoundException if chart does not exist', async () => {
+    it('should throw NotFoundError if chart does not exist', async () => {
       savedChartRepository.findByIdAndUserId.mockResolvedValue(null);
 
-      await expect(service.getSavedChartWithData('chart-123', 'user-123', 'jwt-token')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.getSavedChartWithData('chart-123', 'user-123', 'jwt-token')).rejects.toThrow(NotFoundError);
     });
 
-    it('should throw BadRequestException if chart generation fails', async () => {
+    it('should throw ValidationError if chart generation fails', async () => {
       savedChartRepository.findByIdAndUserId.mockResolvedValue(mockSavedChart);
 
       // eslint-disable-next-line @typescript-eslint/require-await
@@ -233,7 +231,7 @@ describe('SavedChartService', () => {
       });
 
       await expect(service.getSavedChartWithData('chart-123', 'user-123', 'jwt-token')).rejects.toThrow(
-        BadRequestException,
+        ValidationError,
       );
     });
 
@@ -319,7 +317,7 @@ describe('SavedChartService', () => {
       };
 
       await expect(service.getSavedChartWithData('chart-123', 'user-123', 'jwt-token', queryOverrides)).rejects.toThrow(
-        BadRequestException,
+        ValidationError,
       );
     });
 
@@ -331,7 +329,7 @@ describe('SavedChartService', () => {
       };
 
       await expect(service.getSavedChartWithData('chart-123', 'user-123', 'jwt-token', queryOverrides)).rejects.toThrow(
-        BadRequestException,
+        ValidationError,
       );
     });
   });
@@ -352,15 +350,15 @@ describe('SavedChartService', () => {
       expect(result).toEqual(expect.objectContaining({ name: 'Updated Chart Name' }));
     });
 
-    it('should throw BadRequestException if no fields provided', async () => {
-      await expect(service.updateSavedChart('chart-123', 'user-123', {})).rejects.toThrow(BadRequestException);
+    it('should throw ValidationError if no fields provided', async () => {
+      await expect(service.updateSavedChart('chart-123', 'user-123', {})).rejects.toThrow(ValidationError);
       expect(savedChartRepository.updateSavedChart).not.toHaveBeenCalled();
     });
 
-    it('should throw NotFoundException if chart does not exist', async () => {
+    it('should throw NotFoundError if chart does not exist', async () => {
       savedChartRepository.updateSavedChart.mockResolvedValue(null);
 
-      await expect(service.updateSavedChart('chart-123', 'user-123', updateDto)).rejects.toThrow(NotFoundException);
+      await expect(service.updateSavedChart('chart-123', 'user-123', updateDto)).rejects.toThrow(NotFoundError);
     });
 
     it('should update only name if description not provided', async () => {
@@ -383,10 +381,10 @@ describe('SavedChartService', () => {
       expect(savedChartRepository.deleteByIdForUser).toHaveBeenCalledWith('chart-123', 'user-123');
     });
 
-    it('should throw NotFoundException if chart does not exist', async () => {
+    it('should throw NotFoundError if chart does not exist', async () => {
       savedChartRepository.deleteByIdForUser.mockResolvedValue(false);
 
-      await expect(service.deleteSavedChart('chart-123', 'user-123')).rejects.toThrow(NotFoundException);
+      await expect(service.deleteSavedChart('chart-123', 'user-123')).rejects.toThrow(NotFoundError);
     });
   });
 });

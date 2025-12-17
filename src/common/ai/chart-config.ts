@@ -1,3 +1,5 @@
+import { HttpStatus } from '@nestjs/common';
+import { ResponseCode } from '@paystackhq/pkg-response-code';
 import type { PaystackTransaction, PaystackRefund, PaystackPayout, PaystackDispute } from './types/index';
 import {
   DisputeCategory,
@@ -8,6 +10,7 @@ import {
   RefundType,
   TransactionStatus,
 } from './types/data';
+import { APIError } from '../exceptions/api.exception';
 
 /**
  * Supported resource types for chart generation
@@ -179,7 +182,12 @@ export function getFieldConfig(resourceType: ChartResourceType): ResourceFieldCo
     case ChartResourceType.DISPUTE:
       return disputeFieldConfig;
     default:
-      throw new Error(`Unknown resource type: ${String(resourceType)}`);
+      throw new APIError(
+        `Unknown resource type: ${String(resourceType)}`,
+        ResponseCode.INVALID_PARAMS,
+        undefined,
+        HttpStatus.BAD_REQUEST,
+      );
   }
 }
 

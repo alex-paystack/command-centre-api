@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { SavedChartRepository } from './repositories/saved-chart.repository';
 import { PaystackApiService } from '~/common/services/paystack-api.service';
 import { SaveChartDto } from './dto/save-chart.dto';
@@ -9,6 +9,7 @@ import { SavedChartWithDataResponseDto } from './dto/saved-chart-with-data-respo
 import { isValidAggregation, STATUS_VALUES } from '~/common/ai/chart-config';
 import { validateDateRange } from '~/common/ai/utils';
 import { generateChartData, ChartGenerationState } from '~/common/ai/chart-generator';
+import { NotFoundError, ValidationError, ErrorCodes } from '~/common';
 
 @Injectable()
 export class SavedChartService {
@@ -59,7 +60,7 @@ export class SavedChartService {
   ) {
     const savedChart = await this.savedChartRepository.findByIdAndUserId(chartId, userId);
     if (!savedChart) {
-      throw new NotFoundException(`Saved chart with ID ${chartId} not found`);
+      throw new NotFoundError(`Saved chart with ID ${chartId} not found`, ErrorCodes.CHART_NOT_FOUND);
     }
 
     // Merge saved configuration with query overrides
@@ -88,7 +89,7 @@ export class SavedChartService {
     }
 
     if (finalResult && 'error' in finalResult) {
-      throw new BadRequestException(finalResult.error);
+      throw new ValidationError(finalResult.error, ErrorCodes.INVALID_PARAMS);
     }
 
     if (finalResult && 'success' in finalResult) {
@@ -105,7 +106,7 @@ export class SavedChartService {
       return response;
     }
 
-    throw new BadRequestException('Failed to generate chart data');
+    throw new ValidationError('Failed to generate chart data', ErrorCodes.INVALID_PARAMS);
   }
 
   /**
@@ -113,13 +114,16 @@ export class SavedChartService {
    */
   async updateSavedChart(chartId: string, userId: string, dto: UpdateChartDto) {
     if (!dto.name && !dto.description) {
-      throw new BadRequestException('At least one field (name or description) must be provided');
+      throw new ValidationError(
+        'At least one field (name or description) must be provided',
+        ErrorCodes.MISSING_REQUIRED_FIELD,
+      );
     }
 
     const updatedChart = await this.savedChartRepository.updateSavedChart(chartId, userId, dto);
 
     if (!updatedChart) {
-      throw new NotFoundException(`Saved chart with ID ${chartId} not found`);
+      throw new NotFoundError(`Saved chart with ID ${chartId} not found`, ErrorCodes.CHART_NOT_FOUND);
     }
 
     return SavedChartResponseDto.fromEntity(updatedChart);
@@ -131,7 +135,7 @@ export class SavedChartService {
   async deleteSavedChart(chartId: string, userId: string) {
     const deleted = await this.savedChartRepository.deleteByIdForUser(chartId, userId);
     if (!deleted) {
-      throw new NotFoundException(`Saved chart with ID ${chartId} not found`);
+      throw new NotFoundError(`Saved chart with ID ${chartId} not found`, ErrorCodes.CHART_NOT_FOUND);
     }
   }
 
@@ -140,21 +144,23 @@ export class SavedChartService {
    */
   private validateChartConfiguration(dto: SaveChartDto) {
     if (!isValidAggregation(dto.resourceType, dto.aggregationType)) {
-      throw new BadRequestException(
+      throw new ValidationError(
         `Aggregation type '${dto.aggregationType}' is not valid for resource type '${dto.resourceType}'`,
+        ErrorCodes.INVALID_AGGREGATION_TYPE,
       );
     }
 
     if (dto.status && !STATUS_VALUES[dto.resourceType].includes(dto.status)) {
-      throw new BadRequestException(
+      throw new ValidationError(
         `Status '${dto.status}' is not valid for resource type '${dto.resourceType}'. Valid options are: ${STATUS_VALUES[dto.resourceType].join(', ')}`,
+        ErrorCodes.INVALID_STATUS,
       );
     }
 
     // Validate date range does not exceed 30 days
     const dateValidation = validateDateRange(dto.from, dto.to);
     if (!dateValidation.isValid) {
-      throw new BadRequestException(dateValidation.error);
+      throw new ValidationError(dateValidation.error, ErrorCodes.INVALID_DATE_RANGE);
     }
   }
 }

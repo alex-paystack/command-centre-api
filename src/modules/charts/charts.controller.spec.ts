@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
-import { ExecutionContext, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ExecutionContext } from '@nestjs/common';
 import { ChartsController } from './charts.controller';
+import { NotFoundError, ValidationError } from '~/common';
 import { SavedChartService } from './saved-chart.service';
 import { SaveChartDto } from './dto/save-chart.dto';
 import { UpdateChartDto } from './dto/update-chart.dto';
@@ -125,10 +126,10 @@ describe('ChartsController', () => {
       expect(result.data.createdFromConversationId).toBeUndefined();
     });
 
-    it('should throw BadRequestException for invalid chart configuration', async () => {
-      savedChartService.saveChart.mockRejectedValue(new BadRequestException('Invalid aggregation type'));
+    it('should throw ValidationError for invalid chart configuration', async () => {
+      savedChartService.saveChart.mockRejectedValue(new ValidationError('Invalid aggregation type'));
 
-      await expect(controller.createSavedChart(saveChartDto, mockUserId)).rejects.toThrow(BadRequestException);
+      await expect(controller.createSavedChart(saveChartDto, mockUserId)).rejects.toThrow(ValidationError);
     });
   });
 
@@ -242,21 +243,19 @@ describe('ChartsController', () => {
       ).rejects.toThrow('Authorization header missing or malformed');
     });
 
-    it('should throw NotFoundException if chart does not exist', async () => {
-      savedChartService.getSavedChartWithData.mockRejectedValue(new NotFoundException('Chart not found'));
+    it('should throw NotFoundError if chart does not exist', async () => {
+      savedChartService.getSavedChartWithData.mockRejectedValue(new NotFoundError('Chart not found'));
 
       await expect(controller.getSavedChartWithData(mockChartId, {}, mockUserId, mockRequest)).rejects.toThrow(
-        NotFoundException,
+        NotFoundError,
       );
     });
 
-    it('should throw BadRequestException if chart data generation fails', async () => {
-      savedChartService.getSavedChartWithData.mockRejectedValue(
-        new BadRequestException('Failed to generate chart data'),
-      );
+    it('should throw ValidationError if chart data generation fails', async () => {
+      savedChartService.getSavedChartWithData.mockRejectedValue(new ValidationError('Failed to generate chart data'));
 
       await expect(controller.getSavedChartWithData(mockChartId, {}, mockUserId, mockRequest)).rejects.toThrow(
-        BadRequestException,
+        ValidationError,
       );
     });
   });
@@ -291,18 +290,16 @@ describe('ChartsController', () => {
       expect(result.data).toEqual(expect.objectContaining({ name: 'New Name' }));
     });
 
-    it('should throw BadRequestException if no fields provided', async () => {
-      savedChartService.updateSavedChart.mockRejectedValue(
-        new BadRequestException('At least one field must be provided'),
-      );
+    it('should throw ValidationError if no fields provided', async () => {
+      savedChartService.updateSavedChart.mockRejectedValue(new ValidationError('At least one field must be provided'));
 
-      await expect(controller.updateSavedChart(mockChartId, {}, mockUserId)).rejects.toThrow(BadRequestException);
+      await expect(controller.updateSavedChart(mockChartId, {}, mockUserId)).rejects.toThrow(ValidationError);
     });
 
-    it('should throw NotFoundException if chart does not exist', async () => {
-      savedChartService.updateSavedChart.mockRejectedValue(new NotFoundException('Chart not found'));
+    it('should throw NotFoundError if chart does not exist', async () => {
+      savedChartService.updateSavedChart.mockRejectedValue(new NotFoundError('Chart not found'));
 
-      await expect(controller.updateSavedChart(mockChartId, updateDto, mockUserId)).rejects.toThrow(NotFoundException);
+      await expect(controller.updateSavedChart(mockChartId, updateDto, mockUserId)).rejects.toThrow(NotFoundError);
     });
   });
 
@@ -320,10 +317,10 @@ describe('ChartsController', () => {
       });
     });
 
-    it('should throw NotFoundException if chart does not exist', async () => {
-      savedChartService.deleteSavedChart.mockRejectedValue(new NotFoundException('Chart not found'));
+    it('should throw NotFoundError if chart does not exist', async () => {
+      savedChartService.deleteSavedChart.mockRejectedValue(new NotFoundError('Chart not found'));
 
-      await expect(controller.deleteSavedChart(mockChartId, mockUserId)).rejects.toThrow(NotFoundException);
+      await expect(controller.deleteSavedChart(mockChartId, mockUserId)).rejects.toThrow(NotFoundError);
     });
   });
 
@@ -340,7 +337,7 @@ describe('ChartsController', () => {
 
     it("should prevent users from updating charts they don't own", async () => {
       const updateDto = { name: 'Hacked Name' };
-      savedChartService.updateSavedChart.mockRejectedValue(new NotFoundException('Chart not found'));
+      savedChartService.updateSavedChart.mockRejectedValue(new NotFoundError('Chart not found'));
 
       await expect(controller.updateSavedChart(mockChartId, updateDto, 'other_user')).rejects.toThrow();
     });
