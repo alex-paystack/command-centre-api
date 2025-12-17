@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthModule } from './modules/health/health.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { ChartsModule } from './modules/charts/charts.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { Environment } from './config/helpers';
@@ -26,6 +27,7 @@ import { DatabaseModule } from './database/database.module';
     AuthModule,
     HealthModule,
     ChatModule,
+    ChartsModule,
     ObservabilityModule.forRoot(),
   ],
   controllers: [AppController],

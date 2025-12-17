@@ -112,54 +112,24 @@ describe('Aggregation Functions', () => {
     });
 
     it('should generate correct labels for refund resource type', () => {
-      expect(generateChartLabel(AggregationType.BY_DAY, undefined, ChartResourceType.REFUND)).toBe(
-        'Daily Refund Metrics',
-      );
-      expect(generateChartLabel(AggregationType.BY_STATUS, undefined, ChartResourceType.REFUND)).toBe(
-        'Refund Metrics by Status',
-      );
-      expect(generateChartLabel(AggregationType.BY_TYPE, undefined, ChartResourceType.REFUND)).toBe(
-        'Refund Metrics by Type',
-      );
+      expect(generateChartLabel(AggregationType.BY_DAY, ChartResourceType.REFUND)).toBe('Daily Refund Metrics');
+      expect(generateChartLabel(AggregationType.BY_STATUS, ChartResourceType.REFUND)).toBe('Refund Metrics by Status');
+      expect(generateChartLabel(AggregationType.BY_TYPE, ChartResourceType.REFUND)).toBe('Refund Metrics by Type');
     });
 
     it('should generate correct labels for payout resource type', () => {
-      expect(generateChartLabel(AggregationType.BY_DAY, undefined, ChartResourceType.PAYOUT)).toBe(
-        'Daily Payout Metrics',
-      );
-      expect(generateChartLabel(AggregationType.BY_STATUS, undefined, ChartResourceType.PAYOUT)).toBe(
-        'Payout Metrics by Status',
-      );
+      expect(generateChartLabel(AggregationType.BY_DAY, ChartResourceType.PAYOUT)).toBe('Daily Payout Metrics');
+      expect(generateChartLabel(AggregationType.BY_STATUS, ChartResourceType.PAYOUT)).toBe('Payout Metrics by Status');
     });
 
     it('should generate correct labels for dispute resource type', () => {
-      expect(generateChartLabel(AggregationType.BY_DAY, undefined, ChartResourceType.DISPUTE)).toBe(
-        'Daily Dispute Metrics',
-      );
-      expect(generateChartLabel(AggregationType.BY_CATEGORY, undefined, ChartResourceType.DISPUTE)).toBe(
+      expect(generateChartLabel(AggregationType.BY_DAY, ChartResourceType.DISPUTE)).toBe('Daily Dispute Metrics');
+      expect(generateChartLabel(AggregationType.BY_CATEGORY, ChartResourceType.DISPUTE)).toBe(
         'Dispute Metrics by Category',
       );
-      expect(generateChartLabel(AggregationType.BY_RESOLUTION, undefined, ChartResourceType.DISPUTE)).toBe(
+      expect(generateChartLabel(AggregationType.BY_RESOLUTION, ChartResourceType.DISPUTE)).toBe(
         'Dispute Metrics by Resolution',
       );
-    });
-
-    it('should include date range in label when provided', () => {
-      const dateRange = { from: '2024-12-01', to: '2024-12-31' };
-      const label = generateChartLabel(AggregationType.BY_DAY, dateRange);
-      expect(label).toBe('Daily Transaction Metrics (Dec 1, 2024 - Dec 31, 2024)');
-    });
-
-    it('should include only from date when to is not provided', () => {
-      const dateRange = { from: '2024-12-01' };
-      const label = generateChartLabel(AggregationType.BY_DAY, dateRange);
-      expect(label).toBe('Daily Transaction Metrics (from Dec 1, 2024)');
-    });
-
-    it('should include only to date when from is not provided', () => {
-      const dateRange = { to: '2024-12-31' };
-      const label = generateChartLabel(AggregationType.BY_DAY, dateRange);
-      expect(label).toBe('Daily Transaction Metrics (until Dec 31, 2024)');
     });
   });
 
