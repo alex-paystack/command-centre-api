@@ -192,6 +192,17 @@ export class ChatService {
 
   async handleMessageClassification(messages: UIMessage[], pageContext?: PageContext) {
     const messageClassification = await classifyMessage(messages, pageContext);
+    const confidence = messageClassification?.confidence ?? 1;
+    const LOW_CONFIDENCE_THRESHOLD = 0.6;
+
+    const isLowConfidenceOutScope =
+      [MessageClassificationIntent.OUT_OF_SCOPE, MessageClassificationIntent.OUT_OF_PAGE_SCOPE].includes(
+        messageClassification?.intent,
+      ) && confidence < LOW_CONFIDENCE_THRESHOLD;
+
+    if (isLowConfidenceOutScope) {
+      return null;
+    }
 
     if (messageClassification?.intent === MessageClassificationIntent.OUT_OF_SCOPE) {
       const refusalText = policy.outOfScopeRefusalText;

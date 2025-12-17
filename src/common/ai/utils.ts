@@ -18,6 +18,26 @@ export function getTextFromMessages(messages: UIMessage[]) {
     .join('\n');
 }
 
+/**
+ * Prepare a trimmed, most-recent-first view of the conversation for classification.
+ * Returns both the formatted conversation and the latest user message text.
+ */
+export function buildClassifierConversation(messages: UIMessage[], maxMessages = 15) {
+  const trimmed = messages.slice(-maxMessages);
+
+  const reversed = [...trimmed].reverse();
+  const formattedConversation = reversed
+    .map((message) => `${message.role}: ${getTextFromMessage(message)}`.trim())
+    .join('\n');
+
+  const latestUserMessage = reversed.find((message) => message.role === 'user');
+
+  return {
+    formattedConversation,
+    latestUserMessage: latestUserMessage ? getTextFromMessage(latestUserMessage) : '',
+  };
+}
+
 export function convertToUIMessages(messages: MessageResponseDto[]): UIMessage[] {
   return messages.map((message) => ({
     id: message.id,

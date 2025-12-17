@@ -582,6 +582,37 @@ describe('ChatService', () => {
       expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
       expect(result).toBeNull();
     });
+
+    it('should allow message when OUT_OF_SCOPE but low confidence', async () => {
+      classifyMessage.mockResolvedValue({
+        intent: MessageClassificationIntent.OUT_OF_SCOPE,
+        confidence: 0.4,
+        needsMerchantData: false,
+      });
+
+      const result = await service.handleMessageClassification(mockHistory);
+
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
+      expect(result).toBeNull();
+    });
+
+    it('should allow message when OUT_OF_PAGE_SCOPE but low confidence', async () => {
+      const mockPageContext = {
+        type: PageContextType.TRANSACTION,
+        resourceId: 'ref_123',
+      };
+
+      classifyMessage.mockResolvedValue({
+        intent: MessageClassificationIntent.OUT_OF_PAGE_SCOPE,
+        confidence: 0.5,
+        needsMerchantData: false,
+      });
+
+      const result = await service.handleMessageClassification(mockHistory, mockPageContext);
+
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, mockPageContext);
+      expect(result).toBeNull();
+    });
   });
 
   describe('handleStreamingChat', () => {
