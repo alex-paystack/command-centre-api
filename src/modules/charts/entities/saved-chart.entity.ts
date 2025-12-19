@@ -2,6 +2,7 @@ import { Entity, ObjectIdColumn, Column, CreateDateColumn, UpdateDateColumn, Ind
 import { ObjectId } from 'mongodb';
 import { randomUUID } from 'crypto';
 import { ChartResourceType, AggregationType } from '~/common/ai/chart-config';
+import { PaymentChannel } from '~/common/ai/types/data';
 
 @Entity('saved_charts')
 export class SavedChart {
@@ -50,6 +51,13 @@ export class SavedChart {
 
   @Column({ nullable: true })
   currency?: string;
+
+  @Column({
+    type: 'enum',
+    enum: PaymentChannel,
+    nullable: true,
+  })
+  channel?: PaymentChannel;
 
   @CreateDateColumn()
   createdAt: Date;

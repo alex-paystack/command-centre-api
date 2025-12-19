@@ -67,15 +67,7 @@ export async function summarizeConversation(messages: UIMessage[], existingSumma
 }
 
 const ClassifierSchema = z.object({
-  intent: z.enum([
-    MessageClassificationIntent.DASHBOARD_INSIGHT,
-    MessageClassificationIntent.PAYSTACK_PRODUCT_FAQ,
-    MessageClassificationIntent.ACCOUNT_HELP,
-    MessageClassificationIntent.ASSISTANT_CAPABILITIES,
-    MessageClassificationIntent.DATA_EXPORT,
-    MessageClassificationIntent.OUT_OF_SCOPE,
-    MessageClassificationIntent.OUT_OF_PAGE_SCOPE,
-  ]),
+  intent: z.enum(Object.values(MessageClassificationIntent)),
   confidence: z.number().min(0).max(1),
   needsMerchantData: z.boolean(),
 });

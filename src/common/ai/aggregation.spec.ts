@@ -4,6 +4,7 @@ import {
   aggregateByWeek,
   aggregateByMonth,
   aggregateByStatus,
+  aggregateByChannel,
   aggregateByType,
   aggregateByCategory,
   aggregateByResolution,
@@ -89,6 +90,10 @@ describe('Aggregation Functions', () => {
       expect(getChartType(AggregationType.BY_STATUS)).toBe(ChartType.DOUGHNUT);
     });
 
+    it('should return doughnut chart for by-channel aggregation', () => {
+      expect(getChartType(AggregationType.BY_CHANNEL)).toBe(ChartType.DOUGHNUT);
+    });
+
     it('should return doughnut chart for by-type aggregation', () => {
       expect(getChartType(AggregationType.BY_TYPE)).toBe(ChartType.DOUGHNUT);
     });
@@ -109,6 +114,7 @@ describe('Aggregation Functions', () => {
       expect(generateChartLabel(AggregationType.BY_WEEK)).toBe('Weekly Transaction Metrics');
       expect(generateChartLabel(AggregationType.BY_MONTH)).toBe('Monthly Transaction Metrics');
       expect(generateChartLabel(AggregationType.BY_STATUS)).toBe('Transaction Metrics by Status');
+      expect(generateChartLabel(AggregationType.BY_CHANNEL)).toBe('Transaction Metrics by Channel');
     });
 
     it('should generate correct labels for refund resource type', () => {
@@ -574,6 +580,53 @@ describe('Aggregation Functions', () => {
     });
   });
 
+  describe('aggregateByChannel', () => {
+    it('should return empty array for empty transactions', () => {
+      const result = aggregateByChannel([]);
+      expect(result).toEqual([]);
+    });
+
+    it('should aggregate transactions by channel', () => {
+      const cardTransaction = createMockTransaction(1000, '2024-12-10T10:30:00Z');
+      const bankTransaction = { ...createMockTransaction(2000, '2024-12-11T10:30:00Z'), channel: PaymentChannel.BANK };
+      const ussdTransaction = { ...createMockTransaction(3000, '2024-12-12T10:30:00Z'), channel: PaymentChannel.USSD };
+
+      const result = aggregateByChannel([cardTransaction, bankTransaction, ussdTransaction]);
+
+      expect(result).toHaveLength(3);
+      expect(result.find((d) => d.name === PaymentChannel.CARD.toString())).toMatchObject({
+        name: PaymentChannel.CARD,
+        count: 1,
+        volume: 1000,
+        average: 1000,
+        currency: 'NGN',
+      });
+      expect(result.find((d) => d.name === PaymentChannel.BANK.toString())).toMatchObject({
+        name: PaymentChannel.BANK,
+        count: 1,
+        volume: 2000,
+        average: 2000,
+        currency: 'NGN',
+      });
+      expect(result.find((d) => d.name === PaymentChannel.USSD.toString())).toMatchObject({
+        name: PaymentChannel.USSD,
+        count: 1,
+        volume: 3000,
+        average: 3000,
+        currency: 'NGN',
+      });
+    });
+
+    it('should sort channels alphabetically', () => {
+      const cardTransaction = createMockTransaction(1000, '2024-12-10T10:30:00Z');
+      const bankTransaction = { ...createMockTransaction(2000, '2024-12-11T10:30:00Z'), channel: PaymentChannel.BANK };
+
+      const result = aggregateByChannel([cardTransaction, bankTransaction]);
+
+      expect(result.map((r) => r.name)).toEqual([PaymentChannel.BANK, PaymentChannel.CARD]);
+    });
+  });
+
   describe('aggregateByKey', () => {
     const baseRecord = {
       amount: 1000,
@@ -925,6 +978,32 @@ describe('Aggregation Functions', () => {
   });
 
   describe('aggregateRecords', () => {
+    it('should route to aggregateByChannel for by-channel aggregation', () => {
+      const records: ChartableRecord[] = [
+        {
+          amount: 100000,
+          currency: 'NGN',
+          createdAt: '2024-12-10T10:30:00Z',
+          status: 'success',
+          channel: PaymentChannel.CARD,
+        },
+        {
+          amount: 50000,
+          currency: 'NGN',
+          createdAt: '2024-12-11T10:30:00Z',
+          status: 'success',
+          channel: PaymentChannel.BANK,
+        },
+      ];
+
+      const result = aggregateRecords(records, AggregationType.BY_CHANNEL);
+
+      expect(result.chartData).toBeDefined();
+      expect(result.chartData).toHaveLength(2);
+      expect(result.chartData?.some((d) => d.name === PaymentChannel.CARD.toString())).toBe(true);
+      expect(result.chartData?.some((d) => d.name === PaymentChannel.BANK.toString())).toBe(true);
+    });
+
     it('should route to aggregateByType for by-type aggregation', () => {
       const records: ChartableRecord[] = [
         {

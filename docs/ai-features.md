@@ -109,7 +109,7 @@ The `generateChartData` tool provides powerful analytics capabilities across mul
 
 | Resource        | Available Aggregations                                                            |
 | --------------- | --------------------------------------------------------------------------------- |
-| **Transaction** | by-day, by-hour, by-week, by-month, by-status                                     |
+| **Transaction** | by-day, by-hour, by-week, by-month, by-status, **by-channel** (payment channel)   |
 | **Refund**      | by-day, by-hour, by-week, by-month, by-status, **by-type** (full/partial)         |
 | **Payout**      | by-day, by-hour, by-week, by-month, by-status                                     |
 | **Dispute**     | by-day, by-hour, by-week, by-month, by-status, **by-category**, **by-resolution** |
@@ -123,6 +123,7 @@ The `generateChartData` tool provides powerful analytics capabilities across mul
 | `by-week`       | Weekly overview (ISO week format: YYYY-Www)          | Area chart     |
 | `by-month`      | Monthly trends (YYYY-MM)                             | Area chart     |
 | `by-status`     | Status distribution                                  | Doughnut chart |
+| `by-channel`    | Payment channel breakdown (card/bank/mobile_money)   | Doughnut chart |
 | `by-type`       | Refund type breakdown (full/partial)                 | Doughnut chart |
 | `by-category`   | Dispute category (fraud/chargeback)                  | Doughnut chart |
 | `by-resolution` | Dispute resolution outcomes                          | Doughnut chart |
@@ -175,6 +176,8 @@ The `generateChartData` tool provides powerful analytics capabilities across mul
 - Comprehensive summary statistics with per-currency breakdown
 - Date range validation (30-day maximum)
 - Resource-specific validation of aggregation types
+- **Centralized validation system** (`chart-validation.ts`) for consistent parameter validation
+- **Channel filtering** for transaction-specific payment channel analysis
 
 ## Guardrails & Classification
 
