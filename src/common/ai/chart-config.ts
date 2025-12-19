@@ -5,6 +5,7 @@ import {
   DisputeCategory,
   DisputeResolutionSlug,
   DisputeStatusSlug,
+  PaymentChannel,
   PayoutStatus,
   RefundStatus,
   RefundType,
@@ -37,6 +38,7 @@ export enum AggregationType {
   BY_TYPE = 'by-type', // Refunds: full/partial
   BY_CATEGORY = 'by-category', // Disputes: fraud/chargeback
   BY_RESOLUTION = 'by-resolution', // Disputes: resolution outcomes
+  BY_CHANNEL = 'by-channel', // Transactions: payment channel
 }
 
 export type ChartableResource = PaystackTransaction | PaystackRefund | PaystackPayout | PaystackDispute;
@@ -51,6 +53,7 @@ export const VALID_AGGREGATIONS: Record<ChartResourceType, AggregationType[]> = 
     AggregationType.BY_WEEK,
     AggregationType.BY_MONTH,
     AggregationType.BY_STATUS,
+    AggregationType.BY_CHANNEL,
   ],
   [ChartResourceType.REFUND]: [
     AggregationType.BY_DAY,
@@ -87,6 +90,7 @@ export interface ChartableRecord {
   createdAt: string; // ISO date string
   status: string;
   // Optional model-specific fields
+  channel?: PaymentChannel; // For transactions: payment channel
   type?: RefundType; // For refunds: full/partial
   category?: DisputeCategory; // For disputes: fraud/chargeback
   resolution?: DisputeResolutionSlug | null; // For disputes: resolution outcome
@@ -100,6 +104,7 @@ export interface ResourceFieldConfig<T> {
   getCurrency: (record: T) => string;
   getCreatedAt: (record: T) => string;
   getStatus: (record: T) => string;
+  getChannel?: (record: T) => PaymentChannel;
   getType?: (record: T) => RefundType;
   getCategory?: (record: T) => DisputeCategory;
   getResolution?: (record: T) => DisputeResolutionSlug | null;
@@ -133,6 +138,7 @@ export const transactionFieldConfig: ResourceFieldConfig<PaystackTransaction> = 
   getCurrency: (t) => t.currency,
   getCreatedAt: (t) => t.createdAt,
   getStatus: (t) => t.status,
+  getChannel: (t) => t.channel,
 };
 
 /**
@@ -200,6 +206,7 @@ export function toChartableRecord<T>(record: T, config: ResourceFieldConfig<T>):
     currency: config.getCurrency(record),
     createdAt: config.getCreatedAt(record),
     status: config.getStatus(record),
+    channel: config.getChannel?.(record),
     type: config.getType?.(record),
     category: config.getCategory?.(record),
     resolution: config.getResolution?.(record),

@@ -1,6 +1,7 @@
 import { IsString, IsNotEmpty, IsEnum, IsOptional, MaxLength, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ChartResourceType, AggregationType } from '~/common/ai/chart-config';
+import { PaymentChannel } from '~/common/ai/types/data';
 
 export class SaveChartDto {
   @ApiProperty({
@@ -80,4 +81,13 @@ export class SaveChartDto {
   @IsOptional()
   @IsString()
   currency?: string;
+
+  @ApiPropertyOptional({
+    description: 'Payment channel filter (transactions only)',
+    enum: PaymentChannel,
+    example: PaymentChannel.CARD,
+  })
+  @IsOptional()
+  @IsEnum(PaymentChannel)
+  channel?: PaymentChannel;
 }

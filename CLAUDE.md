@@ -118,9 +118,11 @@ All `/chat/*` and `/charts/*` endpoints require JWT authentication:
 Charts are generated via `src/common/ai/aggregation.ts` with resource-specific configurations in `chart-config.ts`:
 
 - **Time-based**: `by-day`, `by-hour`, `by-week`, `by-month` (returns per-currency series)
-- **Categorical**: `by-status`, `by-type`, `by-category`, `by-resolution` (returns flat data)
+- **Categorical**: `by-status`, `by-channel`, `by-type`, `by-category`, `by-resolution` (returns flat data)
 - **Resource-specific configs** define field accessors (`getAmount`, `getCurrency`, `getStatus`, etc.)
-- **Validation**: 30-day max date range, resource-specific aggregation type validation
+- **Centralized validation**: `chart-validation.ts` provides shared validation for chart parameters
+- **Channel filtering**: Transaction-specific payment channel analysis (`by-channel` aggregation)
+- **Validation**: 30-day max date range, resource-specific aggregation type validation, channel filter validation
 - **Recharts-compatible** output format with comprehensive summary statistics
 
 ## Development Patterns
@@ -162,11 +164,13 @@ export function createMyTool(paystackService: PaystackApiService, getAuthenticat
 ### Adding a Chart Resource Type
 
 1. Add to `ChartResourceType` enum in `chart-config.ts`
-2. Define `ResourceFieldConfig` with field accessors
+2. Define `ResourceFieldConfig` with field accessors (including optional model-specific fields like `getChannel`)
 3. Update `VALID_AGGREGATIONS` map
 4. Update `STATUS_VALUES` map
 5. Add to `API_ENDPOINTS` map
 6. Update `getFieldConfig()` function
+7. Update `chart-validation.ts` if adding resource-specific validation rules
+8. If adding categorical aggregations, update `getChartType()` in `aggregation.ts`
 
 ### Adding a Page Context Resource Type
 
@@ -175,6 +179,41 @@ export function createMyTool(paystackService: PaystackApiService, getAuthenticat
 3. Add formatting in `PageContextService.formatResourceData()`
 4. Update `RESOURCE_TOOL_MAP` in `tools/index.ts`
 5. Add TypeScript interface in `types/index.ts`
+
+### Using Chart Validation
+
+The `chart-validation.ts` module provides centralized validation for chart parameters. Use `validateChartParams()` when:
+
+- Creating new saved charts (`SavedChartService.saveChart()`)
+- Regenerating charts with overrides (`SavedChartService.getSavedChartWithData()`)
+- Implementing new chart-related features
+
+**Example**:
+
+```typescript
+import { validateChartParams } from '~/common/ai/chart-validation';
+
+const validation = validateChartParams({
+  resourceType: ChartResourceType.TRANSACTION,
+  aggregationType: AggregationType.BY_CHANNEL,
+  status: 'success',
+  from: '2024-01-01',
+  to: '2024-01-31',
+  channel: PaymentChannel.CARD,
+});
+
+if (!validation.isValid) {
+  throw new ValidationError(validation.error, ErrorCodes.INVALID_PARAMS);
+}
+```
+
+**Validation Rules**:
+
+- Resource type and aggregation type compatibility
+- Status values must match resource-specific enums
+- Date range must not exceed 30 days
+- Channel filter only valid for transactions
+- Channel must be a valid `PaymentChannel` enum value
 
 ### Working with TypeORM & MongoDB
 

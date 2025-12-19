@@ -80,6 +80,7 @@ export function getChartType(aggregationType: AggregationType): ChartType {
     [AggregationType.BY_WEEK]: ChartType.AREA,
     [AggregationType.BY_MONTH]: ChartType.AREA,
     [AggregationType.BY_STATUS]: ChartType.DOUGHNUT,
+    [AggregationType.BY_CHANNEL]: ChartType.DOUGHNUT,
     [AggregationType.BY_TYPE]: ChartType.DOUGHNUT,
     [AggregationType.BY_CATEGORY]: ChartType.DOUGHNUT,
     [AggregationType.BY_RESOLUTION]: ChartType.DOUGHNUT,
@@ -103,6 +104,7 @@ export function generateChartLabel(
     [AggregationType.BY_WEEK]: `Weekly ${resourceName} Metrics`,
     [AggregationType.BY_MONTH]: `Monthly ${resourceName} Metrics`,
     [AggregationType.BY_STATUS]: `${resourceName} Metrics by Status`,
+    [AggregationType.BY_CHANNEL]: `${resourceName} Metrics by Channel`,
     [AggregationType.BY_TYPE]: `${resourceName} Metrics by Type`,
     [AggregationType.BY_CATEGORY]: `${resourceName} Metrics by Category`,
     [AggregationType.BY_RESOLUTION]: `${resourceName} Metrics by Resolution`,
@@ -376,6 +378,13 @@ export function aggregateByStatus(records: ChartableRecord[]): ChartDataPoint[] 
 }
 
 /**
+ * Aggregate records by payment channel (transactions only)
+ */
+export function aggregateByChannel(records: ChartableRecord[]): ChartDataPoint[] {
+  return aggregateByKey(records, (record) => record.channel);
+}
+
+/**
  * Aggregate records by type (for refunds: full/partial)
  */
 export function aggregateByType(records: ChartableRecord[]): ChartDataPoint[] {
@@ -416,6 +425,8 @@ export function aggregateRecords(records: ChartableRecord[], aggregationType: Ag
       return { chartSeries: aggregateByMonth(records) };
     case AggregationType.BY_STATUS:
       return { chartData: aggregateByStatus(records) };
+    case AggregationType.BY_CHANNEL:
+      return { chartData: aggregateByChannel(records) };
     case AggregationType.BY_TYPE:
       return { chartData: aggregateByType(records) };
     case AggregationType.BY_CATEGORY:

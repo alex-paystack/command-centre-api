@@ -33,26 +33,11 @@ export function createExportTransactionsTool(
       from: z.string().optional().describe('Start date for filtering transactions (ISO 8601 format, e.g., 2024-01-01)'),
       to: z.string().optional().describe('End date for filtering transactions (ISO 8601 format, e.g., 2024-12-31)'),
       status: z
-        .enum([TransactionStatus.SUCCESS, TransactionStatus.FAILED, TransactionStatus.ABANDONED])
+        .enum(Object.values(TransactionStatus))
         .optional()
         .describe('Filter by transaction status: success, failed, or abandoned'),
       channel: z
-        .array(
-          z.enum([
-            PaymentChannel.CARD,
-            PaymentChannel.BANK,
-            PaymentChannel.USSD,
-            PaymentChannel.MOBILE_MONEY,
-            PaymentChannel.BANK_TRANSFER,
-            PaymentChannel.DIRECT_DEBIT,
-            PaymentChannel.DEBIT_ORDER,
-            PaymentChannel.PAYATTITUDE,
-            PaymentChannel.APPLE_PAY,
-            PaymentChannel.PAYPAL,
-            PaymentChannel.PREAUTH,
-            PaymentChannel.CAPITEC_PAY,
-          ]),
-        )
+        .enum(Object.values(PaymentChannel))
         .optional()
         .describe('Filter by transaction channels: card, bank, ussd, mobile_money, or bank_transfer'),
       customer: z
@@ -139,10 +124,7 @@ export function createExportRefundsTool(
     description:
       'Export refund data from Paystack via email. Use this when users want to download or receive their refund data as a file. Supports similar filters as getRefunds. The export file will be sent to the email associated with the authenticated user.',
     inputSchema: z.object({
-      status: z
-        .enum([RefundStatus.PENDING, RefundStatus.FAILED, RefundStatus.PROCESSED, RefundStatus.PROCESSING, 'retriable'])
-        .optional()
-        .describe('Filter by refund status'),
+      status: z.enum(Object.values(RefundStatus)).optional().describe('Filter by refund status'),
       from: z.string().optional().describe('Start date for filtering refunds (ISO 8601 format, e.g., 2024-01-01)'),
       to: z.string().optional().describe('End date for filtering refunds (ISO 8601 format, e.g., 2024-12-31)'),
       search: z.string().optional().describe('Filter by transaction search query'),
@@ -204,18 +186,7 @@ export function createExportPayoutsTool(
     inputSchema: z.object({
       from: z.string().optional().describe('Start date for filtering payouts (ISO 8601 format, e.g., 2024-01-01)'),
       to: z.string().optional().describe('End date for filtering payouts (ISO 8601 format, e.g., 2024-12-31)'),
-      status: z
-        .enum([
-          PayoutStatus.SUCCESS,
-          PayoutStatus.FAILED,
-          PayoutStatus.PENDING,
-          PayoutStatus.COMPUTING,
-          PayoutStatus.MANUALPROCESSING,
-          PayoutStatus.OPEN,
-          PayoutStatus.PROCESSING,
-        ])
-        .optional()
-        .describe('Filter by payout status'),
+      status: z.enum(Object.values(PayoutStatus)).optional().describe('Filter by payout status'),
       subaccount: z.string().optional().describe('Filter by subaccount'),
     }),
     execute: async ({ from, to, status, subaccount }) => {
@@ -278,15 +249,9 @@ export function createExportDisputesTool(
     inputSchema: z.object({
       from: z.string().optional().describe('Start date for filtering disputes (ISO 8601 format, e.g., 2024-01-01)'),
       to: z.string().optional().describe('End date for filtering disputes (ISO 8601 format, e.g., 2024-12-31)'),
-      status: z
-        .enum([DisputeStatusSlug.RESOLVED, DisputeStatusSlug.AWAITING_MERCHANT_FEEDBACK])
-        .optional()
-        .describe('Filter by dispute status'),
+      status: z.enum(Object.values(DisputeStatusSlug)).optional().describe('Filter by dispute status'),
       transaction: z.number().optional().describe('Filter by transaction id'),
-      category: z
-        .enum([DisputeCategory.FRAUD, DisputeCategory.CHARGEBACK])
-        .optional()
-        .describe('Filter by dispute category'),
+      category: z.enum(Object.values(DisputeCategory)).optional().describe('Filter by dispute category'),
     }),
     execute: async ({ from, to, status, transaction, category }) => {
       const { jwtToken } = getAuthenticatedUser();

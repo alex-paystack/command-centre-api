@@ -468,23 +468,25 @@ Saves a chart configuration with custom name and description. Charts are standal
   "from": "2024-01-01",
   "to": "2024-01-31",
   "status": "success",
-  "currency": "NGN"
+  "currency": "NGN",
+  "channel": "card"
 }
 ```
 
 #### Parameters
 
-| Parameter                   | Type   | Required | Description                                               |
-| --------------------------- | ------ | -------- | --------------------------------------------------------- |
-| `name`                      | string | Yes      | Chart name (max 200 chars)                                |
-| `description`               | string | No       | Chart description (max 500 chars)                         |
-| `createdFromConversationId` | UUID   | No       | Optional reference to source conversation                 |
-| `resourceType`              | string | Yes      | One of: `transaction`, `refund`, `payout`, `dispute`      |
-| `aggregationType`           | string | Yes      | Aggregation type (e.g., `by-day`, `by-week`, `by-status`) |
-| `from`                      | string | No       | Start date (ISO format)                                   |
-| `to`                        | string | No       | End date (ISO format)                                     |
-| `status`                    | string | No       | Filter by status                                          |
-| `currency`                  | string | No       | Filter by currency                                        |
+| Parameter                   | Type   | Required | Description                                                                      |
+| --------------------------- | ------ | -------- | -------------------------------------------------------------------------------- |
+| `name`                      | string | Yes      | Chart name (max 200 chars)                                                       |
+| `description`               | string | No       | Chart description (max 500 chars)                                                |
+| `createdFromConversationId` | UUID   | No       | Optional reference to source conversation                                        |
+| `resourceType`              | string | Yes      | One of: `transaction`, `refund`, `payout`, `dispute`                             |
+| `aggregationType`           | string | Yes      | Aggregation type (e.g., `by-day`, `by-week`, `by-status`, `by-channel`)          |
+| `from`                      | string | No       | Start date (ISO format)                                                          |
+| `to`                        | string | No       | End date (ISO format)                                                            |
+| `status`                    | string | No       | Filter by status                                                                 |
+| `currency`                  | string | No       | Filter by currency                                                               |
+| `channel`                   | string | No       | Payment channel filter (transactions only): `card`, `bank`, `mobile_money`, etc. |
 
 #### Response
 
@@ -570,20 +572,21 @@ Retrieves a saved chart and regenerates it with fresh data from the Paystack API
 
 All query parameters are optional. If provided, they override the saved configuration values. The `resourceType` and `aggregationType` are immutable and cannot be changed.
 
-| Parameter  | Type   | Description                      | Example      |
-| ---------- | ------ | -------------------------------- | ------------ |
-| `from`     | string | Override start date (ISO format) | `2024-01-01` |
-| `to`       | string | Override end date (ISO format)   | `2024-01-31` |
-| `status`   | string | Override status filter           | `success`    |
-| `currency` | string | Override currency filter         | `NGN`        |
+| Parameter  | Type   | Description                                         | Example      |
+| ---------- | ------ | --------------------------------------------------- | ------------ |
+| `from`     | string | Override start date (ISO format)                    | `2024-01-01` |
+| `to`       | string | Override end date (ISO format)                      | `2024-01-31` |
+| `status`   | string | Override status filter                              | `success`    |
+| `currency` | string | Override currency filter                            | `NGN`        |
+| `channel`  | string | Override payment channel filter (transactions only) | `card`       |
 
 **Example Request:**
 
 ```http
-GET /charts/chart-123?from=2024-02-01&to=2024-02-29&status=success&currency=USD
+GET /charts/chart-123?from=2024-02-01&to=2024-02-29&status=success&currency=USD&channel=bank
 ```
 
-This will regenerate the chart with February 2024 data, success status filter, and USD currency, while keeping the original resourceType and aggregationType.
+This will regenerate the chart with February 2024 data, success status filter, USD currency, and bank channel filter, while keeping the original resourceType and aggregationType.
 
 #### Response
 

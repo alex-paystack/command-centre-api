@@ -6,8 +6,7 @@ import { UpdateChartDto } from './dto/update-chart.dto';
 import { RegenerateChartQueryDto } from './dto/regenerate-chart-query.dto';
 import { SavedChartResponseDto } from './dto/saved-chart-response.dto';
 import { SavedChartWithDataResponseDto } from './dto/saved-chart-with-data-response.dto';
-import { isValidAggregation, STATUS_VALUES } from '~/common/ai/chart-config';
-import { validateDateRange } from '~/common/ai/utils';
+import { validateChartParams } from '~/common/ai/chart-validation';
 import { generateChartData, ChartGenerationState } from '~/common/ai/chart-generator';
 import { NotFoundError, ValidationError, ErrorCodes } from '~/common';
 
@@ -73,6 +72,7 @@ export class SavedChartService {
       to: queryOverrides?.to ?? savedChart.to,
       status: queryOverrides?.status ?? savedChart.status,
       currency: queryOverrides?.currency ?? savedChart.currency,
+      channel: queryOverrides?.channel ?? savedChart.channel,
     };
 
     if (queryOverrides && Object.keys(queryOverrides).length > 0) {
@@ -143,24 +143,29 @@ export class SavedChartService {
    * Validate chart configuration
    */
   private validateChartConfiguration(dto: SaveChartDto) {
-    if (!isValidAggregation(dto.resourceType, dto.aggregationType)) {
-      throw new ValidationError(
-        `Aggregation type '${dto.aggregationType}' is not valid for resource type '${dto.resourceType}'`,
-        ErrorCodes.INVALID_AGGREGATION_TYPE,
-      );
-    }
+    const validation = validateChartParams({
+      resourceType: dto.resourceType,
+      aggregationType: dto.aggregationType,
+      status: dto.status,
+      from: dto.from,
+      to: dto.to,
+      channel: dto.channel,
+    });
 
-    if (dto.status && !STATUS_VALUES[dto.resourceType].includes(dto.status)) {
-      throw new ValidationError(
-        `Status '${dto.status}' is not valid for resource type '${dto.resourceType}'. Valid options are: ${STATUS_VALUES[dto.resourceType].join(', ')}`,
-        ErrorCodes.INVALID_STATUS,
-      );
-    }
+    if (!validation.isValid) {
+      // Map common error messages to existing error codes where possible
+      const message = validation.error;
+      let code = ErrorCodes.INVALID_PARAMS;
 
-    // Validate date range does not exceed 30 days
-    const dateValidation = validateDateRange(dto.from, dto.to);
-    if (!dateValidation.isValid) {
-      throw new ValidationError(dateValidation.error, ErrorCodes.INVALID_DATE_RANGE);
+      if (message.includes('aggregation type')) {
+        code = ErrorCodes.INVALID_AGGREGATION_TYPE;
+      } else if (message.includes('status')) {
+        code = ErrorCodes.INVALID_STATUS;
+      } else if (message.toLowerCase().includes('date')) {
+        code = ErrorCodes.INVALID_DATE_RANGE;
+      }
+
+      throw new ValidationError(message, code);
     }
   }
 }

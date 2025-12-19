@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SavedChart } from '../entities/saved-chart.entity';
 import { ChartResourceType, AggregationType } from '~/common/ai/chart-config';
+import { PaymentChannel } from '~/common/ai/types/data';
 
 export class SavedChartResponseDto {
   @ApiProperty({
@@ -65,6 +66,13 @@ export class SavedChartResponseDto {
   })
   currency?: string;
 
+  @ApiPropertyOptional({
+    description: 'Payment channel filter (transactions only)',
+    enum: PaymentChannel,
+    example: PaymentChannel.CARD,
+  })
+  channel?: PaymentChannel;
+
   @ApiProperty({
     description: 'Creation timestamp',
     example: '2024-12-17T12:00:00.000Z',
@@ -89,6 +97,7 @@ export class SavedChartResponseDto {
     dto.to = savedChart.to;
     dto.status = savedChart.status;
     dto.currency = savedChart.currency;
+    dto.channel = savedChart.channel;
     dto.createdAt = savedChart.createdAt;
     dto.updatedAt = savedChart.updatedAt;
     return dto;

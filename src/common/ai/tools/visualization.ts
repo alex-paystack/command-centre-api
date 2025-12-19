@@ -4,6 +4,7 @@ import type { PaystackApiService } from '../../services/paystack-api.service';
 import type { AuthenticatedUser } from '../types';
 import { AggregationType, ChartResourceType } from '../chart-config';
 import { generateChartData } from '../chart-generator';
+import { PaymentChannel } from '../types/data';
 
 /**
  * Create the generateChartData tool
@@ -17,7 +18,7 @@ export function createGenerateChartDataTool(
     description: `Generate chart data for analytics on transactions, refunds, payouts, or disputes. Use this to create visualizations of trends, patterns, and distributions across different resource types.
 
 **Resource Types & Supported Aggregations:**
-- transaction: by-day, by-hour, by-week, by-month, by-status
+- transaction: by-day, by-hour, by-week, by-month, by-status, by-channel (payment channel)
 - refund: by-day, by-hour, by-week, by-month, by-status, by-type (full/partial)
 - payout: by-day, by-hour, by-week, by-month, by-status
 - dispute: by-day, by-hour, by-week, by-month, by-status, by-category (fraud/chargeback), by-resolution
@@ -25,34 +26,25 @@ export function createGenerateChartDataTool(
 Returns Recharts-compatible data with count, volume, and average metrics.`,
     inputSchema: z.object({
       resourceType: z
-        .enum([
-          ChartResourceType.TRANSACTION,
-          ChartResourceType.REFUND,
-          ChartResourceType.PAYOUT,
-          ChartResourceType.DISPUTE,
-        ])
+        .enum(Object.values(ChartResourceType))
         .default(ChartResourceType.TRANSACTION)
         .describe('Type of resource to generate chart data for (default: transaction)'),
       aggregationType: z
-        .enum([
-          AggregationType.BY_DAY,
-          AggregationType.BY_HOUR,
-          AggregationType.BY_WEEK,
-          AggregationType.BY_MONTH,
-          AggregationType.BY_STATUS,
-          AggregationType.BY_TYPE,
-          AggregationType.BY_CATEGORY,
-          AggregationType.BY_RESOLUTION,
-        ])
+
+        .enum(Object.values(AggregationType))
         .describe(
-          'Type of aggregation. Time-based (by-day, by-hour, by-week, by-month) and by-status work for all resources. by-type is for refunds only. by-category and by-resolution are for disputes only.',
+          'Type of aggregation. Time-based (by-day, by-hour, by-week, by-month) and by-status work for all resources. by-channel is for transactions only. by-type is for refunds only. by-category and by-resolution are for disputes only.',
         ),
       from: z.string().optional().describe('Start date for filtering (ISO 8601 format, e.g., 2024-01-01)'),
       to: z.string().optional().describe('End date for filtering (ISO 8601 format, e.g., 2024-12-31)'),
       status: z.string().optional().describe('Filter by status (values depend on resource type)'),
       currency: z.string().optional().describe('Filter by currency (e.g., NGN, USD, GHS)'),
+      channel: z
+        .enum(Object.values(PaymentChannel))
+        .optional()
+        .describe('Filter by payment channel (e.g., card, bank, mobile money) for transactions only'),
     }),
-    execute: async function* ({ resourceType, aggregationType, from, to, status, currency }) {
+    execute: async function* ({ resourceType, aggregationType, from, to, status, currency, channel }) {
       const { jwtToken } = getAuthenticatedUser();
 
       if (!jwtToken) {
@@ -62,7 +54,7 @@ Returns Recharts-compatible data with count, volume, and average metrics.`,
       }
 
       const generator = generateChartData(
-        { resourceType, aggregationType, from, to, status, currency },
+        { resourceType, aggregationType, from, to, status, currency, channel },
         paystackService,
         jwtToken,
       );

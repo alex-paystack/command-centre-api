@@ -1,5 +1,6 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, IsEnum } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { PaymentChannel } from '~/common/ai/types/data';
 
 /**
  * Query parameters for regenerating a chart with overridden filter values.
@@ -38,4 +39,13 @@ export class RegenerateChartQueryDto {
   @IsOptional()
   @IsString()
   currency?: string;
+
+  @ApiPropertyOptional({
+    description: 'Override the payment channel filter (transactions only)',
+    enum: PaymentChannel,
+    example: PaymentChannel.CARD,
+  })
+  @IsOptional()
+  @IsEnum(PaymentChannel)
+  channel?: PaymentChannel;
 }

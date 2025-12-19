@@ -3,17 +3,15 @@ import type { PaystackApiService } from '../services/paystack-api.service';
 import {
   AggregationType,
   ChartResourceType,
-  VALID_AGGREGATIONS,
   API_ENDPOINTS,
   getFieldConfig,
   toChartableRecords,
-  isValidAggregation,
   getResourceDisplayName,
   ChartableResource,
-  STATUS_VALUES,
 } from './chart-config';
-import { validateDateRange } from './utils';
 import { generateChartLabel, getChartType, calculateSummary, aggregateRecords, ChartResult } from './aggregation';
+import { PaymentChannel } from './types/data';
+import { validateChartParams } from './chart-validation';
 
 /**
  * Parameters for generating chart data
@@ -25,6 +23,7 @@ export interface GenerateChartDataParams {
   to?: string;
   status?: string;
   currency?: string;
+  channel?: PaymentChannel;
 }
 
 /**
@@ -93,7 +92,7 @@ export async function* generateChartData(
   paystackService: PaystackApiService,
   jwtToken: string,
 ): AsyncGenerator<ChartGenerationState, ChartErrorState | ChartSuccessState, unknown> {
-  const { resourceType, aggregationType, from, to, status, currency } = params;
+  const { resourceType, aggregationType, from, to, status, currency, channel } = params;
 
   if (!jwtToken) {
     const errorState: ChartErrorState = {
@@ -103,31 +102,9 @@ export async function* generateChartData(
     return errorState;
   }
 
-  if (!isValidAggregation(resourceType, aggregationType)) {
-    const validAggregations = VALID_AGGREGATIONS[resourceType].join(', ');
-
-    const errorState: ChartErrorState = {
-      error: `Invalid aggregation type '${aggregationType}' for resource type '${resourceType}'. Valid options are: ${validAggregations}`,
-    };
-    yield errorState;
-    return errorState;
-  }
-
-  if (status && !STATUS_VALUES[resourceType].includes(status)) {
-    const errorState: ChartErrorState = {
-      error: `Invalid status '${status}' for resource type '${resourceType}'. Valid options are: ${STATUS_VALUES[resourceType].join(', ')}`,
-    };
-    yield errorState;
-    return errorState;
-  }
-
-  // Validate date range does not exceed 30 days
-  const dateValidation = validateDateRange(from, to);
-
-  if (!dateValidation.isValid) {
-    const errorState: ChartErrorState = {
-      error: dateValidation.error ?? 'Invalid date range',
-    };
+  const validation = validateChartParams({ resourceType, aggregationType, status, from, to, channel });
+  if (!validation.isValid) {
+    const errorState: ChartErrorState = { error: validation.error };
     yield errorState;
     return errorState;
   }
@@ -158,7 +135,7 @@ export async function* generateChartData(
         perPage,
         page,
         use_cursor: false,
-        ...(resourceType === ChartResourceType.TRANSACTION && { reduced_fields: true }),
+        ...(resourceType === ChartResourceType.TRANSACTION && { reduced_fields: true, ...(channel && { channel }) }),
         ...(status && { status }),
         ...(from && { from }),
         ...(to && { to }),
