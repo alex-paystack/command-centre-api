@@ -11,7 +11,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
-import { ChatMode, PageContext, PageContextType } from '~/common/ai/types';
+import { AuthenticatedUser, ChatMode, PageContext, PageContextType } from '~/common/ai/types';
 import { MessageRole } from './entities/message.entity';
 import {
   generateConversationTitle,
@@ -253,6 +253,150 @@ export class ChatService {
     return null;
   }
 
+  validateChatMode(conversation: Conversation, mode?: ChatMode, pageContext?: PageContext) {
+    const savedConversationPageContext = conversation.pageContext;
+    const newPageContext = pageContext;
+
+    if (savedConversationPageContext) {
+      if (mode !== ChatMode.PAGE) {
+        throw new ValidationError(
+          'Conversation is page-scoped and must use mode "page"',
+          ErrorCodes.CONVERSATION_MODE_LOCKED,
+        );
+      }
+
+      if (!newPageContext) {
+        throw new ValidationError('pageContext is required when mode is "page"', ErrorCodes.MISSING_REQUIRED_FIELD);
+      }
+
+      if (
+        newPageContext.type !== savedConversationPageContext.type ||
+        newPageContext.resourceId !== savedConversationPageContext.resourceId
+      ) {
+        throw new ValidationError('Conversation is locked to a different page context', ErrorCodes.CONTEXT_MISMATCH);
+      }
+    } else if (mode === ChatMode.PAGE) {
+      // Do not allow turning an existing global conversation into page-scoped
+      throw new ValidationError(
+        'Cannot change an existing conversation to a page-scoped context',
+        ErrorCodes.CONVERSATION_MODE_LOCKED,
+      );
+    }
+  }
+
+  handleClosedConversation() {
+    const closedConversationMessage =
+      'This conversation has reached its limit and has been closed. Please start a new conversation or continue from this one to carry over the context.';
+
+    const closedStream = createUIMessageStream<ClassificationUIMessage>({
+      execute: ({ writer }) => {
+        writer.write({
+          type: 'data-refusal',
+          data: {
+            text: closedConversationMessage,
+          },
+        });
+      },
+    });
+
+    return {
+      type: ChatResponseType.CONVERSATION_CLOSED,
+      responseStream: closedStream,
+    };
+  }
+
+  async getSystemPromptAndTools(
+    mode: ChatMode,
+    getAuthenticatedUser: () => AuthenticatedUser,
+    pageContext?: PageContext,
+  ) {
+    const { jwtToken } = getAuthenticatedUser();
+
+    if (mode === ChatMode.PAGE) {
+      if (!pageContext) {
+        throw new ValidationError('pageContext is required when mode is "page"', ErrorCodes.MISSING_REQUIRED_FIELD);
+      }
+
+      const enrichedContext = await this.pageContextService.enrichContext(pageContext, jwtToken);
+      const systemPrompt = this.buildPageScopedPrompt(enrichedContext);
+      const tools = createPageScopedTools(this.paystackApiService, getAuthenticatedUser, pageContext.type);
+
+      return { systemPrompt, tools };
+    } else {
+      const currentDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+      const systemPrompt = CHAT_AGENT_SYSTEM_PROMPT.replace(/\{\{CURRENT_DATE\}\}/g, currentDate);
+      const tools = createTools(this.paystackApiService, getAuthenticatedUser);
+
+      return { systemPrompt, tools };
+    }
+  }
+
+  async handleMessageSummarization(conversation: Conversation, userId: string, savedMessages: MessageResponseDto[]) {
+    const summarizationThreshold = this.configService.get<number>('SUMMARIZATION_THRESHOLD', 20);
+    const maxSummaries = this.configService.get<number>('MAX_SUMMARIES', 2);
+
+    let messageCount: number;
+
+    if (conversation.lastSummarizedMessageId) {
+      messageCount = await this.messageRepository.countUserMessagesAfterMessageId(
+        conversation.id,
+        conversation.lastSummarizedMessageId,
+      );
+    } else {
+      messageCount = await this.messageRepository.countUserMessagesByConversationId(conversation.id);
+    }
+
+    const currentSummaryCount = conversation.summaryCount;
+
+    if (messageCount >= summarizationThreshold && currentSummaryCount < maxSummaries) {
+      try {
+        // Only summarize messages that haven't been summarized yet to avoid reprocessing full history
+        const messagesNeedingSummary = conversation.lastSummarizedMessageId
+          ? MessageResponseDto.fromEntities(
+              await this.messageRepository.findMessagesAfterMessageId(
+                conversation.id,
+                conversation.lastSummarizedMessageId,
+              ),
+            )
+          : await this.getMessagesByConversationId(conversation.id, userId);
+
+        if (messagesNeedingSummary.length > 0) {
+          const newSummary = await summarizeConversation(
+            convertToUIMessages(messagesNeedingSummary),
+            conversation.summary,
+          );
+
+          if (newSummary) {
+            // Track the newest user message as the watermark for next summarization
+            const lastUserMessageId = [...messagesNeedingSummary]
+              .reverse()
+              .find((msg) => msg.role === MessageRole.USER)?.id;
+
+            const lastMessageId =
+              lastUserMessageId || (savedMessages.length > 0 ? savedMessages[savedMessages.length - 1].id : null);
+
+            const newSummaryCount = currentSummaryCount + 1;
+            const updates: Partial<Conversation> = {
+              summary: newSummary,
+              summaryCount: newSummaryCount,
+              lastSummarizedMessageId: lastMessageId || conversation.lastSummarizedMessageId,
+              isClosed: newSummaryCount >= maxSummaries,
+            };
+
+            await this.conversationRepository.save({
+              ...conversation,
+              ...updates,
+            });
+          }
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Error generating conversation summary:', error);
+        // Don't fail the entire request if summarization fails
+      }
+    }
+  }
+
   // TODO: Consider decoding the JWT here to get the userId
   async handleStreamingChat(dto: ChatRequestDto, userId: string, jwtToken: string) {
     const { conversationId, message, mode, pageContext } = dto;
@@ -282,51 +426,10 @@ export class ChatService {
     }
 
     if (conversation.isClosed) {
-      const closedConversationMessage =
-        'This conversation has reached its limit and has been closed. Please start a new conversation or continue from this one to carry over the context.';
-
-      const closedStream = createUIMessageStream<ClassificationUIMessage>({
-        execute: ({ writer }) => {
-          writer.write({
-            type: 'data-refusal',
-            data: {
-              text: closedConversationMessage,
-            },
-          });
-        },
-      });
-
-      return {
-        type: ChatResponseType.CONVERSATION_CLOSED,
-        responseStream: closedStream,
-      };
+      return this.handleClosedConversation();
     }
 
-    if (conversation.pageContext) {
-      if (mode !== ChatMode.PAGE) {
-        throw new ValidationError(
-          'Conversation is page-scoped and must use mode "page"',
-          ErrorCodes.CONVERSATION_MODE_LOCKED,
-        );
-      }
-
-      if (!pageContext) {
-        throw new ValidationError('pageContext is required when mode is "page"', ErrorCodes.MISSING_REQUIRED_FIELD);
-      }
-
-      if (
-        pageContext.type !== conversation.pageContext.type ||
-        pageContext.resourceId !== conversation.pageContext.resourceId
-      ) {
-        throw new ValidationError('Conversation is locked to a different page context', ErrorCodes.CONTEXT_MISMATCH);
-      }
-    } else if (mode === ChatMode.PAGE) {
-      // Do not allow turning an existing global conversation into page-scoped
-      throw new ValidationError(
-        'Cannot change an existing conversation to a page-scoped context',
-        ErrorCodes.CONVERSATION_MODE_LOCKED,
-      );
-    }
+    this.validateChatMode(conversation, mode, pageContext);
 
     // Build messages with summary support
     const uiMessages = await this.buildMessagesForLLM(conversation, conversationId, userId, message);
@@ -362,23 +465,11 @@ export class ChatService {
       jwtToken,
     });
 
-    const chatMode = dto.mode || ChatMode.GLOBAL;
-    let systemPrompt: string;
-    let tools: ReturnType<typeof createTools>;
-
-    if (chatMode === ChatMode.PAGE) {
-      if (!dto.pageContext) {
-        throw new ValidationError('pageContext is required when mode is "page"', ErrorCodes.MISSING_REQUIRED_FIELD);
-      }
-
-      const enrichedContext = await this.pageContextService.enrichContext(dto.pageContext, jwtToken);
-      systemPrompt = this.buildPageScopedPrompt(enrichedContext);
-      tools = createPageScopedTools(this.paystackApiService, getAuthenticatedUser, dto.pageContext.type);
-    } else {
-      const currentDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
-      systemPrompt = CHAT_AGENT_SYSTEM_PROMPT.replace(/\{\{CURRENT_DATE\}\}/g, currentDate);
-      tools = createTools(this.paystackApiService, getAuthenticatedUser);
-    }
+    const { systemPrompt, tools } = await this.getSystemPromptAndTools(
+      mode || ChatMode.GLOBAL,
+      getAuthenticatedUser,
+      pageContext,
+    );
 
     const stream = createUIMessageStream({
       execute: ({ writer }) => {
@@ -405,70 +496,7 @@ export class ChatService {
 
         const savedMessages = await this.saveMessages(formattedMessages, userId);
 
-        // Check if summarization is needed
-        const summarizationThreshold = this.configService.get<number>('SUMMARIZATION_THRESHOLD', 20);
-        const maxSummaries = this.configService.get<number>('MAX_SUMMARIES', 2);
-
-        let messageCount: number;
-
-        if (conversation.lastSummarizedMessageId) {
-          messageCount = await this.messageRepository.countUserMessagesAfterMessageId(
-            conversationId,
-            conversation.lastSummarizedMessageId,
-          );
-        } else {
-          messageCount = await this.messageRepository.countUserMessagesByConversationId(conversationId);
-        }
-
-        const currentSummaryCount = conversation.summaryCount;
-
-        if (messageCount >= summarizationThreshold && currentSummaryCount < maxSummaries) {
-          try {
-            // Only summarize messages that haven't been summarized yet to avoid reprocessing full history
-            const messagesNeedingSummary = conversation.lastSummarizedMessageId
-              ? MessageResponseDto.fromEntities(
-                  await this.messageRepository.findMessagesAfterMessageId(
-                    conversationId,
-                    conversation.lastSummarizedMessageId,
-                  ),
-                )
-              : await this.getMessagesByConversationId(conversationId, userId);
-
-            if (messagesNeedingSummary.length > 0) {
-              const newSummary = await summarizeConversation(
-                convertToUIMessages(messagesNeedingSummary),
-                conversation.summary,
-              );
-
-              if (newSummary) {
-                // Track the newest user message as the watermark for next summarization
-                const lastUserMessageId = [...messagesNeedingSummary]
-                  .reverse()
-                  .find((msg) => msg.role === MessageRole.USER)?.id;
-
-                const lastMessageId =
-                  lastUserMessageId || (savedMessages.length > 0 ? savedMessages[savedMessages.length - 1].id : null);
-
-                const newSummaryCount = currentSummaryCount + 1;
-                const updates: Partial<Conversation> = {
-                  summary: newSummary,
-                  summaryCount: newSummaryCount,
-                  lastSummarizedMessageId: lastMessageId || conversation.lastSummarizedMessageId,
-                  isClosed: newSummaryCount >= maxSummaries,
-                };
-
-                await this.conversationRepository.save({
-                  ...conversation,
-                  ...updates,
-                });
-              }
-            }
-          } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('Error generating conversation summary:', error);
-            // Don't fail the entire request if summarization fails
-          }
-        }
+        await this.handleMessageSummarization(conversation, userId, savedMessages);
       },
     });
 
