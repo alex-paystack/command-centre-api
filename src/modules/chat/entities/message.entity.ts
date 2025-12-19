@@ -31,6 +31,10 @@ export class Message {
   @Column('json')
   parts: UIMessage['parts'];
 
+  @Column()
+  @Index({ expireAfterSeconds: 0 })
+  expiresAt: Date;
+
   @CreateDateColumn()
   createdAt: Date;
 

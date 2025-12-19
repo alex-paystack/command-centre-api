@@ -41,6 +41,14 @@ export class Conversation {
   @Column({ default: false })
   isClosed: boolean;
 
+  @Column()
+  @Index()
+  lastActivityAt: Date;
+
+  @Column()
+  @Index({ expireAfterSeconds: 0 })
+  expiresAt: Date;
+
   @CreateDateColumn()
   createdAt: Date;
 

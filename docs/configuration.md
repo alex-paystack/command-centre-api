@@ -41,6 +41,7 @@ PAYSTACK_API_BASE_URL=https://studio-api.paystack.co
 MESSAGE_LIMIT=100              # Maximum messages per user per period (default: 100)
 RATE_LIMIT_PERIOD_HOURS=24     # Sliding window period in hours (default: 24)
 MESSAGE_HISTORY_LIMIT=40       # Number of past messages kept in AI context (default: 40)
+CONVERSATION_TTL_DAYS=3        # Days of inactivity before auto-deletion via TTL indexes (default: 3)
 
 # Conversation Summarization
 SUMMARIZATION_THRESHOLD=20     # User messages before triggering summarization (default: 20)
@@ -75,6 +76,7 @@ OTEL_METRICS_EXPORTER=console
 | `MESSAGE_LIMIT`           | No       | `100`                            | Rate limit message count                |
 | `RATE_LIMIT_PERIOD_HOURS` | No       | `24`                             | Rate limit time window                  |
 | `MESSAGE_HISTORY_LIMIT`   | No       | `40`                             | AI context message limit                |
+| `CONVERSATION_TTL_DAYS`   | No       | `3`                              | Inactivity days before auto-deletion    |
 | `SUMMARIZATION_THRESHOLD` | No       | `20`                             | User messages before summarization      |
 | `MAX_SUMMARIES`           | No       | `2`                              | Max summaries before conversation close |
 | `LOG_LEVEL`               | No       | `info`                           | Logging verbosity                       |
@@ -140,6 +142,36 @@ When rate limit is exceeded:
 - **Repository Method**: `countUserMessagesInPeriod()` - Counts user messages within time window
 - **Service Method**: `checkUserEntitlement()` - Validates user against limits
 - **Integration**: Automatic check in `handleStreamingChat()` before processing requests
+
+## Data Retention
+
+The API automatically cleans up inactive conversations and messages using MongoDB TTL (Time-To-Live) indexes to manage storage efficiently.
+
+### How It Works
+
+- **Activity-Based**: Retention window extends on every new message
+- **Automatic Cleanup**: MongoDB deletes expired data without application intervention
+- **Coordinated Deletion**: Messages expire with their parent conversation
+- **No User Action Required**: Process is transparent to users
+
+### Retention Configuration
+
+```env
+CONVERSATION_TTL_DAYS=3  # Days of inactivity before deletion
+```
+
+### Retention Lifecycle
+
+```text
+Day 0: User sends first message
+       └─> expiresAt = Day 3
+
+Day 1: User sends another message
+       └─> expiresAt = Day 4 (window extends)
+
+Day 4: No activity for 3 days
+       └─> MongoDB deletes conversation + messages
+```
 
 ## Environment-Specific Configuration
 

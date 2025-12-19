@@ -22,6 +22,7 @@ Orchestrates the entire conversation flow:
 - **System Prompts**: Generates mode-specific system prompts and tool sets with `getSystemPromptAndTools()`
 - **Message Building**: Constructs LLM-ready message history with summary support via `buildMessagesForLLM()`
 - **Smart Summarization**: Tracks summarization progress with `lastSummarizedMessageId` to avoid reprocessing
+- **TTL Management**: Manages data retention with automatic expiry window refresh via `calculateExpiry()` and `refreshExpiryWindow()`
 
 ### PaystackModule
 

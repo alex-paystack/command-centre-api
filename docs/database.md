@@ -34,27 +34,31 @@ Stores chat conversation metadata, context, and summarization state.
 
 #### Fields
 
-| Field                     | Type    | Default | Description                                      |
-| ------------------------- | ------- | ------- | ------------------------------------------------ |
-| `id`                      | string  | -       | UUID (client-generated)                          |
-| `title`                   | string  | -       | Conversation title (auto-generated or custom)    |
-| `userId`                  | string  | -       | Owner user ID                                    |
-| `mode`                    | enum    | -       | Chat mode: `global` or `page`                    |
-| `pageContext`             | object  | null    | Resource context for page-scoped conversations   |
-| `summary`                 | string  | null    | AI-generated summary of conversation             |
-| `summaryCount`            | number  | 0       | Count of summaries (conversation closes at 2)    |
-| `previousSummary`         | string  | null    | Summary inherited from a closed conversation     |
-| `lastSummarizedMessageId` | string  | null    | Last message ID included in summary (watermark)  |
-| `isClosed`                | boolean | false   | Whether conversation is closed (no new messages) |
-| `createdAt`               | Date    | -       | Creation timestamp                               |
+| Field                     | Type    | Default | Description                                       |
+| ------------------------- | ------- | ------- | ------------------------------------------------- |
+| `id`                      | string  | -       | UUID (client-generated)                           |
+| `title`                   | string  | -       | Conversation title (auto-generated or custom)     |
+| `userId`                  | string  | -       | Owner user ID                                     |
+| `mode`                    | enum    | -       | Chat mode: `global` or `page`                     |
+| `pageContext`             | object  | null    | Resource context for page-scoped conversations    |
+| `summary`                 | string  | null    | AI-generated summary of conversation              |
+| `summaryCount`            | number  | 0       | Count of summaries (conversation closes at 2)     |
+| `previousSummary`         | string  | null    | Summary inherited from a closed conversation      |
+| `lastSummarizedMessageId` | string  | null    | Last message ID included in summary (watermark)   |
+| `isClosed`                | boolean | false   | Whether conversation is closed (no new messages)  |
+| `lastActivityAt`          | Date    | -       | Last activity timestamp (updated on each message) |
+| `expiresAt`               | Date    | -       | Absolute expiry timestamp for TTL deletion        |
+| `createdAt`               | Date    | -       | Creation timestamp                                |
 
 #### Indexes
 
-| Index    | Type    | Purpose                |
-| -------- | ------- | ---------------------- |
-| `id`     | Unique  | UUID lookups           |
-| `userId` | Regular | User-scoped queries    |
-| `mode`   | Regular | Filtering by chat mode |
+| Index            | Type    | Purpose                       |
+| ---------------- | ------- | ----------------------------- |
+| `id`             | Unique  | UUID lookups                  |
+| `userId`         | Regular | User-scoped queries           |
+| `mode`           | Regular | Filtering by chat mode        |
+| `lastActivityAt` | Regular | Activity tracking and sorting |
+| `expiresAt`      | TTL     | Automatic document deletion   |
 
 ### Messages
 
@@ -82,6 +86,7 @@ Stores individual chat messages within conversations.
 | `conversationId` | string | Yes      | Reference to parent conversation                |
 | `role`           | enum   | Yes      | Message role: `user`, `assistant`, or `system`  |
 | `parts`          | array  | Yes      | Multi-modal content parts (text, images, etc.)  |
+| `expiresAt`      | Date   | Auto     | TTL expiry timestamp (synced with conversation) |
 | `createdAt`      | Date   | Auto     | Message creation timestamp                      |
 
 #### Indexes
@@ -91,6 +96,7 @@ Stores individual chat messages within conversations.
 | `id`             | Unique  | UUID lookups and deduplication     |
 | `conversationId` | Regular | Fetching messages by conversation  |
 | `createdAt`      | Regular | Ordering and rate limiting queries |
+| `expiresAt`      | TTL     | Automatic message cleanup          |
 
 #### Important Notes
 
@@ -157,6 +163,80 @@ Stores user-saved chart configurations that can be regenerated with fresh data. 
 - **User Ownership**: All queries filter by `userId` for security
 - **Flexible Filters**: Supports date ranges, status, and currency filtering
 - **Immutable Configuration**: Only name and description can be updated after creation
+
+## Data Retention & TTL
+
+The application implements automatic data cleanup using MongoDB TTL (Time-To-Live) indexes to manage storage and maintain data freshness.
+
+### How It Works
+
+- **Automatic Deletion**: MongoDB's TTL indexes automatically delete expired documents
+- **Activity-Based Retention**: Expiry window refreshes on every user activity (new messages)
+- **Coordinated Expiry**: Messages expire in sync with their parent conversation
+- **Configurable Period**: Retention period controlled via `CONVERSATION_TTL_DAYS` (default: 3 days)
+
+### Implementation Details
+
+**Conversations:**
+
+- `lastActivityAt`: Updated on every message activity
+- `expiresAt`: Calculated as `lastActivityAt + CONVERSATION_TTL_DAYS`
+- TTL Index: `{ expiresAt: 1 }` with `expireAfterSeconds: 0`
+
+**Messages:**
+
+- `expiresAt`: Set to match parent conversation's expiry
+- TTL Index: `{ expiresAt: 1 }` with `expireAfterSeconds: 0`
+
+### Configuration
+
+```env
+CONVERSATION_TTL_DAYS=3  # Days before inactive conversations/messages expire
+```
+
+### Retention Mechanics
+
+1. **New Conversation**: `expiresAt` set to `now + 3 days`
+2. **New Message**: Triggers `refreshExpiryWindow()` which updates conversation's `lastActivityAt` and `expiresAt`
+3. **Inactivity**: If no messages for 3 days, MongoDB deletes conversation and messages automatically
+4. **Ongoing Activity**: Each message extends the retention window by 3 more days
+
+### Migration
+
+**Migration**: `AddConversationTTLIndex1734600000000`
+
+- Adds TTL indexes to conversations (expiresAt, lastActivityAt)
+- Adds TTL indexes to messages (expiresAt)
+- Enables automatic data cleanup based on retention policy
+
+```typescript
+// Up migration
+await queryRunner.createIndex(
+  'conversations',
+  new TableIndex({
+    name: 'IDX_CONVERSATIONS_EXPIRES_AT',
+    columnNames: ['expiresAt'],
+    expireAfterSeconds: 0,
+  }),
+);
+
+await queryRunner.createIndex(
+  'messages',
+  new TableIndex({
+    name: 'IDX_MESSAGES_EXPIRES_AT',
+    columnNames: ['expiresAt'],
+    expireAfterSeconds: 0,
+  }),
+);
+```
+
+### Technical Notes
+
+- **TTL Background Task**: MongoDB's TTL monitor runs every 60 seconds (default)
+- **Absolute Timestamps**: Uses absolute `expiresAt` timestamps rather than relative expiry
+- **Zero Delay**: `expireAfterSeconds: 0` means deletion happens at the `expiresAt` timestamp
+- **Repository Method**: `refreshExpiryWindow()` updates retention window on activity
+- **Service Method**: `calculateExpiry()` computes new expiry timestamps
 
 ## Migrations
 

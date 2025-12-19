@@ -68,6 +68,7 @@ export class ChatService {
       return [];
     }
 
+    const retentionDays = this.configService.get<number>('CONVERSATION_TTL_DAYS', 3);
     const conversationId = dtos[0].conversationId;
     const allSameConversation = dtos.every((dto) => dto.conversationId === conversationId);
 
@@ -80,6 +81,10 @@ export class ChatService {
       throw new NotFoundError(`Conversation with ID ${conversationId} not found`, ErrorCodes.CONVERSATION_NOT_FOUND);
     }
 
+    if (conversation.isClosed) {
+      throw new ValidationError('Conversation is closed', ErrorCodes.CONVERSATION_CLOSED);
+    }
+
     await this.checkUserEntitlement(userId);
 
     const messagesToCreate = dtos.map((dto) => ({
@@ -87,9 +92,12 @@ export class ChatService {
       role: dto.role,
       parts: dto.parts,
       id: dto.id,
+      expiresAt: this.calculateExpiry(retentionDays),
     }));
 
     const savedMessages = await this.messageRepository.createMessages(messagesToCreate);
+
+    await this.conversationRepository.refreshExpiryWindow(conversationId, retentionDays);
 
     return MessageResponseDto.fromEntities(savedMessages);
   }
@@ -129,7 +137,13 @@ export class ChatService {
   }
 
   async saveConversation(dto: CreateConversationDto) {
-    const conversation = await this.conversationRepository.createConversation(dto);
+    const retentionDays = this.configService.get<number>('CONVERSATION_TTL_DAYS', 3);
+    const now = new Date();
+    const conversation = await this.conversationRepository.createConversation({
+      ...dto,
+      lastActivityAt: now,
+      expiresAt: this.calculateExpiry(retentionDays, now),
+    });
 
     return ConversationResponseDto.fromEntity(conversation);
   }
@@ -157,6 +171,8 @@ export class ChatService {
       .join('\n\n---\n\n');
 
     // Create new conversation with carried-over summary
+    const retentionDays = this.configService.get<number>('CONVERSATION_TTL_DAYS', 3);
+    const now = new Date();
     const newConversation = await this.conversationRepository.createConversation({
       id: randomUUID(),
       title: `${previousConversation.title} (continued)`,
@@ -164,6 +180,8 @@ export class ChatService {
       mode: dto.mode,
       pageContext: dto.pageContext,
       previousSummary: combinedSummary,
+      lastActivityAt: now,
+      expiresAt: this.calculateExpiry(retentionDays, now),
     });
 
     return ConversationResponseDto.fromEntity(newConversation);
@@ -431,6 +449,8 @@ export class ChatService {
 
     await this.checkUserEntitlement(userId);
 
+    const retentionDays = this.configService.get<number>('CONVERSATION_TTL_DAYS', 3);
+
     let conversation = await this.conversationRepository.findById(conversationId);
 
     if (!conversation) {
@@ -443,6 +463,8 @@ export class ChatService {
           userId,
           mode,
           pageContext,
+          lastActivityAt: new Date(),
+          expiresAt: this.calculateExpiry(retentionDays),
         });
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -487,6 +509,7 @@ export class ChatService {
             text: messageClassification.text,
           },
         ],
+        expiresAt: this.calculateExpiry(retentionDays),
       });
 
       return {
@@ -613,5 +636,9 @@ export class ChatService {
     messages.push(...convertToUIMessages(recentMessages), currentUserMessage);
 
     return messages;
+  }
+
+  private calculateExpiry(retentionDays: number, fromDate = new Date()) {
+    return new Date(fromDate.getTime() + retentionDays * 24 * 60 * 60 * 1000);
   }
 }
