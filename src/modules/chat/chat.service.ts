@@ -1,6 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { convertToModelMessages, createUIMessageStream, stepCountIs, streamText, UIMessage } from 'ai';
+import {
+  convertToModelMessages,
+  createUIMessageStream,
+  stepCountIs,
+  streamText,
+  Tool,
+  TypeValidationError,
+  UIMessage,
+  validateUIMessages,
+} from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { randomUUID } from 'crypto';
 import { ConversationRepository } from './repositories/conversation.repository';
@@ -77,6 +86,7 @@ export class ChatService {
       conversationId: dto.conversationId,
       role: dto.role,
       parts: dto.parts,
+      id: dto.id,
     }));
 
     const savedMessages = await this.messageRepository.createMessages(messagesToCreate);
@@ -397,6 +407,24 @@ export class ChatService {
     }
   }
 
+  async validateMessages(messages: UIMessage[], tools: Record<string, Tool<unknown, unknown>>) {
+    try {
+      const validatedMessages = await validateUIMessages({ messages, tools });
+      return validatedMessages;
+    } catch (error) {
+      if (error instanceof TypeValidationError) {
+        // Log validation error for monitoring
+        // eslint-disable-next-line no-console
+        console.error('Database messages validation failed:', error);
+        // Could implement message migration or filtering here
+        // For now, start with empty history
+        return [];
+      } else {
+        throw error;
+      }
+    }
+  }
+
   // TODO: Consider decoding the JWT here to get the userId
   async handleStreamingChat(dto: ChatRequestDto, userId: string, jwtToken: string) {
     const { conversationId, message, mode, pageContext } = dto;
@@ -436,16 +464,23 @@ export class ChatService {
 
     const messageClassification = await this.handleMessageClassification(uiMessages, pageContext);
 
-    await this.messageRepository.createMessage({
-      conversationId,
-      role: MessageRole.USER,
-      parts: message.parts,
-    });
+    await this.saveMessages(
+      [
+        {
+          conversationId,
+          role: MessageRole.USER,
+          parts: message.parts,
+          id: randomUUID(),
+        },
+      ],
+      userId,
+    );
 
     if (messageClassification) {
       await this.messageRepository.createMessage({
         conversationId,
         role: MessageRole.ASSISTANT,
+        id: randomUUID(),
         parts: [
           {
             type: 'text',
@@ -471,19 +506,33 @@ export class ChatService {
       pageContext,
     );
 
+    const validatedMessages = await this.validateMessages(uiMessages, tools);
+
     const stream = createUIMessageStream({
       execute: ({ writer }) => {
+        writer.write({
+          type: 'start',
+          messageId: randomUUID(),
+        });
+
         const result = streamText({
           model: openai('gpt-4o-mini'),
           system: systemPrompt,
-          messages: convertToModelMessages(uiMessages),
+          messages: convertToModelMessages(validatedMessages),
           stopWhen: stepCountIs(10),
           tools,
         });
 
+        /**
+         * Consume the stream to ensure it runs to completion & triggers onFinish
+         * even when the client response is aborted
+         */
+        void result.consumeStream();
+
         writer.merge(
           result.toUIMessageStream({
             sendReasoning: true,
+            sendStart: false,
           }),
         );
       },
@@ -492,6 +541,7 @@ export class ChatService {
           conversationId: dto.conversationId,
           role: message.role as MessageRole,
           parts: message.parts,
+          id: message.id,
         }));
 
         const savedMessages = await this.saveMessages(formattedMessages, userId);

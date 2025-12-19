@@ -1,6 +1,5 @@
-import { Entity, ObjectIdColumn, Column, CreateDateColumn, Index, ManyToOne, BeforeInsert } from 'typeorm';
+import { Entity, ObjectIdColumn, Column, CreateDateColumn, Index, ManyToOne } from 'typeorm';
 import { ObjectId } from 'mongodb';
-import { randomUUID } from 'crypto';
 import { Conversation } from './conversation.entity';
 import { UIMessage } from 'ai';
 
@@ -39,11 +38,4 @@ export class Message {
     onDelete: 'CASCADE',
   })
   conversation: Conversation;
-
-  @BeforeInsert()
-  generateId() {
-    if (!this.id) {
-      this.id = randomUUID();
-    }
-  }
 }

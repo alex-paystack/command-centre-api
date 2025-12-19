@@ -53,7 +53,6 @@ describe('ChatService', () => {
     parts: [{ type: 'text', text: 'Hello' }],
     createdAt: new Date('2024-01-01'),
     conversation: mockConversation,
-    generateId: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -288,6 +287,7 @@ describe('ChatService', () => {
           conversationId: mockMessage.conversationId,
           role: MessageRole.USER,
           parts: [{ type: 'text', text: 'Hello' }],
+          id: '589fcdeb-51a2-43e7-b890-123456789abc',
         },
       ];
 
@@ -325,11 +325,13 @@ describe('ChatService', () => {
           conversationId: '123e4567-e89b-12d3-a456-426614174000',
           role: MessageRole.USER,
           parts: [{ type: 'text', text: 'Hello' }],
+          id: '123e4567-e89b-12d3-a456-426614174000',
         },
         {
           conversationId: '987fcdeb-51a2-43e7-b890-123456789abc',
           role: MessageRole.USER,
           parts: [{ type: 'text', text: 'Hi' }],
+          id: '987fcdeb-51a2-43e7-b890-123456789abc',
         },
       ];
 
@@ -344,6 +346,7 @@ describe('ChatService', () => {
           conversationId: 'non-existent-id',
           role: MessageRole.USER,
           parts: [{ type: 'text', text: 'Hello' }],
+          id: '589fcdeb-51a2-43e7-b890-123456789abc',
         },
       ];
 
@@ -358,6 +361,7 @@ describe('ChatService', () => {
           conversationId: mockConversation.id,
           role: MessageRole.USER,
           parts: [{ type: 'text', text: 'Hello' }],
+          id: '589fcdeb-51a2-43e7-b890-123456789abc',
         },
       ];
 
@@ -372,6 +376,7 @@ describe('ChatService', () => {
           conversationId: mockConversation.id,
           role: MessageRole.USER,
           parts: [{ type: 'text', text: 'Hello' }],
+          id: '589fcdeb-51a2-43e7-b890-123456789abc',
         },
       ];
 
@@ -950,7 +955,6 @@ describe('ChatService', () => {
           id: 'msg-11',
           role: MessageRole.USER,
           parts: [{ type: 'text' as const, text: 'Recent message' }],
-          generateId: jest.fn(),
         },
       ];
 
@@ -978,7 +982,6 @@ describe('ChatService', () => {
         id: `msg-${i}`,
         role: i % 2 === 0 ? MessageRole.USER : MessageRole.ASSISTANT,
         parts: [{ type: 'text' as const, text: `Message ${i}` }],
-        generateId: jest.fn(),
       }));
 
       jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue(manyMessages);
@@ -1016,14 +1019,12 @@ describe('ChatService', () => {
           id: 'msg-6',
           role: MessageRole.USER,
           parts: [{ type: 'text' as const, text: 'Recent question' }],
-          generateId: jest.fn(),
         },
         {
           ...mockMessage,
           id: 'msg-7',
           role: MessageRole.ASSISTANT,
           parts: [{ type: 'text' as const, text: 'Recent answer' }],
-          generateId: jest.fn(),
         },
       ];
 

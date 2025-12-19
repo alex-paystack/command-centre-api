@@ -276,7 +276,6 @@ describe('ChatService - Summarization', () => {
         parts: [{ type: 'text' as const, text: `Message ${i}` }],
         createdAt: new Date(),
         conversation,
-        generateId: jest.fn(),
       }));
 
       jest.spyOn(messageRepository, 'countUserMessagesByConversationId').mockResolvedValue(20);
@@ -330,7 +329,6 @@ describe('ChatService - Summarization', () => {
           ...messageResponse,
           _id: {} as Message['_id'],
           conversation,
-          generateId: jest.fn(),
         })),
       );
 
@@ -360,7 +358,6 @@ describe('ChatService - Summarization', () => {
         parts: [{ type: 'text' as const, text: `Message ${i}` }],
         createdAt: new Date(),
         conversation,
-        generateId: jest.fn(),
       }));
 
       jest.spyOn(messageRepository, 'countUserMessagesByConversationId').mockResolvedValue(20);
