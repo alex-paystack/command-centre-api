@@ -10,12 +10,18 @@ The application is built around several key services that work together:
 
 Orchestrates the entire conversation flow:
 
-- Manages conversation CRUD operations
-- Handles message streaming with AI
-- Enforces rate limiting and user entitlement
-- Coordinates message classification
-- Manages conversation history with configurable limits
-- Handles both global and page-scoped conversation modes
+- **Conversation Management**: CRUD operations for conversations and messages
+- **Message Streaming**: Handles AI-powered streaming responses with automatic stream consumption
+- **Rate Limiting**: Enforces user entitlement with sliding window enforcement
+- **Message Classification**: Dual-layer classification for out-of-scope protection
+- **Conversation History**: Manages message history with configurable limits and summarization
+- **Chat Modes**: Supports both global and page-scoped conversation modes with validation
+- **Mode Validation**: Ensures conversation mode consistency with `validateChatMode()`
+- **Message Validation**: Validates UI messages against tool schemas with `validateMessages()`
+- **Closed Conversations**: Gracefully handles attempts to message closed conversations
+- **System Prompts**: Generates mode-specific system prompts and tool sets with `getSystemPromptAndTools()`
+- **Message Building**: Constructs LLM-ready message history with summary support via `buildMessagesForLLM()`
+- **Smart Summarization**: Tracks summarization progress with `lastSummarizedMessageId` to avoid reprocessing
 
 ### PaystackModule
 
