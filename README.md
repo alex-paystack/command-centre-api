@@ -17,6 +17,7 @@ Command Centre API is a NestJS-based backend service that powers an AI-driven me
 - 🧭 **Guardrails** — Dual-layer classification for out-of-scope protection
 - 🛡️ **Rate Limiting** — Configurable message entitlement with sliding window enforcement
 - 📝 **Smart Summarization** — Automatic conversation summarization with context carry-over
+- 🗑️ **Automatic Cleanup** — TTL-based data retention with configurable expiry periods
 
 ## Quick Start
 

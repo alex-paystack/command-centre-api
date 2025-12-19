@@ -31,6 +31,8 @@ describe('ChatService - Summarization', () => {
     title: 'Closed Conversation',
     userId: 'user_123',
     createdAt: new Date('2024-01-01'),
+    lastActivityAt: new Date('2024-01-01'),
+    expiresAt: new Date('2024-01-04'),
     messages: [],
     mode: ChatMode.GLOBAL,
     summary: 'This is the summary of the conversation.',
@@ -46,6 +48,8 @@ describe('ChatService - Summarization', () => {
     title: 'Open Conversation',
     userId: 'user_123',
     createdAt: new Date('2024-01-01'),
+    lastActivityAt: new Date('2024-01-01'),
+    expiresAt: new Date('2024-01-04'),
     messages: [],
     mode: ChatMode.GLOBAL,
     summaryCount: 0,
@@ -65,6 +69,7 @@ describe('ChatService - Summarization', () => {
       deleteByIdForUser: jest.fn(),
       deleteAllByUserId: jest.fn(),
       save: jest.fn(),
+      refreshExpiryWindow: jest.fn(),
     };
 
     const mockMessageRepository = {
@@ -275,6 +280,7 @@ describe('ChatService - Summarization', () => {
         role: i % 2 === 0 ? MessageRole.USER : MessageRole.ASSISTANT,
         parts: [{ type: 'text' as const, text: `Message ${i}` }],
         createdAt: new Date(),
+        expiresAt: new Date(),
         conversation,
       }));
 
@@ -320,6 +326,7 @@ describe('ChatService - Summarization', () => {
         role: i % 2 === 0 ? MessageRole.USER : MessageRole.ASSISTANT,
         parts: [{ type: 'text' as const, text: `Message ${i}` }],
         createdAt: new Date(),
+        expiresAt: new Date(),
       }));
 
       jest.spyOn(messageRepository, 'countUserMessagesByConversationId').mockResolvedValue(20);
@@ -357,6 +364,7 @@ describe('ChatService - Summarization', () => {
         role: i % 2 === 0 ? MessageRole.USER : MessageRole.ASSISTANT,
         parts: [{ type: 'text' as const, text: `Message ${i}` }],
         createdAt: new Date(),
+        expiresAt: new Date(),
         conversation,
       }));
 

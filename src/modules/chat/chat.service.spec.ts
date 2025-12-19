@@ -39,6 +39,8 @@ describe('ChatService', () => {
     userId: 'user_123',
     pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_abc123' },
     createdAt: new Date('2024-01-01'),
+    lastActivityAt: new Date('2024-01-01'),
+    expiresAt: new Date('2024-01-04'),
     messages: [],
     mode: ChatMode.PAGE,
     summaryCount: 0,
@@ -52,6 +54,7 @@ describe('ChatService', () => {
     role: MessageRole.USER,
     parts: [{ type: 'text', text: 'Hello' }],
     createdAt: new Date('2024-01-01'),
+    expiresAt: new Date('2024-01-04'),
     conversation: mockConversation,
   };
 
@@ -67,6 +70,7 @@ describe('ChatService', () => {
       deleteById: jest.fn(),
       deleteByIdForUser: jest.fn(),
       deleteAllByUserId: jest.fn(),
+      refreshExpiryWindow: jest.fn(),
     };
 
     const mockMessageRepository = {
@@ -311,6 +315,23 @@ describe('ChatService', () => {
       expect(result[0].id).toBe(mockMessage.id);
       expect(result[0].conversationId).toBe(mockMessage.conversationId);
       expect(result[0].role).toBe(mockMessage.role);
+    });
+
+    it('should throw when conversation is closed', async () => {
+      const closedConversation = { ...mockConversation, isClosed: true };
+      const dtos: CreateMessageDto[] = [
+        {
+          conversationId: closedConversation.id,
+          role: MessageRole.USER,
+          parts: [{ type: 'text', text: 'Hello' }],
+          id: '589fcdeb-51a2-43e7-b890-123456789abc',
+        },
+      ];
+
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(closedConversation);
+
+      await expect(service.saveMessages(dtos, closedConversation.userId)).rejects.toThrow('Conversation is closed');
+      expect(messageRepository.createMessages).not.toHaveBeenCalled();
     });
 
     it('should return empty array when given empty array', async () => {

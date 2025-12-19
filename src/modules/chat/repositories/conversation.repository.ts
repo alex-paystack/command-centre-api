@@ -9,6 +9,12 @@ export class ConversationRepository extends MongoRepository<Conversation> {
     super(Conversation, dataSource.createEntityManager());
   }
 
+  private static defaultExpiresAt() {
+    const now = new Date();
+    const threeDaysInMilliseconds = 3 * 24 * 60 * 60 * 1000;
+    return new Date(now.getTime() + threeDaysInMilliseconds);
+  }
+
   async findById(id: string) {
     return this.findOneBy({ id });
   }
@@ -51,6 +57,8 @@ export class ConversationRepository extends MongoRepository<Conversation> {
       ...data,
       summaryCount: data.summaryCount ?? 0,
       isClosed: data.isClosed ?? false,
+      lastActivityAt: data.lastActivityAt ?? new Date(),
+      expiresAt: data.expiresAt ?? ConversationRepository.defaultExpiresAt(),
     });
     return this.save(conversation);
   }
@@ -68,5 +76,21 @@ export class ConversationRepository extends MongoRepository<Conversation> {
   async deleteAllByUserId(userId: string) {
     const result = await this.deleteMany({ userId });
     return result.deletedCount ?? 0;
+  }
+
+  async refreshExpiryWindow(conversationId: string, retentionDays: number) {
+    const now = new Date();
+    const retentionDaysInMilliseconds = retentionDays * 24 * 60 * 60 * 1000;
+    const expiresAt = new Date(now.getTime() + retentionDaysInMilliseconds);
+
+    await this.updateOne(
+      { id: conversationId },
+      {
+        $set: {
+          lastActivityAt: now,
+          expiresAt,
+        },
+      },
+    );
   }
 }
