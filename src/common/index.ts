@@ -14,3 +14,6 @@ export * from './ai';
 
 // Services
 export * from './services/paystack-api.service';
+
+// Mock data bank for agent/chart testing
+export * from './data-mocks';

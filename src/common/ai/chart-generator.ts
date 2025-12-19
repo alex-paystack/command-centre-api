@@ -14,6 +14,7 @@ import {
 } from './chart-config';
 import { validateDateRange } from './utils';
 import { generateChartLabel, getChartType, calculateSummary, aggregateRecords, ChartResult } from './aggregation';
+import { chartMockDataBank } from '../data-mocks';
 
 /**
  * Parameters for generating chart data
@@ -164,24 +165,36 @@ export async function* generateChartData(
         ...(to && { to }),
         ...(currency && { currency }),
       };
+      // TODO: Remove this before going to production
+      const mockData = {
+        [ChartResourceType.TRANSACTION]: chartMockDataBank.transactions,
+        [ChartResourceType.REFUND]: chartMockDataBank.refunds,
+        [ChartResourceType.PAYOUT]: chartMockDataBank.payouts,
+        [ChartResourceType.DISPUTE]: chartMockDataBank.disputes,
+      }[resourceType];
 
-      const response = await paystackService.get<ChartableResource[]>(endpoint, jwtToken, requestParams);
+      if (process.env.NODE_ENV === 'development') {
+        allRecords.push(...mockData);
+        continue;
+      } else {
+        const response = await paystackService.get<ChartableResource[]>(endpoint, jwtToken, requestParams);
 
-      allRecords.push(...response.data);
+        allRecords.push(...response.data);
 
-      // Yield progress update if fetching multiple pages
-      if (page < maxPages && response.data.length === perPage) {
-        yield {
-          loading: true,
-          label: generateChartLabel(aggregationType, resourceType),
-          chartType,
-          message: `Fetching ${resourceDisplayNamePlural}... (${allRecords.length} loaded)`,
-        };
-      }
+        // Yield progress update if fetching multiple pages
+        if (page < maxPages && response.data.length === perPage) {
+          yield {
+            loading: true,
+            label: generateChartLabel(aggregationType, resourceType),
+            chartType,
+            message: `Fetching ${resourceDisplayNamePlural}... (${allRecords.length} loaded)`,
+          };
+        }
 
-      // Stop if we've received fewer than perPage (no more data)
-      if (response.data.length < perPage) {
-        break;
+        // Stop if we've received fewer than perPage (no more data)
+        if (response.data.length < perPage) {
+          break;
+        }
       }
     }
 
