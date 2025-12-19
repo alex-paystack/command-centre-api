@@ -63,7 +63,7 @@ Stores individual chat messages within conversations.
 ```typescript
 {
   _id: ObjectId,
-  id: string,                    // UUID
+  id: string,                    // UUID (required, client-provided)
   conversationId: string,        // Reference to conversation
   role: 'user' | 'assistant',
   parts: {                       // Flexible JSON for multi-modal content
@@ -74,13 +74,30 @@ Stores individual chat messages within conversations.
 }
 ```
 
+#### Message Fields
+
+| Field            | Type   | Required | Description                                     |
+| ---------------- | ------ | -------- | ----------------------------------------------- |
+| `id`             | string | Yes      | UUID v4 (client-provided, unique across system) |
+| `conversationId` | string | Yes      | Reference to parent conversation                |
+| `role`           | enum   | Yes      | Message role: `user`, `assistant`, or `system`  |
+| `parts`          | array  | Yes      | Multi-modal content parts (text, images, etc.)  |
+| `createdAt`      | Date   | Auto     | Message creation timestamp                      |
+
 #### Indexes
 
 | Index            | Type    | Purpose                            |
 | ---------------- | ------- | ---------------------------------- |
-| `id`             | Unique  | UUID lookups                       |
+| `id`             | Unique  | UUID lookups and deduplication     |
 | `conversationId` | Regular | Fetching messages by conversation  |
 | `createdAt`      | Regular | Ordering and rate limiting queries |
+
+#### Important Notes
+
+- **Required UUID**: The `id` field is required and must be a valid UUID v4 provided by the client
+- **Unique Constraint**: The `id` field has a unique index to prevent duplicate messages
+- **Deduplication**: Client-provided IDs enable idempotent message creation
+- **Stream Ordering**: Messages are ordered by `id` to maintain streaming conversation order
 
 ### Saved Charts
 

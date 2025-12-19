@@ -210,6 +210,93 @@ Refusal message:
 - Classification considers full conversation history for context
 - Graceful error handling with helpful suggestions for reformulating queries
 
+## Message & Mode Validation
+
+The system performs several validation steps to ensure conversation integrity and proper mode usage.
+
+### Conversation Mode Validation
+
+The `validateChatMode()` method ensures conversations maintain consistent mode and context:
+
+**Rules:**
+
+1. **Mode Consistency**: Conversations created with a specific mode (global or page-scoped) cannot change modes
+2. **Page Context Immutability**: Page-scoped conversations remain locked to the original resource (type + ID)
+3. **Global → Page Prevention**: Global conversations cannot be converted to page-scoped mode
+4. **Required Context**: Page-scoped mode requires valid `pageContext` with `type` and `resourceId`
+
+**Error Codes:**
+
+- `CONVERSATION_MODE_LOCKED`: Attempting to change conversation mode or use wrong mode
+- `CONTEXT_MISMATCH`: Attempting to use different page context than originally set
+- `MISSING_REQUIRED_FIELD`: Missing required `pageContext` when using page mode
+
+**Example Validation Flow:**
+
+```typescript
+// First message: Creates page-scoped conversation
+POST /chat/stream
+{
+  "conversationId": "abc-123",
+  "mode": "page",
+  "pageContext": { "type": "transaction", "resourceId": "txn_123" }
+}
+
+// Subsequent messages: Must use same mode and context
+POST /chat/stream
+{
+  "conversationId": "abc-123",
+  "mode": "page",
+  "pageContext": { "type": "transaction", "resourceId": "txn_123" } // ✓ Valid
+}
+
+// This will fail with CONTEXT_MISMATCH
+POST /chat/stream
+{
+  "conversationId": "abc-123",
+  "mode": "page",
+  "pageContext": { "type": "customer", "resourceId": "cust_456" } // ✗ Invalid
+}
+```
+
+### Message Validation
+
+The `validateMessages()` method validates message history against tool schemas before sending to the LLM:
+
+**What It Does:**
+
+- Validates UI message format using Vercel AI SDK's `validateUIMessages()`
+- Ensures message parts match expected tool schemas
+- Handles validation errors gracefully without failing the entire request
+
+**Error Handling:**
+
+- If validation fails due to `TypeValidationError`, the system logs the error and starts with empty history
+- This prevents database schema evolution issues from breaking conversations
+- Future enhancement: Implement message migration or intelligent filtering
+
+**Stream Consumption:**
+
+The streaming implementation ensures streams run to completion even if the client aborts:
+
+```typescript
+const result = streamText({
+  model: openai('gpt-4o-mini'),
+  system: systemPrompt,
+  messages: convertToModelMessages(validatedMessages),
+  tools,
+});
+
+// Consume the stream to ensure onFinish triggers
+void result.consumeStream();
+```
+
+This guarantees that:
+
+- Messages are saved to database via `onFinish()` callback
+- Summarization logic executes properly
+- No partial state corruption occurs
+
 ## Resource Context Enrichment
 
 When using page-scoped mode, the system automatically enriches conversations with resource-specific data.

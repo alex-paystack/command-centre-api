@@ -255,6 +255,51 @@ throw new ValidationError('Conversation is closed', ErrorCodes.CONVERSATION_CLOS
 - **Rate Limiting**: `RATE_LIMITED`
 - **Internal**: `INTERNAL_ERROR`, `UNKNOWN`
 
+### Chat Mode Validation Errors
+
+The system enforces strict conversation mode consistency. These errors occur when attempting to violate mode or context rules:
+
+**`CONVERSATION_MODE_LOCKED`** - Occurs when:
+
+- Attempting to use page-scoped mode on a global conversation
+- Attempting to use global mode on a page-scoped conversation
+- Attempting to convert an existing global conversation to page-scoped
+
+**`CONTEXT_MISMATCH`** - Occurs when:
+
+- Attempting to use a different resource type in a page-scoped conversation
+- Attempting to use a different resource ID in a page-scoped conversation
+
+**`MISSING_REQUIRED_FIELD`** - Occurs when:
+
+- Using mode "page" without providing `pageContext`
+- Providing incomplete `pageContext` (missing `type` or `resourceId`)
+
+**Example Error Response:**
+
+```json
+{
+  "status": false,
+  "type": "validation_error",
+  "code": "conversation_mode_locked",
+  "message": "Conversation is page-scoped and must use mode \"page\""
+}
+```
+
+### Message Validation
+
+The `validateMessages()` method validates message history against tool schemas using the Vercel AI SDK. When validation fails:
+
+- A `TypeValidationError` is caught and logged
+- The system continues with empty message history to prevent request failure
+- Error is logged for monitoring: `"Database messages validation failed"`
+
+This graceful degradation ensures that:
+
+- Schema evolution doesn't break existing conversations
+- Users can continue chatting even if old messages are incompatible
+- System remains resilient to message format changes
+
 ## Exception Selection Guide
 
 Use this decision tree to choose the right exception class:

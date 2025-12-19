@@ -354,35 +354,58 @@ Deletes every conversation for the authenticated user.
 
 ---
 
-### Create Message
+### Create Messages
 
 ```http
 POST /chat/messages
 ```
 
-Manually creates a message in a conversation.
+Manually creates one or more messages in a conversation. All messages must belong to the same conversation.
 
 #### Request Body
 
+Accepts an array of message objects:
+
 ```json
-{
-  "conversationId": "550e8400-e29b-41d4-a716-446655440000",
-  "role": "user",
-  "parts": [{ "type": "text", "text": "How do I integrate payments?" }]
-}
+[
+  {
+    "id": "987fcdeb-51a2-43e7-b890-123456789abc",
+    "conversationId": "550e8400-e29b-41d4-a716-446655440000",
+    "role": "user",
+    "parts": [{ "type": "text", "text": "How do I integrate payments?" }]
+  }
+]
 ```
+
+#### Parameters
+
+| Parameter        | Type   | Required | Description                                    |
+| ---------------- | ------ | -------- | ---------------------------------------------- |
+| `id`             | UUID   | Yes      | Unique message identifier (UUID v4)            |
+| `conversationId` | UUID   | Yes      | Conversation UUID                              |
+| `role`           | string | Yes      | Message role: `user`, `assistant`, or `system` |
+| `parts`          | array  | Yes      | Message content parts                          |
 
 #### Response
 
 ```json
-{
-  "id": "message-uuid",
-  "conversationId": "550e8400-e29b-41d4-a716-446655440000",
-  "role": "user",
-  "parts": [{ "type": "text", "text": "How do I integrate payments?" }],
-  "createdAt": "2024-01-01T00:00:00.000Z"
-}
+[
+  {
+    "id": "987fcdeb-51a2-43e7-b890-123456789abc",
+    "conversationId": "550e8400-e29b-41d4-a716-446655440000",
+    "role": "user",
+    "parts": [{ "type": "text", "text": "How do I integrate payments?" }],
+    "createdAt": "2024-01-01T00:00:00.000Z"
+  }
+]
 ```
+
+#### Error Responses
+
+| Status | Code             | Description                                            |
+| ------ | ---------------- | ------------------------------------------------------ |
+| 400    | `invalid_params` | Invalid input or messages from different conversations |
+| 404    | `not_found`      | Conversation not found                                 |
 
 ---
 

@@ -11,8 +11,14 @@ import { Message, MessageRole } from './entities/message.entity';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
 import { PaystackApiService } from '~/common/services/paystack-api.service';
 import { PageContextService } from '~/common/services/page-context.service';
-import { MessageClassificationIntent, ChatResponseType, PageContextType } from '~/common/ai/types';
+import {
+  MessageClassificationIntent,
+  ChatResponseType,
+  PageContextType,
+  ClassificationUIMessage,
+} from '~/common/ai/types';
 import { NotFoundError } from '~/common';
+import { InferUIMessageChunk } from 'ai';
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-return
 jest.mock('~/common/ai/actions', () => ({
@@ -47,7 +53,6 @@ describe('ChatService', () => {
     parts: [{ type: 'text', text: 'Hello' }],
     createdAt: new Date('2024-01-01'),
     conversation: mockConversation,
-    generateId: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -72,6 +77,7 @@ describe('ChatService', () => {
       countUserMessagesInPeriod: jest.fn().mockResolvedValue(0),
       countUserMessagesByConversationId: jest.fn(),
       countUserMessagesAfterMessageId: jest.fn(),
+      findMessagesAfterMessageId: jest.fn(),
     };
 
     configService = {
@@ -281,6 +287,7 @@ describe('ChatService', () => {
           conversationId: mockMessage.conversationId,
           role: MessageRole.USER,
           parts: [{ type: 'text', text: 'Hello' }],
+          id: '589fcdeb-51a2-43e7-b890-123456789abc',
         },
       ];
 
@@ -318,11 +325,13 @@ describe('ChatService', () => {
           conversationId: '123e4567-e89b-12d3-a456-426614174000',
           role: MessageRole.USER,
           parts: [{ type: 'text', text: 'Hello' }],
+          id: '123e4567-e89b-12d3-a456-426614174000',
         },
         {
           conversationId: '987fcdeb-51a2-43e7-b890-123456789abc',
           role: MessageRole.USER,
           parts: [{ type: 'text', text: 'Hi' }],
+          id: '987fcdeb-51a2-43e7-b890-123456789abc',
         },
       ];
 
@@ -337,6 +346,7 @@ describe('ChatService', () => {
           conversationId: 'non-existent-id',
           role: MessageRole.USER,
           parts: [{ type: 'text', text: 'Hello' }],
+          id: '589fcdeb-51a2-43e7-b890-123456789abc',
         },
       ];
 
@@ -351,6 +361,7 @@ describe('ChatService', () => {
           conversationId: mockConversation.id,
           role: MessageRole.USER,
           parts: [{ type: 'text', text: 'Hello' }],
+          id: '589fcdeb-51a2-43e7-b890-123456789abc',
         },
       ];
 
@@ -365,6 +376,7 @@ describe('ChatService', () => {
           conversationId: mockConversation.id,
           role: MessageRole.USER,
           parts: [{ type: 'text', text: 'Hello' }],
+          id: '589fcdeb-51a2-43e7-b890-123456789abc',
         },
       ];
 
@@ -630,75 +642,408 @@ describe('ChatService', () => {
     });
   });
 
-  describe('Page-Scoped Chat', () => {
-    describe('buildPageScopedPrompt', () => {
-      it('should build prompt with transaction context', () => {
-        const enrichedContext = {
-          type: PageContextType.TRANSACTION,
-          resourceId: 'ref_123',
-          resourceData: { id: 123, reference: 'ref_123' },
-          formattedData: 'Transaction Details:\n- Reference: ref_123\n- Amount: NGN 1000.00',
-        };
+  describe('validateChatMode', () => {
+    it('should throw ValidationError when trying to use PAGE mode on a global conversation', () => {
+      const globalConversation = { ...mockConversation, pageContext: undefined };
 
-        const prompt = service['buildPageScopedPrompt'](enrichedContext);
-
-        expect(prompt).toContain('Transaction');
-        expect(prompt).toContain('Transaction Details');
-        expect(prompt).toContain('ref_123');
-      });
-
-      it('should build prompt with customer context', () => {
-        const enrichedContext = {
-          type: PageContextType.CUSTOMER,
-          resourceId: 'CUS_123',
-          resourceData: { customer_code: 'CUS_123', email: 'test@example.com' },
-          formattedData: 'Customer Details:\n- Customer Code: CUS_123\n- Email: test@example.com',
-        };
-
-        const prompt = service['buildPageScopedPrompt'](enrichedContext);
-
-        expect(prompt).toContain('Customer');
-        expect(prompt).toContain('Customer Details');
-        expect(prompt).toContain('CUS_123');
-      });
-
-      it('should include current date in prompt', () => {
-        const enrichedContext = {
-          type: PageContextType.TRANSACTION,
-          resourceId: 'ref_123',
-          resourceData: {},
-          formattedData: 'Transaction Details',
-        };
-
-        const prompt = service['buildPageScopedPrompt'](enrichedContext);
-        const currentDate = new Date().toISOString().split('T')[0];
-
-        expect(prompt).toContain(currentDate);
-      });
+      expect(() => {
+        service.validateChatMode(globalConversation, ChatMode.PAGE);
+      }).toThrow('Cannot change an existing conversation to a page-scoped context');
     });
 
-    describe('handleStreamingChat with ChatMode', () => {
-      beforeEach(() => {
-        jest.spyOn(conversationRepository, 'findById').mockResolvedValue(mockConversation);
-        jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(mockConversation);
-        jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue([]);
-        jest.spyOn(messageRepository, 'createMessage').mockResolvedValue(mockMessage);
-        jest.spyOn(messageRepository, 'countUserMessagesInPeriod').mockResolvedValue(0);
+    it('should throw ValidationError when page-scoped conversation is used without PAGE mode', () => {
+      const pageConversation = {
+        ...mockConversation,
+        pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_123' },
+      };
+
+      expect(() => {
+        service.validateChatMode(pageConversation, ChatMode.GLOBAL);
+      }).toThrow('Conversation is page-scoped and must use mode "page"');
+    });
+
+    it('should throw ValidationError when page-scoped mode is used but pageContext is missing', () => {
+      const pageConversation = {
+        ...mockConversation,
+        pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_123' },
+      };
+
+      expect(() => {
+        service.validateChatMode(pageConversation, ChatMode.PAGE);
+      }).toThrow('pageContext is required when mode is "page"');
+    });
+
+    it('should throw ValidationError when pageContext type differs from saved context', () => {
+      const pageConversation = {
+        ...mockConversation,
+        pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_123' },
+      };
+
+      expect(() => {
+        service.validateChatMode(pageConversation, ChatMode.PAGE, {
+          type: PageContextType.CUSTOMER,
+          resourceId: 'CUS_123',
+        });
+      }).toThrow('Conversation is locked to a different page context');
+    });
+
+    it('should throw ValidationError when pageContext resourceId differs from saved context', () => {
+      const pageConversation = {
+        ...mockConversation,
+        pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_123' },
+      };
+
+      expect(() => {
+        service.validateChatMode(pageConversation, ChatMode.PAGE, {
+          type: PageContextType.TRANSACTION,
+          resourceId: 'ref_456',
+        });
+      }).toThrow('Conversation is locked to a different page context');
+    });
+
+    it('should not throw when page context matches', () => {
+      const pageConversation = {
+        ...mockConversation,
+        pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_123' },
+      };
+
+      expect(() => {
+        service.validateChatMode(pageConversation, ChatMode.PAGE, {
+          type: PageContextType.TRANSACTION,
+          resourceId: 'ref_123',
+        });
+      }).not.toThrow();
+    });
+
+    it('should not throw when global conversation is used in global mode', () => {
+      const globalConversation = { ...mockConversation, pageContext: undefined };
+
+      expect(() => {
+        service.validateChatMode(globalConversation, ChatMode.GLOBAL);
+      }).not.toThrow();
+    });
+  });
+
+  describe('handleClosedConversation', () => {
+    it('should return a conversation closed response with appropriate stream', () => {
+      const result = service.handleClosedConversation();
+
+      expect(result).toBeDefined();
+      expect(result.type).toBe(ChatResponseType.CONVERSATION_CLOSED);
+      expect(result.responseStream).toBeDefined();
+    });
+
+    it('should include a message about starting a new conversation', async () => {
+      const result = service.handleClosedConversation();
+
+      const streamMessages: InferUIMessageChunk<ClassificationUIMessage>[] = [];
+      for await (const message of result.responseStream) {
+        streamMessages.push(message);
+      }
+
+      expect(streamMessages.length).toBeGreaterThan(0);
+      const dataRefusalMessage = streamMessages.find((message) => message.type === 'data-refusal');
+      expect(dataRefusalMessage).toBeDefined();
+      expect(dataRefusalMessage?.data?.text).toContain('This conversation has reached its limit');
+      expect(dataRefusalMessage?.data?.text).toContain('start a new conversation');
+    });
+  });
+
+  describe('buildPageScopedPrompt', () => {
+    it('should build prompt with transaction context', () => {
+      const enrichedContext = {
+        type: PageContextType.TRANSACTION,
+        resourceId: 'ref_123',
+        resourceData: { id: 123, reference: 'ref_123' },
+        formattedData: 'Transaction Details:\n- Reference: ref_123\n- Amount: NGN 1000.00',
+      };
+
+      const prompt = service['buildPageScopedPrompt'](enrichedContext);
+
+      expect(prompt).toContain('Transaction');
+      expect(prompt).toContain('Transaction Details');
+      expect(prompt).toContain('ref_123');
+    });
+
+    it('should build prompt with customer context', () => {
+      const enrichedContext = {
+        type: PageContextType.CUSTOMER,
+        resourceId: 'CUS_123',
+        resourceData: { customer_code: 'CUS_123', email: 'test@example.com' },
+        formattedData: 'Customer Details:\n- Customer Code: CUS_123\n- Email: test@example.com',
+      };
+
+      const prompt = service['buildPageScopedPrompt'](enrichedContext);
+
+      expect(prompt).toContain('Customer');
+      expect(prompt).toContain('Customer Details');
+      expect(prompt).toContain('CUS_123');
+    });
+
+    it('should include current date in prompt', () => {
+      const enrichedContext = {
+        type: PageContextType.TRANSACTION,
+        resourceId: 'ref_123',
+        resourceData: {},
+        formattedData: 'Transaction Details',
+      };
+
+      const prompt = service['buildPageScopedPrompt'](enrichedContext);
+      const currentDate = new Date().toISOString().split('T')[0];
+
+      expect(prompt).toContain(currentDate);
+    });
+  });
+
+  describe('getSystemPromptAndTools', () => {
+    const mockPageContextService = jest.fn();
+    const mockGetAuthenticatedUser = () => ({
+      userId: 'user_123',
+      jwtToken: 'mock-jwt-token',
+    });
+
+    beforeEach(() => {
+      mockPageContextService.mockClear();
+    });
+
+    it('should return global system prompt and tools when mode is GLOBAL', async () => {
+      const result = await service.getSystemPromptAndTools(ChatMode.GLOBAL, mockGetAuthenticatedUser);
+
+      expect(result.systemPrompt).toBeDefined();
+      expect(result.tools).toBeDefined();
+      expect(typeof result.tools).toBe('object');
+    });
+
+    it('should throw ValidationError when mode is PAGE but pageContext is missing', async () => {
+      await expect(service.getSystemPromptAndTools(ChatMode.PAGE, mockGetAuthenticatedUser, undefined)).rejects.toThrow(
+        'pageContext is required when mode is "page"',
+      );
+    });
+
+    it('should return page-scoped system prompt and tools when mode is PAGE with valid context', async () => {
+      const pageContext = { type: PageContextType.TRANSACTION, resourceId: 'ref_123' };
+      const enrichedContext = {
+        type: PageContextType.TRANSACTION,
+        resourceId: 'ref_123',
+        resourceData: { id: 123, reference: 'ref_123' },
+        formattedData: 'Transaction Details:\n- Reference: ref_123',
+      };
+
+      const pageContextService = service['pageContextService'];
+      jest.spyOn(pageContextService, 'enrichContext').mockResolvedValue(enrichedContext);
+
+      const result = await service.getSystemPromptAndTools(ChatMode.PAGE, mockGetAuthenticatedUser, pageContext);
+
+      expect(pageContextService.enrichContext).toHaveBeenCalledWith(pageContext, 'mock-jwt-token');
+      expect(result.systemPrompt).toBeDefined();
+      expect(result.systemPrompt).toContain('Transaction');
+      expect(result.systemPrompt).toContain('ref_123');
+      expect(result.tools).toBeDefined();
+      expect(typeof result.tools).toBe('object');
+    });
+
+    it('should include current date in both global and page-scoped prompts', async () => {
+      const currentDate = new Date().toISOString().split('T')[0];
+
+      // Test global mode
+      const globalResult = await service.getSystemPromptAndTools(ChatMode.GLOBAL, mockGetAuthenticatedUser);
+      expect(globalResult.systemPrompt).toContain(currentDate);
+
+      // Test page-scoped mode
+      const pageContext = { type: PageContextType.TRANSACTION, resourceId: 'ref_123' };
+      const enrichedContext = {
+        type: PageContextType.TRANSACTION,
+        resourceId: 'ref_123',
+        resourceData: {},
+        formattedData: 'Transaction Details',
+      };
+
+      const pageContextService = service['pageContextService'];
+      jest.spyOn(pageContextService, 'enrichContext').mockResolvedValue(enrichedContext);
+
+      const pageResult = await service.getSystemPromptAndTools(ChatMode.PAGE, mockGetAuthenticatedUser, pageContext);
+      expect(pageResult.systemPrompt).toContain(currentDate);
+    });
+  });
+
+  describe('buildMessagesForLLM', () => {
+    const currentUserMessage = {
+      id: 'current-msg',
+      role: 'user' as const,
+      parts: [{ type: 'text' as const, text: 'What is my current balance?' }],
+    };
+
+    it('should include only the current message when no conversation history exists', async () => {
+      const conversation = { ...mockConversation, pageContext: undefined };
+      jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue([]);
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(conversation);
+
+      const result = await service['buildMessagesForLLM'](
+        conversation,
+        conversation.id,
+        conversation.userId,
+        currentUserMessage,
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual(currentUserMessage);
+    });
+
+    it('should prepend summary message when conversation has a summary', async () => {
+      const conversation = {
+        ...mockConversation,
+        pageContext: undefined,
+        summary: 'Previously discussed transaction fees.',
+      };
+
+      jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue([]);
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(conversation);
+
+      const result = await service['buildMessagesForLLM'](
+        conversation,
+        conversation.id,
+        conversation.userId,
+        currentUserMessage,
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0].id).toBe('summary-context');
+      expect(result[0].role).toBe('assistant');
+      const summaryPart = result[0].parts[0] as { type: 'text'; text: string };
+      expect(summaryPart.text).toContain('Earlier in this conversation');
+      expect(summaryPart.text).toContain('Previously discussed transaction fees.');
+      expect(result[1]).toEqual(currentUserMessage);
+    });
+
+    it('should include both previousSummary and summary when both exist', async () => {
+      const conversation = {
+        ...mockConversation,
+        pageContext: undefined,
+        previousSummary: 'Carried over from closed conversation.',
+        summary: 'Current conversation summary.',
+      };
+
+      jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue([]);
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(conversation);
+
+      const result = await service['buildMessagesForLLM'](
+        conversation,
+        conversation.id,
+        conversation.userId,
+        currentUserMessage,
+      );
+
+      expect(result).toHaveLength(2);
+      const summaryPart = result[0].parts[0] as { type: 'text'; text: string };
+      expect(summaryPart.text).toContain('Carried over from previous conversation');
+      expect(summaryPart.text).toContain('Carried over from closed conversation.');
+      expect(summaryPart.text).toContain('Earlier in this conversation');
+      expect(summaryPart.text).toContain('Current conversation summary.');
+    });
+
+    it('should fetch messages after lastSummarizedMessageId when it exists', async () => {
+      const conversation = {
+        ...mockConversation,
+        pageContext: undefined,
+        summary: 'Conversation summary.',
+        lastSummarizedMessageId: 'msg-10',
+      };
+
+      const recentMessages = [
+        {
+          ...mockMessage,
+          id: 'msg-11',
+          role: MessageRole.USER,
+          parts: [{ type: 'text' as const, text: 'Recent message' }],
+        },
+      ];
+
+      jest.spyOn(messageRepository, 'findMessagesAfterMessageId').mockResolvedValue(recentMessages);
+
+      const result = await service['buildMessagesForLLM'](
+        conversation,
+        conversation.id,
+        conversation.userId,
+        currentUserMessage,
+      );
+
+      expect(messageRepository.findMessagesAfterMessageId).toHaveBeenCalledWith(conversation.id, 'msg-10');
+      expect(result).toHaveLength(3); // summary + recent message + current message
+      expect(result[0].id).toBe('summary-context');
+      expect(result[1].id).toBe('msg-11');
+      expect(result[2]).toEqual(currentUserMessage);
+    });
+
+    it('should limit messages to MESSAGE_HISTORY_LIMIT when no summary exists', async () => {
+      const conversation = { ...mockConversation, pageContext: undefined };
+
+      const manyMessages = Array.from({ length: 50 }, (_, i) => ({
+        ...mockMessage,
+        id: `msg-${i}`,
+        role: i % 2 === 0 ? MessageRole.USER : MessageRole.ASSISTANT,
+        parts: [{ type: 'text' as const, text: `Message ${i}` }],
+      }));
+
+      jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue(manyMessages);
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(conversation);
+
+      configService.get.mockImplementation((key: string, defaultValue?: unknown) => {
+        if (key === 'MESSAGE_HISTORY_LIMIT') return 40;
+        return defaultValue;
       });
 
-      it('should throw ValidationError when mode is PAGE but pageContext is missing', async () => {
-        await expect(
-          service.handleStreamingChat(
-            {
-              conversationId: mockConversation.id,
-              message: { id: '123', role: MessageRole.USER, parts: [{ type: 'text', text: 'hi' }] },
-              mode: ChatMode.PAGE,
-            },
-            mockConversation.userId,
-            'mock-jwt-token',
-          ),
-        ).rejects.toThrow('pageContext is required when mode is "page"');
-      });
+      const result = await service['buildMessagesForLLM'](
+        conversation,
+        conversation.id,
+        conversation.userId,
+        currentUserMessage,
+      );
+
+      // Should have last 40 messages + current message = 41 total
+      expect(result).toHaveLength(41);
+      expect(result[0].id).toBe('msg-10'); // Last 40 messages start from msg-10
+      expect(result[40]).toEqual(currentUserMessage);
+    });
+
+    it('should combine summary, recent messages, and current message correctly', async () => {
+      const conversation = {
+        ...mockConversation,
+        pageContext: undefined,
+        summary: 'Summary of older messages.',
+        lastSummarizedMessageId: 'msg-5',
+      };
+
+      const recentMessages = [
+        {
+          ...mockMessage,
+          id: 'msg-6',
+          role: MessageRole.USER,
+          parts: [{ type: 'text' as const, text: 'Recent question' }],
+        },
+        {
+          ...mockMessage,
+          id: 'msg-7',
+          role: MessageRole.ASSISTANT,
+          parts: [{ type: 'text' as const, text: 'Recent answer' }],
+        },
+      ];
+
+      jest.spyOn(messageRepository, 'findMessagesAfterMessageId').mockResolvedValue(recentMessages);
+
+      const result = await service['buildMessagesForLLM'](
+        conversation,
+        conversation.id,
+        conversation.userId,
+        currentUserMessage,
+      );
+
+      expect(result).toHaveLength(4);
+      expect(result[0].id).toBe('summary-context');
+      const summaryPart = result[0].parts[0] as { type: 'text'; text: string };
+      expect(summaryPart.text).toContain('Summary of older messages.');
+      expect(result[1].id).toBe('msg-6');
+      expect(result[2].id).toBe('msg-7');
+      expect(result[3]).toEqual(currentUserMessage);
     });
   });
 });

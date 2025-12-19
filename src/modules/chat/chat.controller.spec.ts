@@ -192,6 +192,7 @@ describe('ChatController', () => {
           conversationId: mockMessageResponse.conversationId,
           role: MessageRole.USER,
           parts: [{ type: 'text', text: 'Hello' }],
+          id: '589fcdeb-51a2-43e7-b890-123456789abc',
         },
       ];
 

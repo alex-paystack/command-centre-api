@@ -13,6 +13,14 @@ export class CreateMessageDto {
   conversationId: string;
 
   @ApiProperty({
+    description: 'Message UUID',
+    example: '987fcdeb-51a2-43e7-b890-123456789abc',
+  })
+  @IsUUID()
+  @IsNotEmpty()
+  id: string;
+
+  @ApiProperty({
     description: 'Message role',
     enum: MessageRole,
     example: MessageRole.USER,

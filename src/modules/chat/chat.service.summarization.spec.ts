@@ -10,7 +10,14 @@ import { Conversation } from './entities/conversation.entity';
 import { PaystackApiService } from '~/common/services/paystack-api.service';
 import { PageContextService } from '~/common/services/page-context.service';
 import { CreateConversationFromSummaryDto } from './dto/create-conversation-from-summary.dto';
-import { Message } from './entities/message.entity';
+import { Message, MessageRole } from './entities/message.entity';
+
+// Mock the summarizeConversation function
+// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+jest.mock('~/common/ai/actions', () => ({
+  ...jest.requireActual('~/common/ai/actions'),
+  summarizeConversation: jest.fn(),
+}));
 
 describe('ChatService - Summarization', () => {
   let service: ChatService;
@@ -244,6 +251,125 @@ describe('ChatService - Summarization', () => {
       );
       expect(result.mode).toBe(ChatMode.PAGE);
       expect(result.pageContext).toEqual(dto.pageContext);
+    });
+  });
+
+  describe('handleMessageSummarization', () => {
+    it('should not trigger summarization when message count is below threshold', async () => {
+      const conversation = { ...mockOpenConversation };
+      jest.spyOn(messageRepository, 'countUserMessagesByConversationId').mockResolvedValue(10);
+      jest.spyOn(conversationRepository, 'save').mockResolvedValue(conversation);
+
+      await service.handleMessageSummarization(conversation, 'user_123', []);
+
+      // Should not call save since we haven't reached the threshold
+      expect(conversationRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should trigger summarization when message count reaches threshold', async () => {
+      const conversation = { ...mockOpenConversation };
+      const mockMessages = Array.from({ length: 20 }, (_, i) => ({
+        _id: {} as Message['_id'],
+        id: `msg-${i}`,
+        conversationId: conversation.id,
+        role: i % 2 === 0 ? MessageRole.USER : MessageRole.ASSISTANT,
+        parts: [{ type: 'text' as const, text: `Message ${i}` }],
+        createdAt: new Date(),
+        conversation,
+      }));
+
+      jest.spyOn(messageRepository, 'countUserMessagesByConversationId').mockResolvedValue(20);
+      jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue(mockMessages);
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(conversation);
+      jest.spyOn(conversationRepository, 'save').mockResolvedValue({ ...conversation, summaryCount: 1 });
+
+      // Mock the summarizeConversation to return a summary
+      const { summarizeConversation } = await import('~/common/ai/actions');
+      (summarizeConversation as jest.Mock).mockResolvedValue('This is a summary of the conversation.');
+
+      await service.handleMessageSummarization(conversation, 'user_123', []);
+
+      expect(messageRepository.countUserMessagesByConversationId).toHaveBeenCalledWith(conversation.id);
+    });
+
+    it('should only summarize messages after lastSummarizedMessageId', async () => {
+      const conversation = {
+        ...mockOpenConversation,
+        lastSummarizedMessageId: 'msg-10',
+        summaryCount: 1,
+      };
+
+      jest.spyOn(messageRepository, 'countUserMessagesAfterMessageId').mockResolvedValue(20);
+      jest.spyOn(messageRepository, 'findMessagesAfterMessageId').mockResolvedValue([]);
+      jest.spyOn(conversationRepository, 'save').mockResolvedValue(conversation);
+
+      await service.handleMessageSummarization(conversation, 'user_123', []);
+
+      expect(messageRepository.countUserMessagesAfterMessageId).toHaveBeenCalledWith(conversation.id, 'msg-10');
+    });
+
+    it('should close conversation after reaching max summaries', async () => {
+      const conversation = {
+        ...mockOpenConversation,
+        summaryCount: 1,
+      };
+
+      const mockMessageResponses = Array.from({ length: 20 }, (_, i) => ({
+        id: `msg-${i}`,
+        conversationId: conversation.id,
+        role: i % 2 === 0 ? MessageRole.USER : MessageRole.ASSISTANT,
+        parts: [{ type: 'text' as const, text: `Message ${i}` }],
+        createdAt: new Date(),
+      }));
+
+      jest.spyOn(messageRepository, 'countUserMessagesByConversationId').mockResolvedValue(20);
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(conversation);
+      jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue(
+        mockMessageResponses.map((messageResponse) => ({
+          ...messageResponse,
+          _id: {} as Message['_id'],
+          conversation,
+        })),
+      );
+
+      const savedConversation = { ...conversation, summaryCount: 2, isClosed: true };
+      jest.spyOn(conversationRepository, 'save').mockResolvedValue(savedConversation);
+
+      const { summarizeConversation } = await import('~/common/ai/actions');
+      (summarizeConversation as jest.Mock).mockResolvedValue('Second summary.');
+
+      await service.handleMessageSummarization(conversation, 'user_123', []);
+
+      expect(conversationRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          summaryCount: 2,
+          isClosed: true,
+        }),
+      );
+    });
+
+    it('should not fail the request if summarization fails', async () => {
+      const conversation = { ...mockOpenConversation };
+      const mockMessages = Array.from({ length: 20 }, (_, i) => ({
+        _id: {} as Message['_id'],
+        id: `msg-${i}`,
+        conversationId: conversation.id,
+        role: i % 2 === 0 ? MessageRole.USER : MessageRole.ASSISTANT,
+        parts: [{ type: 'text' as const, text: `Message ${i}` }],
+        createdAt: new Date(),
+        conversation,
+      }));
+
+      jest.spyOn(messageRepository, 'countUserMessagesByConversationId').mockResolvedValue(20);
+      jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue(mockMessages);
+      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(conversation);
+      jest.spyOn(conversationRepository, 'save').mockResolvedValue(conversation);
+
+      const { summarizeConversation } = await import('~/common/ai/actions');
+      (summarizeConversation as jest.Mock).mockRejectedValue(new Error('AI service unavailable'));
+
+      // Should not throw
+      await expect(service.handleMessageSummarization(conversation, 'user_123', [])).resolves.toBeUndefined();
     });
   });
 
