@@ -16,6 +16,7 @@ export const ErrorCodes = {
   INVALID_AGGREGATION_TYPE: ResponseCode.INVALID_PARAMS,
   INVALID_DATE_RANGE: ResponseCode.INVALID_PARAMS,
   INVALID_STATUS: ResponseCode.INVALID_PARAMS,
+  INVALID_CHANNEL: ResponseCode.INVALID_PARAMS,
   MISSING_REQUIRED_FIELD: ResponseCode.INVALID_PARAMS,
 
   // Business logic errors

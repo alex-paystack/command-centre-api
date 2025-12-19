@@ -153,19 +153,9 @@ export class SavedChartService {
     });
 
     if (!validation.isValid) {
-      // Map common error messages to existing error codes where possible
-      const message = validation.error;
-      let code = ErrorCodes.INVALID_PARAMS;
+      const { error, code } = validation;
 
-      if (message.includes('aggregation type')) {
-        code = ErrorCodes.INVALID_AGGREGATION_TYPE;
-      } else if (message.includes('status')) {
-        code = ErrorCodes.INVALID_STATUS;
-      } else if (message.toLowerCase().includes('date')) {
-        code = ErrorCodes.INVALID_DATE_RANGE;
-      }
-
-      throw new ValidationError(message, code);
+      throw new ValidationError(error, code);
     }
   }
 }

@@ -587,11 +587,11 @@ describe('Aggregation Functions', () => {
     });
 
     it('should aggregate transactions by channel', () => {
-      const cardTx = createMockTransaction(1000, '2024-12-10T10:30:00Z');
-      const bankTx = { ...createMockTransaction(2000, '2024-12-11T10:30:00Z'), channel: PaymentChannel.BANK };
-      const ussdTx = { ...createMockTransaction(3000, '2024-12-12T10:30:00Z'), channel: PaymentChannel.USSD };
+      const cardTransaction = createMockTransaction(1000, '2024-12-10T10:30:00Z');
+      const bankTransaction = { ...createMockTransaction(2000, '2024-12-11T10:30:00Z'), channel: PaymentChannel.BANK };
+      const ussdTransaction = { ...createMockTransaction(3000, '2024-12-12T10:30:00Z'), channel: PaymentChannel.USSD };
 
-      const result = aggregateByChannel([cardTx, bankTx, ussdTx]);
+      const result = aggregateByChannel([cardTransaction, bankTransaction, ussdTransaction]);
 
       expect(result).toHaveLength(3);
       expect(result.find((d) => d.name === PaymentChannel.CARD.toString())).toMatchObject({
@@ -618,10 +618,10 @@ describe('Aggregation Functions', () => {
     });
 
     it('should sort channels alphabetically', () => {
-      const cardTx = createMockTransaction(1000, '2024-12-10T10:30:00Z');
-      const bankTx = { ...createMockTransaction(2000, '2024-12-11T10:30:00Z'), channel: PaymentChannel.BANK };
+      const cardTransaction = createMockTransaction(1000, '2024-12-10T10:30:00Z');
+      const bankTransaction = { ...createMockTransaction(2000, '2024-12-11T10:30:00Z'), channel: PaymentChannel.BANK };
 
-      const result = aggregateByChannel([cardTx, bankTx]);
+      const result = aggregateByChannel([cardTransaction, bankTransaction]);
 
       expect(result.map((r) => r.name)).toEqual([PaymentChannel.BANK, PaymentChannel.CARD]);
     });

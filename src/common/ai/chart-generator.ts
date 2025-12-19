@@ -103,6 +103,7 @@ export async function* generateChartData(
   }
 
   const validation = validateChartParams({ resourceType, aggregationType, status, from, to, channel });
+
   if (!validation.isValid) {
     const errorState: ChartErrorState = { error: validation.error };
     yield errorState;

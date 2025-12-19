@@ -1,3 +1,4 @@
+import { ErrorCodes } from '..';
 import {
   AggregationType,
   ChartResourceType,
@@ -17,7 +18,13 @@ export type ChartValidationParams = {
   channel?: PaymentChannel;
 };
 
-export type ChartValidationResult = { isValid: true } | { isValid: false; error: string };
+export type ValidationError = {
+  isValid: false;
+  error: string;
+  code: (typeof ErrorCodes)[keyof typeof ErrorCodes];
+};
+
+export type ChartValidationResult = { isValid: true } | ValidationError;
 
 /**
  * Shared validator for chart configuration used by chart generation and saved charts.
@@ -29,6 +36,7 @@ export function validateChartParams(params: ChartValidationParams): ChartValidat
     return {
       isValid: false,
       error: `Invalid aggregation type '${aggregationType}' for resource type '${resourceType}'. Valid options are: ${getValidAggregationList(resourceType)}`,
+      code: ErrorCodes.INVALID_AGGREGATION_TYPE,
     };
   }
 
@@ -36,6 +44,7 @@ export function validateChartParams(params: ChartValidationParams): ChartValidat
     return {
       isValid: false,
       error: `Invalid status '${status}' for resource type '${resourceType}'. Valid options are: ${STATUS_VALUES[resourceType].join(', ')}`,
+      code: ErrorCodes.INVALID_STATUS,
     };
   }
 
@@ -44,6 +53,7 @@ export function validateChartParams(params: ChartValidationParams): ChartValidat
       return {
         isValid: false,
         error: `Channel filter is only supported for transactions. Received resource type '${resourceType}'.`,
+        code: ErrorCodes.INVALID_AGGREGATION_TYPE,
       };
     }
 
@@ -51,13 +61,16 @@ export function validateChartParams(params: ChartValidationParams): ChartValidat
       return {
         isValid: false,
         error: `Invalid channel '${channel}'. Valid options are: ${Object.values(PaymentChannel).join(', ')}`,
+        code: ErrorCodes.INVALID_CHANNEL,
       };
     }
   }
 
+  // Validate date range does not exceed 30 days
   const dateValidation = validateDateRange(from, to);
+
   if (!dateValidation.isValid) {
-    return { isValid: false, error: dateValidation.error ?? 'Invalid date range' };
+    return { isValid: false, error: dateValidation.error ?? 'Invalid date range', code: ErrorCodes.INVALID_DATE_RANGE };
   }
 
   return { isValid: true };
