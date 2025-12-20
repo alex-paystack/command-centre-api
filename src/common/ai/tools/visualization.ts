@@ -30,11 +30,11 @@ Returns Recharts-compatible data with count, volume, and average metrics.`,
         .default(ChartResourceType.TRANSACTION)
         .describe('Type of resource to generate chart data for (default: transaction)'),
       aggregationType: z
-
         .enum(Object.values(AggregationType))
         .describe(
           'Type of aggregation. Time-based (by-day, by-hour, by-week, by-month) and by-status work for all resources. by-channel is for transactions only. by-type is for refunds only. by-category and by-resolution are for disputes only.',
-        ),
+        )
+        .default(AggregationType.BY_DAY),
       from: z.string().optional().describe('Start date for filtering (ISO 8601 format, e.g., 2024-01-01)'),
       to: z.string().optional().describe('End date for filtering (ISO 8601 format, e.g., 2024-12-31)'),
       status: z.string().optional().describe('Filter by status (values depend on resource type)'),

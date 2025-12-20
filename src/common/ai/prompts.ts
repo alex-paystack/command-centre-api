@@ -63,7 +63,7 @@ You have access to the following data retrieval, export, and visualization tools
 
 **Data Visualization Tool:**
 10. **generateChartData** - Generate chart-ready data for analytics on transactions, refunds, payouts, or disputes
-   - **When to use**: When users ask for trends, patterns, visual representations, or time-based analysis
+   - **When to use**: When users ask for trends, patterns, visual representations, or time-based analysis -- generate only one chart per user request
    - **Resource types available**: transaction (default), refund, payout, dispute
    - **Aggregation types by resource**:
      - **All resources**: by-day, by-hour, by-week, by-month, by-status
