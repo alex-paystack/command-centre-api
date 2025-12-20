@@ -10,6 +10,7 @@ import {
 import { getTextFromMessage, getTextFromMessages, buildClassifierConversation } from './utils';
 import { z } from 'zod';
 import { MessageClassificationIntent, PageContext } from './types';
+import { LangfuseRuntime } from '~/common/observability/langfuse.runtime';
 
 /**
  * Generate a conversation title from a message
@@ -19,16 +20,31 @@ import { MessageClassificationIntent, PageContext } from './types';
  * @returns A generated title or a fallback if generation fails
  */
 export async function generateConversationTitle(message: UIMessage) {
+  const generation = LangfuseRuntime.startGeneration({
+    name: 'chat.title',
+    model: 'gpt-3.5-turbo',
+    input: {
+      message: getTextFromMessage(message),
+    },
+  });
   try {
-    const { text } = await generateText({
+    const { text, usage } = await generateText({
       model: openai('gpt-3.5-turbo'),
       system: CONVERSATION_TITLE_GENERATION_PROMPT,
       prompt: getTextFromMessage(message),
     });
 
     const title = text.trim();
+    LangfuseRuntime.endGeneration(generation, {
+      output: { title },
+      usage: LangfuseRuntime.mapUsage(usage as Record<string, number>),
+    });
     return title || 'New Conversation';
   } catch (error) {
+    LangfuseRuntime.endGeneration(generation, {
+      level: 'ERROR',
+      statusMessage: error instanceof Error ? error.message : String(error),
+    });
     // eslint-disable-next-line no-console
     console.error('Error generating conversation title:', error);
     return 'New Conversation';
@@ -44,22 +60,39 @@ export async function generateConversationTitle(message: UIMessage) {
  * @returns A generated summary or empty string if generation fails
  */
 export async function summarizeConversation(messages: UIMessage[], existingSummary?: string) {
+  const conversationText = getTextFromMessages(messages);
+  const generation = LangfuseRuntime.startGeneration({
+    name: 'chat.summarize',
+    model: 'gpt-4o-mini',
+    input: {
+      existingSummary,
+      conversationText,
+    },
+  });
   try {
-    const conversationText = getTextFromMessages(messages);
     let prompt = conversationText;
 
     if (existingSummary) {
       prompt = `Previous Summary:\n${existingSummary}\n\n---\n\nNew Messages to Incorporate:\n${conversationText}`;
     }
 
-    const { text } = await generateText({
+    const { text, usage } = await generateText({
       model: openai('gpt-4o-mini'),
       system: CONVERSATION_SUMMARY_PROMPT,
       prompt,
     });
 
-    return text.trim();
+    const summary = text.trim();
+    LangfuseRuntime.endGeneration(generation, {
+      output: { summary },
+      usage: LangfuseRuntime.mapUsage(usage as Record<string, number>),
+    });
+    return summary;
   } catch (error) {
+    LangfuseRuntime.endGeneration(generation, {
+      level: 'ERROR',
+      statusMessage: error instanceof Error ? error.message : String(error),
+    });
     // eslint-disable-next-line no-console
     console.error('Error generating conversation summary:', error);
     return '';
@@ -82,6 +115,16 @@ const ClassifierSchema = z.object({
  * @returns The classified intent
  */
 export async function classifyMessage(messages: UIMessage[], pageContext?: PageContext) {
+  const { formattedConversation, latestUserMessage } = buildClassifierConversation(messages);
+  const generation = LangfuseRuntime.startGeneration({
+    name: 'chat.classify',
+    model: 'gpt-4o-mini',
+    input: {
+      formattedConversation,
+      latestUserMessage,
+      pageContext,
+    },
+  });
   try {
     let systemPrompt = CLASSIFIER_SYSTEM_PROMPT;
 
@@ -89,9 +132,7 @@ export async function classifyMessage(messages: UIMessage[], pageContext?: PageC
       systemPrompt = PAGE_SCOPED_CLASSIFIER_SYSTEM_PROMPT.replace(/\{\{RESOURCE_TYPE\}\}/g, pageContext.type);
     }
 
-    const { formattedConversation, latestUserMessage } = buildClassifierConversation(messages);
-
-    const { object } = await generateObject({
+    const { object, usage } = await generateObject({
       model: openai('gpt-4o-mini'),
       temperature: 0,
       schema: ClassifierSchema,
@@ -99,8 +140,22 @@ export async function classifyMessage(messages: UIMessage[], pageContext?: PageC
       prompt: getClassifierUserPrompt(formattedConversation, latestUserMessage),
     });
 
+    LangfuseRuntime.endGeneration(generation, {
+      output: object,
+      usage: LangfuseRuntime.mapUsage(usage as Record<string, number>),
+      metadata: {
+        pageContextType: pageContext?.type,
+      },
+    });
     return object;
   } catch (error) {
+    LangfuseRuntime.endGeneration(generation, {
+      level: 'ERROR',
+      statusMessage: error instanceof Error ? error.message : String(error),
+      metadata: {
+        pageContextType: pageContext?.type,
+      },
+    });
     // eslint-disable-next-line no-console
     console.error('Error classifying message:', error);
     return {

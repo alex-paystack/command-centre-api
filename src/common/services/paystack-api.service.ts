@@ -4,6 +4,7 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
 import { PaystackError } from '../helpers/paystack.error';
+import { LangfuseRuntime } from '~/common/observability/langfuse.runtime';
 
 export interface PaystackApiResponse<T = unknown> {
   status: boolean;
@@ -41,6 +42,16 @@ export class PaystackApiService {
     jwtToken: string,
     params?: Record<string, unknown>,
   ): Promise<PaystackApiResponse<T>> {
+    const span = LangfuseRuntime.startSpan({
+      name: 'paystack.get',
+      input: {
+        endpoint,
+        params,
+      },
+      metadata: {
+        baseUrl: this.baseUrl,
+      },
+    });
     try {
       const response = await firstValueFrom(
         this.httpService.get<PaystackApiResponse<T>>(`${this.baseUrl}${endpoint}`, {
@@ -53,8 +64,15 @@ export class PaystackApiService {
         }),
       );
 
+      LangfuseRuntime.endSpan(span, {
+        output: LangfuseRuntime.summarizePaystackResponse(response.data),
+      });
       return response.data;
     } catch (error) {
+      LangfuseRuntime.endSpan(span, {
+        level: 'ERROR',
+        statusMessage: error instanceof Error ? error.message : 'Paystack GET failed',
+      });
       this.handleError(error);
     }
   }
@@ -70,6 +88,16 @@ export class PaystackApiService {
     jwtToken: string,
     data?: Record<string, unknown>,
   ): Promise<PaystackApiResponse<T>> {
+    const span = LangfuseRuntime.startSpan({
+      name: 'paystack.post',
+      input: {
+        endpoint,
+        data,
+      },
+      metadata: {
+        baseUrl: this.baseUrl,
+      },
+    });
     try {
       const response = await firstValueFrom(
         this.httpService.post<PaystackApiResponse<T>>(`${this.baseUrl}${endpoint}`, data, {
@@ -81,8 +109,15 @@ export class PaystackApiService {
         }),
       );
 
+      LangfuseRuntime.endSpan(span, {
+        output: LangfuseRuntime.summarizePaystackResponse(response.data),
+      });
       return response.data;
     } catch (error) {
+      LangfuseRuntime.endSpan(span, {
+        level: 'ERROR',
+        statusMessage: error instanceof Error ? error.message : 'Paystack POST failed',
+      });
       this.handleError(error);
     }
   }

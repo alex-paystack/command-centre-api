@@ -9,9 +9,10 @@ import { ChatService } from './chat.service';
 import { ChatController } from './chat.controller';
 import { PageContextService } from '~/common/services/page-context.service';
 import { PaystackModule } from '~/common/services/paystack.module';
+import { LangfuseModule } from '~/common/observability/langfuse.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Conversation, Message]), ConfigModule, PaystackModule],
+  imports: [TypeOrmModule.forFeature([Conversation, Message]), ConfigModule, PaystackModule, LangfuseModule],
   providers: [ConversationRepository, MessageRepository, PageContextService, ChatService],
   controllers: [ChatController],
   exports: [ChatService],

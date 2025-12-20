@@ -56,31 +56,65 @@ DEBUG=false
 OTEL_LOGS_EXPORTER=console
 OTEL_TRACES_EXPORTER=console
 OTEL_METRICS_EXPORTER=console
+
+# Langfuse Observability (optional)
+LANGFUSE_ENABLED=false
+LANGFUSE_PUBLIC_KEY=
+LANGFUSE_SECRET_KEY=
+LANGFUSE_BASE_URL=https://cloud.langfuse.com
+LANGFUSE_FLUSH_INTERVAL=5000
+LANGFUSE_FLUSH_AT=15
+LANGFUSE_REQUEST_TIMEOUT=10000
+LANGFUSE_SAMPLE_RATE=1.0
+LANGFUSE_MASK_INPUTS=false
+LANGFUSE_MASK_OUTPUTS=false
+LANGFUSE_TOOL_OUTPUT_MODE=summary
+LANGFUSE_TOOL_OUTPUT_OVERRIDES=
 ```
 
 ### Variable Reference
 
-| Variable                  | Required | Default                          | Description                             |
-| ------------------------- | -------- | -------------------------------- | --------------------------------------- |
-| `DATABASE_HOST`           | Yes      | -                                | MongoDB host                            |
-| `DATABASE_USERNAME`       | Yes      | -                                | MongoDB username                        |
-| `DATABASE_PASSWORD`       | Yes      | -                                | MongoDB password                        |
-| `DATABASE_NAME`           | Yes      | -                                | Database name                           |
-| `OPENAI_API_KEY`          | Yes      | -                                | OpenAI API key (starts with `sk-`)      |
-| `JWT_SECRET`              | Yes      | -                                | Secret for JWT signing                  |
-| `JWT_EXPIRES_IN`          | No       | `24h`                            | JWT expiration time                     |
-| `NODE_ENV`                | No       | `development`                    | Environment mode                        |
-| `APP_NAME`                | No       | `command-centre-api`             | Application name                        |
-| `APP_VERSION`             | No       | `1.0.0`                          | Application version                     |
-| `PAYSTACK_API_BASE_URL`   | No       | `https://studio-api.paystack.co` | Paystack API base URL                   |
-| `MESSAGE_LIMIT`           | No       | `100`                            | Rate limit message count                |
-| `RATE_LIMIT_PERIOD_HOURS` | No       | `24`                             | Rate limit time window                  |
-| `MESSAGE_HISTORY_LIMIT`   | No       | `40`                             | AI context message limit                |
-| `CONVERSATION_TTL_DAYS`   | No       | `3`                              | Inactivity days before auto-deletion    |
-| `SUMMARIZATION_THRESHOLD` | No       | `20`                             | User messages before summarization      |
-| `MAX_SUMMARIES`           | No       | `2`                              | Max summaries before conversation close |
-| `LOG_LEVEL`               | No       | `info`                           | Logging verbosity                       |
-| `OTEL_SERVICE_NAME`       | No       | `command-centre-api`             | OpenTelemetry service name              |
+| Variable                         | Required | Default                          | Description                             |
+| -------------------------------- | -------- | -------------------------------- | --------------------------------------- |
+| `DATABASE_HOST`                  | Yes      | -                                | MongoDB host                            |
+| `DATABASE_USERNAME`              | Yes      | -                                | MongoDB username                        |
+| `DATABASE_PASSWORD`              | Yes      | -                                | MongoDB password                        |
+| `DATABASE_NAME`                  | Yes      | -                                | Database name                           |
+| `OPENAI_API_KEY`                 | Yes      | -                                | OpenAI API key (starts with `sk-`)      |
+| `JWT_SECRET`                     | Yes      | -                                | Secret for JWT signing                  |
+| `JWT_EXPIRES_IN`                 | No       | `24h`                            | JWT expiration time                     |
+| `NODE_ENV`                       | No       | `development`                    | Environment mode                        |
+| `APP_NAME`                       | No       | `command-centre-api`             | Application name                        |
+| `APP_VERSION`                    | No       | `1.0.0`                          | Application version                     |
+| `PAYSTACK_API_BASE_URL`          | No       | `https://studio-api.paystack.co` | Paystack API base URL                   |
+| `MESSAGE_LIMIT`                  | No       | `100`                            | Rate limit message count                |
+| `RATE_LIMIT_PERIOD_HOURS`        | No       | `24`                             | Rate limit time window                  |
+| `MESSAGE_HISTORY_LIMIT`          | No       | `40`                             | AI context message limit                |
+| `CONVERSATION_TTL_DAYS`          | No       | `3`                              | Inactivity days before auto-deletion    |
+| `SUMMARIZATION_THRESHOLD`        | No       | `20`                             | User messages before summarization      |
+| `MAX_SUMMARIES`                  | No       | `2`                              | Max summaries before conversation close |
+| `LOG_LEVEL`                      | No       | `info`                           | Logging verbosity                       |
+| `OTEL_SERVICE_NAME`              | No       | `command-centre-api`             | OpenTelemetry service name              |
+| `LANGFUSE_ENABLED`               | No       | `false`                          | Enable Langfuse SDK                     |
+| `LANGFUSE_PUBLIC_KEY`            | No       | -                                | Langfuse public key                     |
+| `LANGFUSE_SECRET_KEY`            | No       | -                                | Langfuse secret key                     |
+| `LANGFUSE_BASE_URL`              | No       | `https://cloud.langfuse.com`     | Langfuse API base URL                   |
+| `LANGFUSE_FLUSH_INTERVAL`        | No       | `5000`                           | Flush interval in milliseconds          |
+| `LANGFUSE_FLUSH_AT`              | No       | `15`                             | Batch size before auto-flush            |
+| `LANGFUSE_REQUEST_TIMEOUT`       | No       | `10000`                          | Request timeout in milliseconds         |
+| `LANGFUSE_SAMPLE_RATE`           | No       | `1.0`                            | Trace sampling rate (0.0 - 1.0)         |
+| `LANGFUSE_MASK_INPUTS`           | No       | `false`                          | Mask input payloads                     |
+| `LANGFUSE_MASK_OUTPUTS`          | No       | `false`                          | Mask output payloads                    |
+| `LANGFUSE_TOOL_OUTPUT_MODE`      | No       | `summary`                        | Default tool output logging mode        |
+| `LANGFUSE_TOOL_OUTPUT_OVERRIDES` | No       | -                                | JSON map of tool output modes           |
+
+### Langfuse Tool Output Overrides
+
+Use `LANGFUSE_TOOL_OUTPUT_OVERRIDES` to override output logging per tool. Provide a JSON map where values are `summary` or `full`.
+
+```env
+LANGFUSE_TOOL_OUTPUT_OVERRIDES={"getTransactions":"full","generateChartData":"summary"}
+```
 
 ## Rate Limiting
 

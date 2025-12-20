@@ -42,6 +42,8 @@ import { PageContextService } from '~/common/services/page-context.service';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
 import { Conversation } from './entities/conversation.entity';
 import { NotFoundError, ValidationError, APIError, ErrorCodes } from '~/common';
+import { LangfuseService } from '~/common/observability/langfuse.service';
+import type { LangfuseGenerationHandle } from '~/common/observability/langfuse.runtime';
 
 @Injectable()
 export class ChatService {
@@ -51,6 +53,7 @@ export class ChatService {
     private readonly configService: ConfigService,
     private readonly paystackApiService: PaystackApiService,
     private readonly pageContextService: PageContextService,
+    private readonly langfuseService: LangfuseService,
   ) {}
 
   async getMessagesByConversationId(conversationId: string, userId: string) {
@@ -446,134 +449,248 @@ export class ChatService {
   // TODO: Consider decoding the JWT here to get the userId
   async handleStreamingChat(dto: ChatRequestDto, userId: string, jwtToken: string) {
     const { conversationId, message, mode, pageContext } = dto;
-
-    await this.checkUserEntitlement(userId);
-
-    const retentionDays = this.configService.get<number>('CONVERSATION_TTL_DAYS', 3);
-
-    let conversation = await this.conversationRepository.findById(conversationId);
-
-    if (!conversation) {
-      try {
-        const title = await generateConversationTitle(message);
-
-        conversation = await this.conversationRepository.createConversation({
-          id: conversationId,
-          title,
-          userId,
-          mode,
-          pageContext,
-          lastActivityAt: new Date(),
-          expiresAt: this.calculateExpiry(retentionDays),
-        });
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Error creating conversation:', error);
-        throw new APIError('Failed to create conversation', ErrorCodes.INTERNAL_ERROR);
-      }
-    } else if (conversation.userId !== userId) {
-      throw new NotFoundError(`Conversation with ID ${conversationId} not found`, ErrorCodes.CONVERSATION_NOT_FOUND);
-    }
-
-    if (conversation.isClosed) {
-      return this.handleClosedConversation();
-    }
-
-    this.validateChatMode(conversation, mode, pageContext);
-
-    // Build messages with summary support
-    const uiMessages = await this.buildMessagesForLLM(conversation, conversationId, userId, message);
-
-    const messageClassification = await this.handleMessageClassification(uiMessages, pageContext);
-
-    await this.saveMessages(
-      [
-        {
-          conversationId,
-          role: MessageRole.USER,
-          parts: message.parts,
-          id: randomUUID(),
-        },
-      ],
+    const resolvedMode = mode || ChatMode.GLOBAL;
+    const traceTags = [
+      ...this.langfuseService.getBaseTags(),
+      `mode:${resolvedMode}`,
+      `page:${pageContext?.type ?? 'none'}`,
+    ];
+    const traceContext = this.langfuseService.startTrace({
+      name: 'chat.stream',
+      sessionId: conversationId,
       userId,
-    );
-
-    if (messageClassification) {
-      await this.messageRepository.createMessage({
+      input: { message },
+      metadata: {
         conversationId,
-        role: MessageRole.ASSISTANT,
-        id: randomUUID(),
-        parts: [
-          {
-            type: 'text',
-            text: messageClassification.text,
-          },
-        ],
-        expiresAt: this.calculateExpiry(retentionDays),
-      });
-
-      return {
-        type: messageClassification.type,
-        responseStream: messageClassification.responseStream,
-      };
-    }
-
-    const getAuthenticatedUser = () => ({
-      userId,
-      jwtToken,
+        mode: resolvedMode,
+        pageContext,
+      },
+      tags: traceTags,
     });
 
-    const { systemPrompt, tools } = await this.getSystemPromptAndTools(
-      mode || ChatMode.GLOBAL,
-      getAuthenticatedUser,
-      pageContext,
-    );
+    return this.langfuseService.runWithTrace(traceContext, async () => {
+      try {
+        await this.checkUserEntitlement(userId);
 
-    const validatedMessages = await this.validateMessages(uiMessages, tools);
+        const retentionDays = this.configService.get<number>('CONVERSATION_TTL_DAYS', 3);
 
-    const stream = createUIMessageStream({
-      execute: ({ writer }) => {
-        writer.write({
-          type: 'start',
-          messageId: randomUUID(),
-        });
+        let conversation = await this.conversationRepository.findById(conversationId);
 
-        const result = streamText({
-          model: openai('gpt-4o-mini'),
-          system: systemPrompt,
-          messages: convertToModelMessages(validatedMessages),
-          stopWhen: stepCountIs(10),
-          tools,
-        });
+        if (!conversation) {
+          try {
+            const title = await generateConversationTitle(message);
 
-        /**
-         * Consume the stream to ensure it runs to completion & triggers onFinish
-         * even when the client response is aborted
-         */
-        void result.consumeStream();
+            conversation = await this.conversationRepository.createConversation({
+              id: conversationId,
+              title,
+              userId,
+              mode,
+              pageContext,
+              lastActivityAt: new Date(),
+              expiresAt: this.calculateExpiry(retentionDays),
+            });
+          } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error creating conversation:', error);
+            throw new APIError('Failed to create conversation', ErrorCodes.INTERNAL_ERROR);
+          }
+        } else if (conversation.userId !== userId) {
+          throw new NotFoundError(
+            `Conversation with ID ${conversationId} not found`,
+            ErrorCodes.CONVERSATION_NOT_FOUND,
+          );
+        }
 
-        writer.merge(
-          result.toUIMessageStream({
-            sendReasoning: true,
-            sendStart: false,
-          }),
+        if (conversation.isClosed) {
+          const closed = this.handleClosedConversation();
+          this.langfuseService.updateTrace(traceContext, {
+            output: {
+              type: ChatResponseType.CONVERSATION_CLOSED,
+            },
+          });
+          return closed;
+        }
+
+        this.validateChatMode(conversation, mode, pageContext);
+
+        // Build messages with summary support
+        const uiMessages = await this.buildMessagesForLLM(conversation, conversationId, userId, message);
+
+        const messageClassification = await this.handleMessageClassification(uiMessages, pageContext);
+
+        await this.saveMessages(
+          [
+            {
+              conversationId,
+              role: MessageRole.USER,
+              parts: message.parts,
+              id: randomUUID(),
+            },
+          ],
+          userId,
         );
-      },
-      onFinish: async ({ messages }) => {
-        const formattedMessages = messages.map((message) => ({
-          conversationId: dto.conversationId,
-          role: message.role as MessageRole,
-          parts: message.parts,
-          id: message.id,
-        }));
 
-        const savedMessages = await this.saveMessages(formattedMessages, userId);
+        if (messageClassification) {
+          await this.messageRepository.createMessage({
+            conversationId,
+            role: MessageRole.ASSISTANT,
+            id: randomUUID(),
+            parts: [
+              {
+                type: 'text',
+                text: messageClassification.text,
+              },
+            ],
+            expiresAt: this.calculateExpiry(retentionDays),
+          });
 
-        await this.handleMessageSummarization(conversation, userId, savedMessages);
-      },
+          this.langfuseService.updateTrace(traceContext, {
+            output: {
+              type: messageClassification.type,
+              refusal: messageClassification.text,
+            },
+          });
+
+          return {
+            type: messageClassification.type,
+            responseStream: messageClassification.responseStream,
+          };
+        }
+
+        const getAuthenticatedUser = () => ({
+          userId,
+          jwtToken,
+        });
+
+        const { systemPrompt, tools } = await this.getSystemPromptAndTools(
+          resolvedMode,
+          getAuthenticatedUser,
+          pageContext,
+        );
+
+        const validatedMessages = await this.validateMessages(uiMessages, tools);
+        const toolNames = Object.keys(tools);
+        type ChatStreamResult = ReturnType<typeof streamText<Record<string, Tool<unknown, unknown>>, unknown>>;
+        let chatGeneration: LangfuseGenerationHandle | null = null;
+        let chatResult: ChatStreamResult | null = null;
+
+        const stream = createUIMessageStream({
+          execute: ({ writer }) => {
+            writer.write({
+              type: 'start',
+              messageId: randomUUID(),
+            });
+
+            chatGeneration = this.langfuseService.startGeneration({
+              name: 'chat.stream',
+              model: 'gpt-4o-mini',
+              input: {
+                message,
+                messageCount: validatedMessages.length,
+                tools: toolNames,
+                mode: resolvedMode,
+                pageContext,
+              },
+              metadata: {
+                conversationId,
+                mode: resolvedMode,
+                pageContext,
+              },
+            });
+
+            let result: ChatStreamResult;
+            try {
+              result = streamText<Record<string, Tool<unknown, unknown>>, unknown>({
+                model: openai('gpt-4o-mini'),
+                system: systemPrompt,
+                messages: convertToModelMessages(validatedMessages),
+                stopWhen: stepCountIs(10),
+                tools,
+              });
+              chatResult = result;
+            } catch (error) {
+              this.langfuseService.endGeneration(chatGeneration, {
+                level: 'ERROR',
+                statusMessage: error instanceof Error ? error.message : String(error),
+              });
+              throw error;
+            }
+
+            /**
+             * Consume the stream to ensure it runs to completion & triggers onFinish
+             * even when the client response is aborted
+             */
+            void result.consumeStream();
+
+            writer.merge(
+              result.toUIMessageStream({
+                sendReasoning: true,
+                sendStart: false,
+              }),
+            );
+          },
+          onFinish: async ({ messages }) => {
+            const formattedMessages = messages.map((message) => ({
+              conversationId: dto.conversationId,
+              role: message.role as MessageRole,
+              parts: message.parts,
+              id: message.id,
+            }));
+
+            const savedMessages = await this.saveMessages(formattedMessages, userId);
+
+            await this.handleMessageSummarization(conversation, userId, savedMessages);
+
+            const outputSummary = this.summarizeAssistantMessages(messages);
+            const usage = chatResult
+              ? this.langfuseService.mapUsage((await chatResult.totalUsage) as Record<string, number>)
+              : undefined;
+            const finishReason = chatResult ? await chatResult.finishReason : undefined;
+
+            this.langfuseService.endGeneration(chatGeneration, {
+              output: outputSummary,
+              usage,
+              metadata: {
+                finishReason,
+                responseType: ChatResponseType.CHAT_RESPONSE,
+              },
+            });
+
+            this.langfuseService.updateTrace(traceContext, {
+              output: {
+                responseType: ChatResponseType.CHAT_RESPONSE,
+                ...outputSummary,
+              },
+            });
+
+            await this.langfuseService.flushAsync();
+          },
+        });
+
+        return { type: ChatResponseType.CHAT_RESPONSE, responseStream: stream };
+      } catch (error) {
+        this.langfuseService.updateTrace(traceContext, {
+          output: {
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
+        throw error;
+      }
     });
+  }
 
-    return { type: ChatResponseType.CHAT_RESPONSE, responseStream: stream };
+  private summarizeAssistantMessages(messages: UIMessage[]) {
+    const assistantMessages = messages.filter((message) => message.role === 'assistant');
+    const lastAssistantMessage = [...assistantMessages]
+      .reverse()
+      .find((message) => message.parts.some((part) => part.type === 'text'));
+    const lastAssistantTextPart = lastAssistantMessage?.parts.find((part) => part.type === 'text');
+    return {
+      totalMessages: messages.length,
+      assistantMessages: assistantMessages.length,
+      lastAssistantText:
+        lastAssistantTextPart && 'text' in lastAssistantTextPart ? lastAssistantTextPart.text : undefined,
+    };
   }
 
   private buildPageScopedPrompt(enrichedContext: EnrichedPageContext) {

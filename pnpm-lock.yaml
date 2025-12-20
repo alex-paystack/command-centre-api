@@ -61,6 +61,12 @@ importers:
       dotenv:
         specifier: ^17.2.1
         version: 17.2.3
+      langfuse:
+        specifier: ^3.38.6
+        version: 3.38.6
+      langfuse-core:
+        specifier: ^3.38.6
+        version: 3.38.6
       mongodb:
         specifier: ^6.8.0
         version: 6.21.0
@@ -4632,6 +4638,16 @@ packages:
       { integrity: sha512-eTIzlVOSUR+JxdDFepEYcBMtZ9Qqdef+rnzWdRZuMbOywu5tO2w2N7rqjoANZ5k9vywhL6Br1VRjUIgTQx4E8w== }
     engines: { node: '>=6' }
 
+  langfuse-core@3.38.6:
+    resolution:
+      { integrity: sha512-EcZXa+DK9FJdi1I30+u19eKjuBJ04du6j2Nybk19KKCuraLczg/ppkTQcGvc4QOk//OAi3qUHrajUuV74RXsBQ== }
+    engines: { node: '>=18' }
+
+  langfuse@3.38.6:
+    resolution:
+      { integrity: sha512-mtwfsNGIYvObRh+NYNGlJQJDiBN+Wr3Hnr++wN25mxuOpSTdXX+JQqVCyAqGL5GD2TAXRZ7COsN42Vmp9krYmg== }
+    engines: { node: '>=18' }
+
   leven@3.1.0:
     resolution:
       { integrity: sha512-qsda+H8jTaUaN/x5vzW2rzc+8Rw4TAQ/4KjB46IwK5VH+IlVeeeje/EoZRpiXvIqjFgK84QffqPztGI3VBLG1A== }
@@ -4990,6 +5006,11 @@ packages:
     resolution:
       { integrity: sha512-u7f2xaZ/UG8oLXHvtF/oWTRvT44p9ecwBBqTwgJVq0+4BW1g8OW01TyMEGWBHbyMOYVHXslaut7qEQ1meATXgw== }
     engines: { node: '>= 10.16.0' }
+
+  mustache@4.2.0:
+    resolution:
+      { integrity: sha512-71ippSywq5Yb7/tVYyGbkBggbU8H3u5Rz56fH60jGFgr8uHwxs+aSKeqmluIVzM0m0kB7xQjKS6qPfd0b2ZoqQ== }
+    hasBin: true
 
   mute-stream@2.0.0:
     resolution:
@@ -10850,6 +10871,14 @@ snapshots:
 
   kleur@3.0.3: {}
 
+  langfuse-core@3.38.6:
+    dependencies:
+      mustache: 4.2.0
+
+  langfuse@3.38.6:
+    dependencies:
+      langfuse-core: 3.38.6
+
   leven@3.1.0: {}
 
   levn@0.4.1:
@@ -11073,6 +11102,8 @@ snapshots:
       object-assign: 4.1.1
       type-is: 1.6.18
       xtend: 4.0.2
+
+  mustache@4.2.0: {}
 
   mute-stream@2.0.0: {}
 

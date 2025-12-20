@@ -11,6 +11,20 @@ import { createExportTransactionsTool } from './export';
 import { createExportRefundsTool } from './export';
 import { createExportPayoutsTool } from './export';
 import { createExportDisputesTool } from './export';
+import { LangfuseRuntime } from '~/common/observability/langfuse.runtime';
+
+const wrapToolsWithLangfuse = (
+  tools: Record<string, Tool<unknown, unknown>>,
+): Record<string, Tool<unknown, unknown>> => {
+  const entries = Object.entries(tools);
+  const wrappedEntries = entries.map(([name, toolDef]) => {
+    if (!toolDef.execute) {
+      return [name, toolDef] as const;
+    }
+    return [name, { ...toolDef, execute: LangfuseRuntime.wrapToolExecute(name, toolDef.execute) }] as const;
+  });
+  return Object.fromEntries(wrappedEntries) as Record<string, Tool<unknown, unknown>>;
+};
 
 /**
  * Create AI tools with access to PaystackApiService
@@ -21,7 +35,7 @@ export function createTools(
   paystackService: PaystackApiService,
   getAuthenticatedUser: () => AuthenticatedUser,
 ): Record<string, Tool<unknown, unknown>> {
-  return {
+  const tools = {
     getTransactions: createGetTransactionsTool(paystackService, getAuthenticatedUser),
     getCustomers: createGetCustomersTool(paystackService, getAuthenticatedUser),
     getRefunds: createGetRefundsTool(paystackService, getAuthenticatedUser),
@@ -33,6 +47,7 @@ export function createTools(
     exportDisputes: createExportDisputesTool(paystackService, getAuthenticatedUser),
     exportPayouts: createExportPayoutsTool(paystackService, getAuthenticatedUser),
   };
+  return wrapToolsWithLangfuse(tools);
 }
 
 /**
@@ -61,5 +76,6 @@ export function createPageScopedTools(
 ): Record<string, Tool<unknown, unknown>> {
   const allTools = createTools(paystackService, getAuthenticatedUser);
   const allowedTools = RESOURCE_TOOL_MAP[contextType];
-  return Object.fromEntries(Object.entries(allTools).filter(([name]) => allowedTools.includes(name)));
+  const filteredEntries = Object.entries(allTools).filter(([name]) => allowedTools.includes(name));
+  return Object.fromEntries(filteredEntries) as Record<string, Tool<unknown, unknown>>;
 }
