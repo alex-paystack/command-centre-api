@@ -9,6 +9,7 @@ import type {
   PaystackPayout,
   PaystackDispute,
 } from '../types';
+import { ToolIntent } from '../types';
 import {
   TransactionStatus,
   PaymentChannel,
@@ -28,8 +29,12 @@ export function createGetTransactionsTool(
 ) {
   return tool({
     description:
-      'Fetch transaction data from Paystack. Use this to get payment transactions, check transaction status, analyze payment patterns, or retrieve transaction details. Supports filtering by date range, status, and pagination.',
+      'Fetch transaction data from Paystack or get transaction counts. Use intent="count" to get only the total count without fetching full data (saves tokens). Use intent="fetch" (default) to retrieve full transaction details. Supports filtering by date range, status, channel, and pagination.',
     inputSchema: z.object({
+      intent: z
+        .enum(Object.values(ToolIntent))
+        .optional()
+        .describe('Operation intent: "fetch" returns full data, "count" returns only the total count'),
       perPage: z.number().optional().default(50).describe('Number of transactions per page (default: 50, max: 100)'),
       page: z.number().optional().default(1).describe('Page number for pagination (default: 1)'),
       from: z.string().optional().describe('Start date for filtering transactions (ISO 8601 format, e.g., 2024-01-01)'),
@@ -49,7 +54,7 @@ export function createGetTransactionsTool(
       amount: z.number().optional().describe('Filter by amount'),
       currency: z.string().optional().describe('Filter by currency'),
     }),
-    execute: async ({ perPage, page, from, to, status, channel, customer, amount, currency }) => {
+    execute: async ({ intent, perPage, page, from, to, status, channel, customer, amount, currency }) => {
       const { jwtToken } = getAuthenticatedUser();
 
       if (!jwtToken) {
@@ -69,7 +74,7 @@ export function createGetTransactionsTool(
 
       try {
         const params: Record<string, unknown> = {
-          perPage,
+          perPage: intent === ToolIntent.COUNT ? 1 : perPage,
           page,
           reduced_fields: true,
           ...(channel && { channel }),
@@ -82,6 +87,14 @@ export function createGetTransactionsTool(
         };
 
         const response = await paystackService.get<PaystackTransaction[]>('/transaction', jwtToken, params);
+
+        if (intent === ToolIntent.COUNT) {
+          return {
+            success: true,
+            count: response.meta?.total ?? 0,
+            message: `Found ${response.meta?.total ?? 0} transaction(s)`,
+          };
+        }
 
         return {
           success: true,
@@ -107,14 +120,18 @@ export function createGetCustomersTool(
 ) {
   return tool({
     description:
-      'Fetch customer data from Paystack. Use this to get customer information, analyze customer behavior, check customer transaction history, or retrieve customer details. Supports filtering by date range and pagination.',
+      'Fetch customer data from Paystack or get customer counts. Use intent="count" to get only the total count without fetching full data (saves tokens). Use intent="fetch" (default) to retrieve full customer details. Supports filtering by email, account number, and pagination.',
     inputSchema: z.object({
+      intent: z
+        .enum(Object.values(ToolIntent))
+        .optional()
+        .describe('Operation intent: "fetch" returns full data, "count" returns only the total count'),
       perPage: z.number().optional().default(50).describe('Number of customers per page (default: 50, max: 100)'),
       page: z.number().optional().default(1).describe('Page number for pagination (default: 1)'),
       email: z.string().optional().describe('Filter by email'),
       account_number: z.string().optional().describe('Filter by account number'),
     }),
-    execute: async ({ perPage, page, email, account_number }) => {
+    execute: async ({ intent, perPage, page, email, account_number }) => {
       const { jwtToken } = getAuthenticatedUser();
 
       if (!jwtToken) {
@@ -125,13 +142,21 @@ export function createGetCustomersTool(
 
       try {
         const params: Record<string, unknown> = {
-          perPage,
+          perPage: intent === ToolIntent.COUNT ? 1 : perPage,
           page,
           ...(email && { email }),
           ...(account_number && { account_number }),
         };
 
         const response = await paystackService.get<PaystackCustomer[]>('/customer', jwtToken, params);
+
+        if (intent === ToolIntent.COUNT) {
+          return {
+            success: true,
+            count: response.meta?.total ?? 0,
+            message: `Found ${response.meta?.total ?? 0} customer(s)`,
+          };
+        }
 
         return {
           success: true,
@@ -157,8 +182,12 @@ export function createGetRefundsTool(
 ) {
   return tool({
     description:
-      'Fetch refund data from Paystack. Use this to get refund information, check refund status, analyze refund patterns, or retrieve refund details. Supports filtering by date range, transaction reference, and pagination.',
+      'Fetch refund data from Paystack or get refund counts. Use intent="count" to get only the total count without fetching full data (saves tokens). Use intent="fetch" (default) to retrieve full refund details. Supports filtering by date range, status, transaction reference, and pagination.',
     inputSchema: z.object({
+      intent: z
+        .enum(Object.values(ToolIntent))
+        .optional()
+        .describe('Operation intent: "fetch" returns full data, "count" returns only the total count'),
       status: z.enum(Object.values(RefundStatus)).optional().describe('Filter by refund status'),
       perPage: z.number().optional().default(50).describe('Number of refunds per page (default: 50, max: 100)'),
       page: z.number().optional().default(1).describe('Page number for pagination (default: 1)'),
@@ -169,7 +198,7 @@ export function createGetRefundsTool(
       active: z.boolean().optional().describe('Filter by active status'),
       search: z.string().optional().describe('Filter by transaction search query'),
     }),
-    execute: async ({ status, perPage, page, from, to, amount, amount_operator = 'eq', active, search }) => {
+    execute: async ({ intent, status, perPage, page, from, to, amount, amount_operator = 'eq', active, search }) => {
       const { jwtToken } = getAuthenticatedUser();
 
       if (!jwtToken) {
@@ -196,7 +225,7 @@ export function createGetRefundsTool(
             : {};
 
         const params: Record<string, unknown> = {
-          perPage,
+          perPage: intent === ToolIntent.COUNT ? 1 : perPage,
           page,
           ...(status && { status }),
           ...(from && { from }),
@@ -207,6 +236,14 @@ export function createGetRefundsTool(
         };
 
         const response = await paystackService.get<PaystackRefund[]>('/refund', jwtToken, params);
+
+        if (intent === ToolIntent.COUNT) {
+          return {
+            success: true,
+            count: response.meta?.total ?? 0,
+            message: `Found ${response.meta?.total ?? 0} refund(s)`,
+          };
+        }
 
         return {
           success: true,
@@ -232,8 +269,12 @@ export function createGetPayoutsTool(
 ) {
   return tool({
     description:
-      'Fetch payout data from Paystack. Use this to get payout information, check payout status, analyze payout patterns, or retrieve payout details. Supports filtering by date range, status, and pagination.',
+      'Fetch payout data from Paystack or get payout counts. Use intent="count" to get only the total count without fetching full data (saves tokens). Use intent="fetch" (default) to retrieve full payout details. Supports filtering by date range, status, subaccount, and pagination.',
     inputSchema: z.object({
+      intent: z
+        .enum(Object.values(ToolIntent))
+        .optional()
+        .describe('Operation intent: "fetch" returns full data, "count" returns only the total count'),
       perPage: z.number().optional().default(50).describe('Number of payouts per page (default: 50, max: 100)'),
       page: z.number().optional().default(1).describe('Page number for pagination (default: 1)'),
       from: z.string().optional().describe('Start date for filtering payouts (ISO 8601 format, e.g., 2024-01-01)'),
@@ -242,7 +283,7 @@ export function createGetPayoutsTool(
       subaccount: z.string().optional().describe('Filter by subaccount'),
       id: z.string().optional().describe('Filter by payout id'),
     }),
-    execute: async ({ perPage, page, from, to, status, subaccount, id }) => {
+    execute: async ({ intent, perPage, page, from, to, status, subaccount, id }) => {
       const { jwtToken } = getAuthenticatedUser();
 
       if (!jwtToken) {
@@ -262,7 +303,7 @@ export function createGetPayoutsTool(
 
       try {
         const params: Record<string, unknown> = {
-          perPage,
+          perPage: intent === ToolIntent.COUNT ? 1 : perPage,
           page,
           ...(from && { from }),
           ...(to && { to }),
@@ -272,6 +313,14 @@ export function createGetPayoutsTool(
         };
 
         const response = await paystackService.get<PaystackPayout[]>('/settlement', jwtToken, params);
+
+        if (intent === ToolIntent.COUNT) {
+          return {
+            success: true,
+            count: response.meta?.total ?? 0,
+            message: `Found ${response.meta?.total ?? 0} payout(s)`,
+          };
+        }
 
         return {
           success: true,
@@ -297,8 +346,12 @@ export function createGetDisputesTool(
 ) {
   return tool({
     description:
-      'Fetch dispute data from Paystack. Use this to get dispute information, check dispute status, analyze dispute patterns, or retrieve dispute details. Supports filtering by date range, status, and pagination.',
+      'Fetch dispute data from Paystack or get dispute counts. Use intent="count" to get only the total count without fetching full data (saves tokens). Use intent="fetch" (default) to retrieve full dispute details. Supports filtering by date range, status, transaction, and pagination.',
     inputSchema: z.object({
+      intent: z
+        .enum(Object.values(ToolIntent))
+        .optional()
+        .describe('Operation intent: "fetch" returns full data, "count" returns only the total count'),
       perPage: z.number().optional().default(50).describe('Number of disputes per page (default: 50, max: 100)'),
       page: z.number().optional().default(1).describe('Page number for pagination (default: 1)'),
       from: z.string().optional().describe('Start date for filtering disputes (ISO 8601 format, e.g., 2024-01-01)'),
@@ -308,7 +361,7 @@ export function createGetDisputesTool(
       transaction: z.number().optional().describe('Filter by transaction id'),
       category: z.enum(Object.values(DisputeCategory)).optional().describe('Filter by dispute category'),
     }),
-    execute: async ({ perPage, page, from, to, status, ignore_resolved, transaction, category }) => {
+    execute: async ({ intent, perPage, page, from, to, status, ignore_resolved, transaction, category }) => {
       const { jwtToken } = getAuthenticatedUser();
 
       if (!jwtToken) {
@@ -328,7 +381,7 @@ export function createGetDisputesTool(
 
       try {
         const params: Record<string, unknown> = {
-          perPage,
+          perPage: intent === ToolIntent.COUNT ? 1 : perPage,
           page,
           ...(from && { from }),
           ...(to && { to }),
@@ -339,6 +392,14 @@ export function createGetDisputesTool(
         };
 
         const response = await paystackService.get<PaystackDispute[]>('/dispute', jwtToken, params);
+
+        if (intent === ToolIntent.COUNT) {
+          return {
+            success: true,
+            count: response.meta?.total ?? 0,
+            message: `Found ${response.meta?.total ?? 0} dispute(s)`,
+          };
+        }
 
         return {
           success: true,

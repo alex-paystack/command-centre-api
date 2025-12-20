@@ -8,7 +8,14 @@ import {
   createGetDisputesTool,
 } from './retrieval';
 import { PaystackApiService } from '../../services/paystack-api.service';
-import { PaystackTransaction, PaystackCustomer, PaystackRefund, PaystackPayout, PaystackDispute } from '../types';
+import {
+  PaystackTransaction,
+  PaystackCustomer,
+  PaystackRefund,
+  PaystackPayout,
+  PaystackDispute,
+  ToolIntent,
+} from '../types';
 import { TransactionStatus, RefundStatus, PayoutStatus, DisputeStatusSlug, PaymentChannel } from '../types/data';
 
 describe('Data Retrieval Tools', () => {
@@ -153,6 +160,87 @@ describe('Data Retrieval Tools', () => {
         error: 'Network Error',
       });
     });
+
+    it('should return count when intent is COUNT', async () => {
+      mockPaystackService.get.mockResolvedValueOnce({
+        status: true,
+        message: 'Transactions retrieved',
+        data: [{ id: 1 } as PaystackTransaction], // Only 1 item because perPage=1
+        meta: {
+          total: 150,
+          total_volume: 5000000,
+          skipped: 0,
+          perPage: 1,
+          page: 1,
+          pageCount: 150,
+        },
+      });
+
+      const tool = createGetTransactionsTool(mockPaystackService, mockGetAuthenticatedUser);
+      const result = await tool.execute?.({ intent: ToolIntent.COUNT, perPage: 50, page: 1 }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        success: true,
+        count: 150,
+        message: 'Found 150 transaction(s)',
+      });
+      expect(result).not.toHaveProperty('transactions');
+      expect(mockPaystackService.get).toHaveBeenCalledWith(
+        '/transaction',
+        'test-token',
+        expect.objectContaining({ perPage: 1 }),
+      );
+    });
+
+    it('should return full data when intent is FETCH', async () => {
+      const mockTransactions: PaystackTransaction[] = [
+        { id: 1, reference: 'ref123' } as PaystackTransaction,
+        { id: 2, reference: 'ref456' } as PaystackTransaction,
+      ];
+
+      mockPaystackService.get.mockResolvedValueOnce({
+        status: true,
+        message: 'Transactions retrieved',
+        data: mockTransactions,
+        meta: { total: 2, total_volume: 125000, skipped: 0, perPage: 50, page: 1, pageCount: 1 },
+      });
+
+      const tool = createGetTransactionsTool(mockPaystackService, mockGetAuthenticatedUser);
+      const result = await tool.execute?.({ intent: ToolIntent.FETCH, perPage: 50, page: 1 }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        success: true,
+        transactions: mockTransactions,
+        message: 'Retrieved 2 transaction(s)',
+      });
+      expect(result).not.toHaveProperty('count');
+      expect(mockPaystackService.get).toHaveBeenCalledWith(
+        '/transaction',
+        'test-token',
+        expect.objectContaining({ perPage: 50 }),
+      );
+    });
+
+    it('should return full data when intent parameter is omitted (backward compatibility)', async () => {
+      const mockTransactions: PaystackTransaction[] = [{ id: 1 } as PaystackTransaction];
+
+      mockPaystackService.get.mockResolvedValueOnce({
+        status: true,
+        message: 'Transactions retrieved',
+        data: mockTransactions,
+        meta: { total: 1, total_volume: 50000, skipped: 0, perPage: 50, page: 1, pageCount: 1 },
+      });
+
+      const tool = createGetTransactionsTool(mockPaystackService, mockGetAuthenticatedUser);
+      const result = await tool.execute?.({ perPage: 50, page: 1 }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        success: true,
+        transactions: mockTransactions,
+        message: 'Retrieved 1 transaction(s)',
+      });
+      expect(result).not.toHaveProperty('count');
+    });
   });
 
   describe('createGetCustomersTool', () => {
@@ -226,6 +314,75 @@ describe('Data Retrieval Tools', () => {
       expect(result).toMatchObject({
         error: 'Authentication token not available. Please ensure you are logged in.',
       });
+    });
+
+    it('should return count when intent is COUNT', async () => {
+      mockPaystackService.get.mockResolvedValueOnce({
+        status: true,
+        message: 'Customers retrieved',
+        data: [{ id: 1 } as PaystackCustomer],
+        meta: { total: 250, total_volume: 0, skipped: 0, perPage: 1, page: 1, pageCount: 250 },
+      });
+
+      const tool = createGetCustomersTool(mockPaystackService, mockGetAuthenticatedUser);
+      const result = await tool.execute?.({ intent: ToolIntent.COUNT, perPage: 50, page: 1 }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        success: true,
+        count: 250,
+        message: 'Found 250 customer(s)',
+      });
+      expect(result).not.toHaveProperty('customers');
+      expect(mockPaystackService.get).toHaveBeenCalledWith(
+        '/customer',
+        'test-token',
+        expect.objectContaining({ perPage: 1 }),
+      );
+    });
+
+    it('should return full data when intent is FETCH', async () => {
+      const mockCustomers: PaystackCustomer[] = [
+        { id: 1, email: 'test1@example.com' } as PaystackCustomer,
+        { id: 2, email: 'test2@example.com' } as PaystackCustomer,
+      ];
+
+      mockPaystackService.get.mockResolvedValueOnce({
+        status: true,
+        message: 'Customers retrieved',
+        data: mockCustomers,
+        meta: { total: 2, total_volume: 0, skipped: 0, perPage: 50, page: 1, pageCount: 1 },
+      });
+
+      const tool = createGetCustomersTool(mockPaystackService, mockGetAuthenticatedUser);
+      const result = await tool.execute?.({ intent: ToolIntent.FETCH, perPage: 50, page: 1 }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        success: true,
+        customers: mockCustomers,
+        message: 'Retrieved 2 customer(s)',
+      });
+      expect(result).not.toHaveProperty('count');
+    });
+
+    it('should return full data when intent parameter is omitted (backward compatibility)', async () => {
+      const mockCustomers: PaystackCustomer[] = [{ id: 1 } as PaystackCustomer];
+
+      mockPaystackService.get.mockResolvedValueOnce({
+        status: true,
+        message: 'Customers retrieved',
+        data: mockCustomers,
+        meta: { total: 1, total_volume: 0, skipped: 0, perPage: 50, page: 1, pageCount: 1 },
+      });
+
+      const tool = createGetCustomersTool(mockPaystackService, mockGetAuthenticatedUser);
+      const result = await tool.execute?.({ perPage: 50, page: 1 }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        success: true,
+        customers: mockCustomers,
+        message: 'Retrieved 1 customer(s)',
+      });
+      expect(result).not.toHaveProperty('count');
     });
   });
 
@@ -322,6 +479,78 @@ describe('Data Retrieval Tools', () => {
         error: 'Authentication token not available. Please ensure you are logged in.',
       });
     });
+
+    it('should return count when intent is COUNT', async () => {
+      mockPaystackService.get.mockResolvedValueOnce({
+        status: true,
+        message: 'Refunds retrieved',
+        data: [{ id: 1 } as PaystackRefund],
+        meta: { total: 75, total_volume: 300000, skipped: 0, perPage: 1, page: 1, pageCount: 75 },
+      });
+
+      const tool = createGetRefundsTool(mockPaystackService, mockGetAuthenticatedUser);
+      const result = await tool.execute?.(
+        { intent: ToolIntent.COUNT, perPage: 50, page: 1, amount_operator: 'eq' },
+        mockToolCallOptions,
+      );
+
+      expect(result).toMatchObject({
+        success: true,
+        count: 75,
+        message: 'Found 75 refund(s)',
+      });
+      expect(result).not.toHaveProperty('refunds');
+      expect(mockPaystackService.get).toHaveBeenCalledWith(
+        '/refund',
+        'test-token',
+        expect.objectContaining({ perPage: 1 }),
+      );
+    });
+
+    it('should return full data when intent is FETCH', async () => {
+      const mockRefunds: PaystackRefund[] = [{ id: 1, amount: 50000 } as PaystackRefund];
+
+      mockPaystackService.get.mockResolvedValueOnce({
+        status: true,
+        message: 'Refunds retrieved',
+        data: mockRefunds,
+        meta: { total: 1, total_volume: 50000, skipped: 0, perPage: 50, page: 1, pageCount: 1 },
+      });
+
+      const tool = createGetRefundsTool(mockPaystackService, mockGetAuthenticatedUser);
+      const result = await tool.execute?.(
+        { intent: ToolIntent.FETCH, perPage: 50, page: 1, amount_operator: 'eq' },
+        mockToolCallOptions,
+      );
+
+      expect(result).toMatchObject({
+        success: true,
+        refunds: mockRefunds,
+        message: 'Retrieved 1 refund(s)',
+      });
+      expect(result).not.toHaveProperty('count');
+    });
+
+    it('should return full data when intent parameter is omitted (backward compatibility)', async () => {
+      const mockRefunds: PaystackRefund[] = [{ id: 1 } as PaystackRefund];
+
+      mockPaystackService.get.mockResolvedValueOnce({
+        status: true,
+        message: 'Refunds retrieved',
+        data: mockRefunds,
+        meta: { total: 1, total_volume: 50000, skipped: 0, perPage: 50, page: 1, pageCount: 1 },
+      });
+
+      const tool = createGetRefundsTool(mockPaystackService, mockGetAuthenticatedUser);
+      const result = await tool.execute?.({ perPage: 50, page: 1, amount_operator: 'eq' }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        success: true,
+        refunds: mockRefunds,
+        message: 'Retrieved 1 refund(s)',
+      });
+      expect(result).not.toHaveProperty('count');
+    });
   });
 
   describe('createGetPayoutsTool', () => {
@@ -404,6 +633,72 @@ describe('Data Retrieval Tools', () => {
       expect(result).toMatchObject({
         error: 'Authentication token not available. Please ensure you are logged in.',
       });
+    });
+
+    it('should return count when intent is COUNT', async () => {
+      mockPaystackService.get.mockResolvedValueOnce({
+        status: true,
+        message: 'Payouts retrieved',
+        data: [{ id: 1 } as PaystackPayout],
+        meta: { total: 42, total_volume: 2000000, skipped: 0, perPage: 1, page: 1, pageCount: 42 },
+      });
+
+      const tool = createGetPayoutsTool(mockPaystackService, mockGetAuthenticatedUser);
+      const result = await tool.execute?.({ intent: ToolIntent.COUNT, perPage: 50, page: 1 }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        success: true,
+        count: 42,
+        message: 'Found 42 payout(s)',
+      });
+      expect(result).not.toHaveProperty('payouts');
+      expect(mockPaystackService.get).toHaveBeenCalledWith(
+        '/settlement',
+        'test-token',
+        expect.objectContaining({ perPage: 1 }),
+      );
+    });
+
+    it('should return full data when intent is FETCH', async () => {
+      const mockPayouts: PaystackPayout[] = [{ id: 1, total_amount: 500000 } as PaystackPayout];
+
+      mockPaystackService.get.mockResolvedValueOnce({
+        status: true,
+        message: 'Payouts retrieved',
+        data: mockPayouts,
+        meta: { total: 1, total_volume: 500000, skipped: 0, perPage: 50, page: 1, pageCount: 1 },
+      });
+
+      const tool = createGetPayoutsTool(mockPaystackService, mockGetAuthenticatedUser);
+      const result = await tool.execute?.({ intent: ToolIntent.FETCH, perPage: 50, page: 1 }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        success: true,
+        payouts: mockPayouts,
+        message: 'Retrieved 1 payout(s)',
+      });
+      expect(result).not.toHaveProperty('count');
+    });
+
+    it('should return full data when intent parameter is omitted (backward compatibility)', async () => {
+      const mockPayouts: PaystackPayout[] = [{ id: 1 } as PaystackPayout];
+
+      mockPaystackService.get.mockResolvedValueOnce({
+        status: true,
+        message: 'Payouts retrieved',
+        data: mockPayouts,
+        meta: { total: 1, total_volume: 500000, skipped: 0, perPage: 50, page: 1, pageCount: 1 },
+      });
+
+      const tool = createGetPayoutsTool(mockPaystackService, mockGetAuthenticatedUser);
+      const result = await tool.execute?.({ perPage: 50, page: 1 }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        success: true,
+        payouts: mockPayouts,
+        message: 'Retrieved 1 payout(s)',
+      });
+      expect(result).not.toHaveProperty('count');
     });
   });
 
@@ -519,6 +814,72 @@ describe('Data Retrieval Tools', () => {
       expect(result).toMatchObject({
         error: 'API Error',
       });
+    });
+
+    it('should return count when intent is COUNT', async () => {
+      mockPaystackService.get.mockResolvedValueOnce({
+        status: true,
+        message: 'Disputes retrieved',
+        data: [{ id: 1 } as PaystackDispute],
+        meta: { total: 18, total_volume: 90000, skipped: 0, perPage: 1, page: 1, pageCount: 18 },
+      });
+
+      const tool = createGetDisputesTool(mockPaystackService, mockGetAuthenticatedUser);
+      const result = await tool.execute?.({ intent: ToolIntent.COUNT, perPage: 50, page: 1 }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        success: true,
+        count: 18,
+        message: 'Found 18 dispute(s)',
+      });
+      expect(result).not.toHaveProperty('disputes');
+      expect(mockPaystackService.get).toHaveBeenCalledWith(
+        '/dispute',
+        'test-token',
+        expect.objectContaining({ perPage: 1 }),
+      );
+    });
+
+    it('should return full data when intent is FETCH', async () => {
+      const mockDisputes: PaystackDispute[] = [{ id: 1, refund_amount: 50000 } as PaystackDispute];
+
+      mockPaystackService.get.mockResolvedValueOnce({
+        status: true,
+        message: 'Disputes retrieved',
+        data: mockDisputes,
+        meta: { total: 1, total_volume: 50000, skipped: 0, perPage: 50, page: 1, pageCount: 1 },
+      });
+
+      const tool = createGetDisputesTool(mockPaystackService, mockGetAuthenticatedUser);
+      const result = await tool.execute?.({ intent: ToolIntent.FETCH, perPage: 50, page: 1 }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        success: true,
+        disputes: mockDisputes,
+        message: 'Retrieved 1 dispute(s)',
+      });
+      expect(result).not.toHaveProperty('count');
+    });
+
+    it('should return full data when intent parameter is omitted (backward compatibility)', async () => {
+      const mockDisputes: PaystackDispute[] = [{ id: 1 } as PaystackDispute];
+
+      mockPaystackService.get.mockResolvedValueOnce({
+        status: true,
+        message: 'Disputes retrieved',
+        data: mockDisputes,
+        meta: { total: 1, total_volume: 50000, skipped: 0, perPage: 50, page: 1, pageCount: 1 },
+      });
+
+      const tool = createGetDisputesTool(mockPaystackService, mockGetAuthenticatedUser);
+      const result = await tool.execute?.({ perPage: 50, page: 1 }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        success: true,
+        disputes: mockDisputes,
+        message: 'Retrieved 1 dispute(s)',
+      });
+      expect(result).not.toHaveProperty('count');
     });
   });
 
