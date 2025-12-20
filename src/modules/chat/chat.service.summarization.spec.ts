@@ -9,8 +9,19 @@ import { ChatMode, PageContextType } from '~/common/ai/types';
 import { Conversation } from './entities/conversation.entity';
 import { PaystackApiService } from '~/common/services/paystack-api.service';
 import { PageContextService } from '~/common/services/page-context.service';
+import { LangfuseService } from '~/common/observability/langfuse.service';
 import { CreateConversationFromSummaryDto } from './dto/create-conversation-from-summary.dto';
 import { Message, MessageRole } from './entities/message.entity';
+
+// Mock the langfuse package to avoid dynamic import issues in Jest
+jest.mock('langfuse', () => ({
+  Langfuse: jest.fn().mockImplementation(() => ({
+    trace: jest.fn(),
+    getPrompt: jest.fn(),
+    flushAsync: jest.fn().mockResolvedValue(undefined),
+    shutdownAsync: jest.fn().mockResolvedValue(undefined),
+  })),
+}));
 
 // Mock the summarizeConversation function
 // eslint-disable-next-line @typescript-eslint/no-unsafe-return
@@ -123,6 +134,20 @@ describe('ChatService - Summarization', () => {
         {
           provide: ConfigService,
           useValue: configService,
+        },
+        {
+          provide: LangfuseService,
+          useValue: {
+            isEnabled: jest.fn().mockReturnValue(false),
+            trace: jest.fn().mockReturnValue(null),
+            getConfig: jest.fn().mockReturnValue(null),
+            flush: jest.fn().mockResolvedValue(undefined),
+            shutdown: jest.fn().mockResolvedValue(undefined),
+            getClient: jest.fn().mockReturnValue(null),
+            getPrompt: jest.fn().mockResolvedValue(null),
+            shouldSample: jest.fn().mockReturnValue(false),
+            onModuleDestroy: jest.fn().mockResolvedValue(undefined),
+          },
         },
       ],
     }).compile();

@@ -451,3 +451,180 @@ MESSAGE_HISTORY_LIMIT=40    # Number of past messages kept in AI context
 SUMMARIZATION_THRESHOLD=20  # User messages before triggering summarization
 MAX_SUMMARIES=2             # Maximum summaries before conversation closes
 ```
+
+## AI Observability
+
+The system includes optional Langfuse integration for comprehensive AI observability and monitoring. This integration provides insights into LLM performance, costs, and usage patterns.
+
+### Features
+
+- **LLM Call Tracking**: Automatic tracking of all OpenAI API calls with tokens, costs, and latency
+- **Tool Execution Monitoring**: Tracks all AI tool invocations with parameters and results
+- **User Session Analytics**: Links conversations across user sessions for behavior analysis
+- **Prompt Management**: Version control and A/B testing support for AI prompts
+- **Graceful Degradation**: Application works normally without Langfuse configured
+- **Cloud & Self-Hosted Support**: Works with both Langfuse Cloud (EU/US) and self-hosted instances
+
+### Configuration
+
+The integration is optional and disabled by default:
+
+```env
+# Langfuse (Optional - graceful degradation)
+LANGFUSE_ENABLED=false
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_BASE_URL=https://cloud.langfuse.com
+LANGFUSE_SAMPLE_RATE=1.0  # 0.0-1.0 for production sampling
+```
+
+**Deployment URLs:**
+
+- **Cloud EU**: `https://cloud.langfuse.com` (default)
+- **Cloud US**: `https://us.cloud.langfuse.com`
+- **Self-hosted**: Your custom domain URL
+
+### Architecture
+
+The integration uses a hybrid approach for maximum coverage:
+
+1. **OpenTelemetry Span Processor** (Primary)
+   - Automatic instrumentation via Vercel AI SDK's `experimental_telemetry`
+   - Registered via `LangfuseExporter` in `main.ts`
+   - Captures all LLM calls and tool executions automatically
+
+2. **LangfuseService Wrapper** (Secondary)
+   - Explicit session and trace management
+   - User tracking across conversations
+   - Graceful degradation when unavailable
+
+3. **Factory Pattern**
+   - `createAITelemetryConfig()` helper ensures consistent telemetry configuration
+   - Centralized configuration reduces boilerplate
+
+### Trace Architecture
+
+**Trace Hierarchy:**
+
+- **Trace ID** = Conversation ID (one trace per conversation)
+- **Session ID** = User ID (tracks user across multiple conversations)
+- **User ID** = Extracted from JWT token
+
+**Span Relationships:**
+
+```md
+Conversation Trace (conversation-123)
+├── Classification Span (message-classification)
+├── Chat Stream Span (chat-stream)
+│ ├── Tool Execution: getTransactions
+│ ├── Tool Execution: generateChartData
+│ └── Tool Execution: exportTransactions
+├── Title Generation Span (generate-title)
+└── Summarization Span (conversation-summary)
+```
+
+### Instrumented Operations
+
+All AI operations are automatically instrumented with full context:
+
+| Operation            | Model         | Function ID              | Metadata Tracked                                         |
+| -------------------- | ------------- | ------------------------ | -------------------------------------------------------- |
+| **Chat Streaming**   | gpt-4o-mini   | `chat-stream`            | conversationId, userId, mode, pageContextType, toolCount |
+| **Title Generation** | gpt-3.5-turbo | `generate-title`         | First message content                                    |
+| **Summarization**    | gpt-4o-mini   | `conversation-summary`   | conversationId, messageCount, hasPreviousSummary         |
+| **Classification**   | gpt-4o-mini   | `message-classification` | hasPageContext, pageContextType                          |
+| **Tool Execution**   | N/A           | Auto-generated           | toolName, parameters, results                            |
+
+### Prompt Management
+
+The following prompts can be versioned in Langfuse UI for A/B testing:
+
+1. `chat-agent-prompt` - Main chat system prompt (global mode)
+2. `page-scoped-prompt` - Page-scoped chat system prompt
+3. `classifier-prompt` - Message classification prompt (global)
+4. `page-scoped-classifier-prompt` - Message classification (page-scoped)
+5. `title-generation-prompt` - Conversation title generation
+6. `summary-prompt` - Conversation summarization
+
+**To use Langfuse-managed prompts:**
+
+1. Create prompts in Langfuse UI with the names above
+2. Set version numbers for A/B testing
+3. Application will fetch from Langfuse with local fallback
+
+### Health Check
+
+Monitor Langfuse operational status:
+
+```http
+GET /health/langfuse
+```
+
+**Response:**
+
+```json
+{
+  "status": "up",
+  "enabled": true,
+  "baseUrl": "https://cloud.langfuse.com",
+  "message": "Langfuse is operational at https://cloud.langfuse.com"
+}
+```
+
+**Possible statuses:**
+
+- `up` - Langfuse is enabled and operational
+- `disabled` - Langfuse is intentionally disabled
+- `error` - Langfuse is enabled but configuration is invalid
+
+### Sampling & Cost Control
+
+Use sampling in production to control costs:
+
+```env
+LANGFUSE_SAMPLE_RATE=0.1  # Track 10% of requests
+```
+
+**Recommended rollout strategy:**
+
+1. Start with 10% sampling: `LANGFUSE_SAMPLE_RATE=0.1`
+2. Monitor for 24-48 hours
+3. Gradually increase: 0.1 → 0.5 → 1.0
+4. Use 100% sampling for troubleshooting specific issues
+
+### Viewing Traces
+
+Access your traces at:
+
+- **Cloud EU**: <https://cloud.langfuse.com/project/[your-project>]
+- **Cloud US**: <https://us.cloud.langfuse.com/project/[your-project>]
+- **Self-hosted**: Your Langfuse URL
+
+**Available views:**
+
+- **Traces**: See all conversation traces with full context
+- **Sessions**: Track user behavior across conversations
+- **Generations**: Analyze LLM calls by model, cost, and latency
+- **Prompts**: Manage prompt versions and compare performance
+- **Users**: Understand per-user usage patterns
+
+### Troubleshooting
+
+**Issue: Traces not appearing**
+
+- Verify `LANGFUSE_ENABLED=true`
+- Check credentials are correct (starts with `sk-lf-` and `pk-lf-`)
+- Ensure sampling rate is high enough: `LANGFUSE_SAMPLE_RATE=1.0`
+- Check `/health/langfuse` endpoint
+
+**Issue: Performance impact**
+
+- Reduce sampling rate: `LANGFUSE_SAMPLE_RATE=0.5`
+- Increase flush interval: `LANGFUSE_FLUSH_INTERVAL=10000`
+- Increase batch size: `LANGFUSE_FLUSH_AT=50`
+
+**Issue: Missing tool execution data**
+
+- Tool executions are automatically tracked by Vercel AI SDK
+- Ensure chat operations are completing successfully
+- Check that `experimental_telemetry` is properly configured

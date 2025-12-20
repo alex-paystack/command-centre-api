@@ -13,6 +13,7 @@ import { Environment } from './config/helpers';
 import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
 import { DatabaseModule } from './database/database.module';
+import { LangfuseModule } from './common/observability/langfuse.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { DatabaseModule } from './database/database.module';
     ChatModule,
     ChartsModule,
     ObservabilityModule.forRoot(),
+    LangfuseModule,
   ],
   controllers: [AppController],
   providers: [

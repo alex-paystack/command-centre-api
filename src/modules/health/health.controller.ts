@@ -3,10 +3,18 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { NoLogClass, NoTraceClass } from '@paystackhq/nestjs-observability';
 import { HealthCheckService, HttpHealthIndicator, TypeOrmHealthIndicator } from '@nestjs/terminus';
 import { PaystackResponse, APIError } from '~/common';
+import { LangfuseService } from '~/common/observability/langfuse.service';
 
 export type HealthDetails = {
   application: { status: 'up'; message: string };
   mongodb?: { status: 'up' | 'down'; message: string };
+};
+
+export type LangfuseHealthDetails = {
+  status: 'up' | 'disabled' | 'error';
+  enabled: boolean;
+  baseUrl?: string;
+  message: string;
 };
 
 @ApiTags('health')
@@ -18,6 +26,7 @@ export class HealthController {
     private health: HealthCheckService,
     private http: HttpHealthIndicator,
     private db: TypeOrmHealthIndicator,
+    private langfuseService: LangfuseService,
   ) {}
 
   @Get()
@@ -62,5 +71,25 @@ export class HealthController {
     }
 
     return PaystackResponse.success(details, 'Service is healthy');
+  }
+
+  @Get('langfuse')
+  @ApiOperation({ summary: 'Langfuse observability health check' })
+  checkLangfuse() {
+    const config = this.langfuseService.getConfig();
+    const isEnabled = this.langfuseService.isEnabled();
+
+    const details: LangfuseHealthDetails = {
+      status: isEnabled ? 'up' : config?.enabled === false ? 'disabled' : 'error',
+      enabled: config?.enabled || false,
+      baseUrl: config?.baseUrl,
+      message: isEnabled
+        ? `Langfuse is operational at ${config?.baseUrl}`
+        : config?.enabled === false
+          ? 'Langfuse is disabled via LANGFUSE_ENABLED=false'
+          : 'Langfuse configuration is invalid or credentials are missing',
+    };
+
+    return PaystackResponse.success(details, details.message);
   }
 }

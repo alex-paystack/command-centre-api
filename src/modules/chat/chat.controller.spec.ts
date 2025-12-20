@@ -12,6 +12,16 @@ import { MessageRole } from './entities/message.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ChatMode, PageContextType } from '~/common/ai/types';
 
+// Mock the langfuse package to avoid dynamic import issues in Jest
+jest.mock('langfuse', () => ({
+  Langfuse: jest.fn().mockImplementation(() => ({
+    trace: jest.fn(),
+    getPrompt: jest.fn(),
+    flushAsync: jest.fn().mockResolvedValue(undefined),
+    shutdownAsync: jest.fn().mockResolvedValue(undefined),
+  })),
+}));
+
 describe('ChatController', () => {
   let controller: ChatController;
   let service: jest.Mocked<ChatService>;

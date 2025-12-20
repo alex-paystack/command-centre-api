@@ -56,31 +56,51 @@ DEBUG=false
 OTEL_LOGS_EXPORTER=console
 OTEL_TRACES_EXPORTER=console
 OTEL_METRICS_EXPORTER=console
+
+# Langfuse AI Observability (Optional)
+LANGFUSE_ENABLED=false                              # Enable Langfuse observability
+LANGFUSE_SECRET_KEY=                                # Required if enabled (starts with sk-lf-)
+LANGFUSE_PUBLIC_KEY=                                # Required if enabled (starts with pk-lf-)
+LANGFUSE_BASE_URL=https://cloud.langfuse.com        # Cloud EU (default), US, or self-hosted
+LANGFUSE_FLUSH_INTERVAL=5000                        # Flush interval in milliseconds
+LANGFUSE_FLUSH_AT=15                                # Batch size before auto-flush
+LANGFUSE_REQUEST_TIMEOUT=10000                      # Request timeout in milliseconds
+LANGFUSE_SAMPLE_RATE=1.0                            # Sampling rate (0.0-1.0, default: 1.0)
 ```
 
 ### Variable Reference
 
-| Variable                  | Required | Default                          | Description                             |
-| ------------------------- | -------- | -------------------------------- | --------------------------------------- |
-| `DATABASE_HOST`           | Yes      | -                                | MongoDB host                            |
-| `DATABASE_USERNAME`       | Yes      | -                                | MongoDB username                        |
-| `DATABASE_PASSWORD`       | Yes      | -                                | MongoDB password                        |
-| `DATABASE_NAME`           | Yes      | -                                | Database name                           |
-| `OPENAI_API_KEY`          | Yes      | -                                | OpenAI API key (starts with `sk-`)      |
-| `JWT_SECRET`              | Yes      | -                                | Secret for JWT signing                  |
-| `JWT_EXPIRES_IN`          | No       | `24h`                            | JWT expiration time                     |
-| `NODE_ENV`                | No       | `development`                    | Environment mode                        |
-| `APP_NAME`                | No       | `command-centre-api`             | Application name                        |
-| `APP_VERSION`             | No       | `1.0.0`                          | Application version                     |
-| `PAYSTACK_API_BASE_URL`   | No       | `https://studio-api.paystack.co` | Paystack API base URL                   |
-| `MESSAGE_LIMIT`           | No       | `100`                            | Rate limit message count                |
-| `RATE_LIMIT_PERIOD_HOURS` | No       | `24`                             | Rate limit time window                  |
-| `MESSAGE_HISTORY_LIMIT`   | No       | `40`                             | AI context message limit                |
-| `CONVERSATION_TTL_DAYS`   | No       | `3`                              | Inactivity days before auto-deletion    |
-| `SUMMARIZATION_THRESHOLD` | No       | `20`                             | User messages before summarization      |
-| `MAX_SUMMARIES`           | No       | `2`                              | Max summaries before conversation close |
-| `LOG_LEVEL`               | No       | `info`                           | Logging verbosity                       |
-| `OTEL_SERVICE_NAME`       | No       | `command-centre-api`             | OpenTelemetry service name              |
+| Variable                   | Required | Default                          | Description                               |
+| -------------------------- | -------- | -------------------------------- | ----------------------------------------- |
+| `DATABASE_HOST`            | Yes      | -                                | MongoDB host                              |
+| `DATABASE_USERNAME`        | Yes      | -                                | MongoDB username                          |
+| `DATABASE_PASSWORD`        | Yes      | -                                | MongoDB password                          |
+| `DATABASE_NAME`            | Yes      | -                                | Database name                             |
+| `OPENAI_API_KEY`           | Yes      | -                                | OpenAI API key (starts with `sk-`)        |
+| `JWT_SECRET`               | Yes      | -                                | Secret for JWT signing                    |
+| `JWT_EXPIRES_IN`           | No       | `24h`                            | JWT expiration time                       |
+| `NODE_ENV`                 | No       | `development`                    | Environment mode                          |
+| `APP_NAME`                 | No       | `command-centre-api`             | Application name                          |
+| `APP_VERSION`              | No       | `1.0.0`                          | Application version                       |
+| `PAYSTACK_API_BASE_URL`    | No       | `https://studio-api.paystack.co` | Paystack API base URL                     |
+| `MESSAGE_LIMIT`            | No       | `100`                            | Rate limit message count                  |
+| `RATE_LIMIT_PERIOD_HOURS`  | No       | `24`                             | Rate limit time window                    |
+| `MESSAGE_HISTORY_LIMIT`    | No       | `40`                             | AI context message limit                  |
+| `CONVERSATION_TTL_DAYS`    | No       | `3`                              | Inactivity days before auto-deletion      |
+| `SUMMARIZATION_THRESHOLD`  | No       | `20`                             | User messages before summarization        |
+| `MAX_SUMMARIES`            | No       | `2`                              | Max summaries before conversation close   |
+| `LOG_LEVEL`                | No       | `info`                           | Logging verbosity                         |
+| `OTEL_SERVICE_NAME`        | No       | `command-centre-api`             | OpenTelemetry service name                |
+| `LANGFUSE_ENABLED`         | No       | `false`                          | Enable Langfuse AI observability          |
+| `LANGFUSE_SECRET_KEY`      | No\*     | -                                | Langfuse secret key (required if enabled) |
+| `LANGFUSE_PUBLIC_KEY`      | No\*     | -                                | Langfuse public key (required if enabled) |
+| `LANGFUSE_BASE_URL`        | No       | `https://cloud.langfuse.com`     | Langfuse instance URL                     |
+| `LANGFUSE_FLUSH_INTERVAL`  | No       | `5000`                           | Flush interval in milliseconds            |
+| `LANGFUSE_FLUSH_AT`        | No       | `15`                             | Batch size before auto-flush              |
+| `LANGFUSE_REQUEST_TIMEOUT` | No       | `10000`                          | Request timeout in milliseconds           |
+| `LANGFUSE_SAMPLE_RATE`     | No       | `1.0`                            | Sampling rate (0.0-1.0)                   |
+
+\*Required when `LANGFUSE_ENABLED=true`
 
 ## Rate Limiting
 
@@ -183,6 +203,9 @@ LOG_LEVEL=debug
 OTEL_LOGS_EXPORTER=console
 OTEL_TRACES_EXPORTER=console
 OTEL_METRICS_EXPORTER=console
+
+# Langfuse (optional - typically disabled in local dev)
+LANGFUSE_ENABLED=false
 ```
 
 ### Production
@@ -195,6 +218,13 @@ OTEL_LOGS_EXPORTER=otlp
 OTEL_TRACES_EXPORTER=otlp
 OTEL_METRICS_EXPORTER=otlp
 OTEL_EXPORTER_OTLP_ENDPOINT=http://your-collector:4318
+
+# Langfuse (recommended for production observability)
+LANGFUSE_ENABLED=true
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_BASE_URL=https://cloud.langfuse.com  # or https://us.cloud.langfuse.com or self-hosted URL
+LANGFUSE_SAMPLE_RATE=1.0  # Start with 0.1 for gradual rollout
 ```
 
 ### Testing
@@ -206,6 +236,9 @@ NODE_ENV=test
 LOG_LEVEL=error
 METRICS_ENABLED=false
 TRACING_ENABLED=false
+
+# Langfuse (always disabled in tests)
+LANGFUSE_ENABLED=false
 ```
 
 ## Security Recommendations

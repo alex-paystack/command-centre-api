@@ -42,6 +42,8 @@ import { PageContextService } from '~/common/services/page-context.service';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
 import { Conversation } from './entities/conversation.entity';
 import { NotFoundError, ValidationError, APIError, ErrorCodes } from '~/common';
+import { LangfuseService } from '~/common/observability/langfuse.service';
+import { createAITelemetryConfig } from '~/common/observability/utils/ai-telemetry-config';
 
 @Injectable()
 export class ChatService {
@@ -51,6 +53,7 @@ export class ChatService {
     private readonly configService: ConfigService,
     private readonly paystackApiService: PaystackApiService,
     private readonly pageContextService: PageContextService,
+    private readonly langfuseService: LangfuseService,
   ) {}
 
   async getMessagesByConversationId(conversationId: string, userId: string) {
@@ -223,7 +226,7 @@ export class ChatService {
   }
 
   async handleMessageClassification(messages: UIMessage[], pageContext?: PageContext) {
-    const messageClassification = await classifyMessage(messages, pageContext);
+    const messageClassification = await classifyMessage(messages, pageContext, this.langfuseService);
     const confidence = messageClassification?.confidence ?? 1;
     const LOW_CONFIDENCE_THRESHOLD = 0.6;
 
@@ -391,7 +394,8 @@ export class ChatService {
         if (messagesNeedingSummary.length > 0) {
           const newSummary = await summarizeConversation(
             convertToUIMessages(messagesNeedingSummary),
-            conversation.summary,
+            conversation,
+            this.langfuseService,
           );
 
           if (newSummary) {
@@ -455,7 +459,7 @@ export class ChatService {
 
     if (!conversation) {
       try {
-        const title = await generateConversationTitle(message);
+        const title = await generateConversationTitle(message, this.langfuseService);
 
         conversation = await this.conversationRepository.createConversation({
           id: conversationId,
@@ -531,6 +535,55 @@ export class ChatService {
 
     const validatedMessages = await this.validateMessages(uiMessages, tools);
 
+    // Create Langfuse trace for this conversation (for explicit session tracking)
+    // Note: Automatic tracing is handled by Vercel AI SDK via OpenTelemetry
+    const trace = this.langfuseService.trace({
+      id: conversationId,
+      name: 'conversation',
+      userId,
+      sessionId: userId,
+      input: {
+        message: message.parts.map((part) => (part.type === 'text' ? part.text : '[non-text]')).join('\n'),
+        mode: mode || ChatMode.GLOBAL,
+        hasPageContext: !!pageContext,
+      },
+      metadata: {
+        conversationId,
+        conversationTitle: conversation.title,
+        mode: mode || ChatMode.GLOBAL,
+        hasPageContext: !!pageContext,
+        pageContextType: pageContext?.type,
+      },
+    });
+
+    const telemetryConfig = createAITelemetryConfig(this.langfuseService, {
+      functionId: 'chat-stream',
+      promptName: mode === ChatMode.PAGE ? 'page-scoped-prompt' : 'chat-agent-prompt',
+      promptVersion: 1,
+      metadata: {
+        conversationId,
+        userId,
+        mode: mode || ChatMode.GLOBAL,
+        hasPageContext: !!pageContext,
+        ...(pageContext?.type && { pageContextType: pageContext.type }),
+        toolCount: Object.keys(tools).length,
+      },
+    });
+
+    // Create a generation within the trace to capture input/output
+    const generation = trace?.generation({
+      name: 'chat-completion',
+      model: 'gpt-4o-mini',
+      input: {
+        system: systemPrompt,
+        messages: convertToModelMessages(validatedMessages),
+      },
+      metadata: {
+        mode: mode || ChatMode.GLOBAL,
+        toolCount: Object.keys(tools).length,
+      },
+    });
+
     const stream = createUIMessageStream({
       execute: ({ writer }) => {
         writer.write({
@@ -544,6 +597,7 @@ export class ChatService {
           messages: convertToModelMessages(validatedMessages),
           stopWhen: stepCountIs(10),
           tools,
+          ...telemetryConfig,
         });
 
         /**
@@ -566,6 +620,71 @@ export class ChatService {
           parts: message.parts,
           id: message.id,
         }));
+
+        // Track tool executions in Langfuse
+        let toolCallCount = 0;
+        if (generation) {
+          for (const message of messages) {
+            for (const part of message.parts) {
+              // Capture tool calls
+              if (part.type === 'tool-call' && 'toolName' in part) {
+                toolCallCount++;
+                let toolOutput: unknown = null;
+
+                // Extract input based on tool-call state
+                const toolInput = 'args' in part ? part.args : 'input' in part ? part.input : {};
+
+                // Find corresponding result
+                const resultMessage = messages.find((m) =>
+                  m.parts.some(
+                    (p) => p.type === 'tool-result' && 'toolCallId' in p && p.toolCallId === part.toolCallId,
+                  ),
+                );
+
+                if (resultMessage) {
+                  const resultPart = resultMessage.parts.find(
+                    (p) => p.type === 'tool-result' && 'toolCallId' in p && p.toolCallId === part.toolCallId,
+                  );
+                  if (resultPart && resultPart.type === 'tool-result' && 'result' in resultPart) {
+                    toolOutput = resultPart.result;
+                  }
+                }
+
+                // Create a span for each tool execution
+                generation.span({
+                  name: String(part.toolName),
+                  input: toolInput,
+                  output: toolOutput,
+                  metadata: {
+                    toolCallId: part.toolCallId,
+                  },
+                });
+              }
+            }
+          }
+        }
+
+        // Update Langfuse generation with output
+        const assistantMessage = messages.find((m) => m.role === 'assistant');
+        if (generation && assistantMessage) {
+          generation.end({
+            output: {
+              response: assistantMessage.parts
+                .map((part) => (part.type === 'text' ? part.text : '[non-text]'))
+                .join('\n'),
+              toolCallsExecuted: toolCallCount,
+            },
+          });
+        }
+
+        // Update trace with output
+        trace?.update({
+          output: {
+            messageCount: messages.length,
+            hasAssistantResponse: !!assistantMessage,
+            toolCallsExecuted: toolCallCount,
+          },
+        });
 
         const savedMessages = await this.saveMessages(formattedMessages, userId);
 

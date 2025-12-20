@@ -73,6 +73,33 @@ Manages saved chart configurations and regeneration:
 - Deletes saved charts with ownership verification
 - Validates chart configurations (aggregation types, date ranges)
 
+### LangfuseService
+
+Provides AI observability with graceful degradation:
+
+- **Optional Integration**: App works normally without Langfuse configured
+- **Trace Management**: Creates traces linked to conversations with user session tracking
+- **Configuration Validation**: Validates credentials and supports cloud (EU/US) and self-hosted instances
+- **Graceful Degradation**: Returns null/no-op when disabled or credentials missing
+- **Lifecycle Management**: Automatic flush and shutdown via `onModuleDestroy()`
+- **Error Handling**: All operations wrapped in try-catch with error logging
+- **Health Check**: `/health/langfuse` endpoint for operational monitoring
+- **Sampling Support**: Configurable sampling rate for production cost control
+
+**Hybrid Architecture**:
+
+- **Primary**: OpenTelemetry Span Processor via Vercel AI SDK's `experimental_telemetry`
+- **Secondary**: Explicit trace/session management via LangfuseService wrapper
+- **Factory Pattern**: `createAITelemetryConfig()` helper for consistent telemetry configuration
+
+**Instrumented Operations**:
+
+- Chat streaming (gpt-4o-mini) - Includes conversation metadata, tool tracking
+- Title generation (gpt-3.5-turbo) - Links to first message
+- Conversation summarization - Tracks message count and summary progression
+- Message classification - Includes page context awareness
+- Tool execution - Automatic tracking via Vercel AI SDK
+
 ## Project Structure
 
 ```md
@@ -97,6 +124,13 @@ src/
 │ │ │ ├── index.ts # Main type exports
 │ │ │ └── data.ts # Enums and data types
 │ │ └── index.ts
+│ ├── observability/ # AI observability with Langfuse
+│ │ ├── langfuse.module.ts # NestJS global module
+│ │ ├── langfuse.service.ts # Core service with graceful degradation
+│ │ ├── langfuse.config.ts # Config validation (cloud/self-hosted)
+│ │ ├── langfuse.service.spec.ts # Comprehensive unit tests
+│ │ └── utils/
+│ │ └── ai-telemetry-config.ts # Helper for Vercel AI SDK telemetry
 │ ├── exceptions/ # Custom exceptions and global filters
 │ ├── helpers/ # Shared utilities
 │ ├── interfaces/ # Common interfaces
@@ -149,19 +183,20 @@ src/
 
 ## Technology Stack
 
-| Category           | Technology                              | Version     |
-| ------------------ | --------------------------------------- | ----------- |
-| **Framework**      | NestJS                                  | v11         |
-| **Database**       | MongoDB with TypeORM                    | v6.8 / v0.3 |
-| **AI SDK**         | Vercel AI SDK with OpenAI               | v5.0.110    |
-| **Language**       | TypeScript                              | v5.7        |
-| **Validation**     | class-validator, class-transformer, Zod | v4.0        |
-| **HTTP Client**    | Axios via @nestjs/axios                 | v1.6        |
-| **Date Utilities** | date-fns                                | v4.1        |
-| **Documentation**  | Swagger/OpenAPI (@nestjs/swagger)       | v11         |
-| **Observability**  | @paystackhq/nestjs-observability        | v1.2        |
-| **Error Handling** | @paystackhq/pkg-response-code           | v3.0        |
-| **Build Tool**     | SWC                                     | v1.10       |
+| Category             | Technology                                           | Version     |
+| -------------------- | ---------------------------------------------------- | ----------- |
+| **Framework**        | NestJS                                               | v11         |
+| **Database**         | MongoDB with TypeORM                                 | v6.8 / v0.3 |
+| **AI SDK**           | Vercel AI SDK with OpenAI                            | v5.0.110    |
+| **Language**         | TypeScript                                           | v5.7        |
+| **Validation**       | class-validator, class-transformer, Zod              | v4.0        |
+| **HTTP Client**      | Axios via @nestjs/axios                              | v1.6        |
+| **Date Utilities**   | date-fns                                             | v4.1        |
+| **Documentation**    | Swagger/OpenAPI (@nestjs/swagger)                    | v11         |
+| **Observability**    | @paystackhq/nestjs-observability                     | v1.2        |
+| **AI Observability** | Langfuse (langfuse, langfuse-vercel, @langfuse/otel) | v3.38/v4.5  |
+| **Error Handling**   | @paystackhq/pkg-response-code                        | v3.0        |
+| **Build Tool**       | SWC                                                  | v1.10       |
 
 ### AI Models
 
@@ -187,6 +222,16 @@ This pattern avoids common pitfalls like:
 - Inconsistent error handling across modules
 - Configuration drift between similar services
 
+### LangfuseModule (Global)
+
+The `LangfuseModule` is a global module that:
+
+- **Optional**: Can be disabled without affecting application functionality
+- **Provides** LangfuseService across all modules without explicit imports
+- **Integrates** with OpenTelemetry via LangfuseExporter span processor
+- **Supports** both cloud (EU/US) and self-hosted Langfuse instances
+- **Tracks** LLM calls, tool executions, user sessions, and conversation traces
+
 ## Request Flow
 
 ```mermaid
@@ -211,6 +256,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     AppModule --> AuthModule
+    AppModule --> LangfuseModule
     AppModule --> ChatModule
     AppModule --> ChartsModule
     AppModule --> HealthModule
@@ -218,6 +264,10 @@ flowchart TD
 
     subgraph AuthModule[AuthModule - global]
         JwtModule[JwtModule]
+    end
+
+    subgraph LangfuseModule[LangfuseModule - global]
+        LangfuseService[LangfuseService<br/>Optional AI observability]
     end
 
     subgraph ChatModule[ChatModule]

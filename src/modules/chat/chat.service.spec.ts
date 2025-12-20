@@ -11,6 +11,7 @@ import { Message, MessageRole } from './entities/message.entity';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
 import { PaystackApiService } from '~/common/services/paystack-api.service';
 import { PageContextService } from '~/common/services/page-context.service';
+import { LangfuseService } from '~/common/observability/langfuse.service';
 import {
   MessageClassificationIntent,
   ChatResponseType,
@@ -19,6 +20,16 @@ import {
 } from '~/common/ai/types';
 import { NotFoundError } from '~/common';
 import { InferUIMessageChunk } from 'ai';
+
+// Mock the langfuse package to avoid dynamic import issues in Jest
+jest.mock('langfuse', () => ({
+  Langfuse: jest.fn().mockImplementation(() => ({
+    trace: jest.fn(),
+    getPrompt: jest.fn(),
+    flushAsync: jest.fn().mockResolvedValue(undefined),
+    shutdownAsync: jest.fn().mockResolvedValue(undefined),
+  })),
+}));
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-return
 jest.mock('~/common/ai/actions', () => ({
@@ -115,6 +126,20 @@ describe('ChatService', () => {
         {
           provide: ConfigService,
           useValue: configService,
+        },
+        {
+          provide: LangfuseService,
+          useValue: {
+            isEnabled: jest.fn().mockReturnValue(false),
+            trace: jest.fn().mockReturnValue(null),
+            getConfig: jest.fn().mockReturnValue(null),
+            flush: jest.fn().mockResolvedValue(undefined),
+            shutdown: jest.fn().mockResolvedValue(undefined),
+            getClient: jest.fn().mockReturnValue(null),
+            getPrompt: jest.fn().mockResolvedValue(null),
+            shouldSample: jest.fn().mockReturnValue(false),
+            onModuleDestroy: jest.fn().mockResolvedValue(undefined),
+          },
         },
       ],
     }).compile();
@@ -530,7 +555,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined, expect.any(Object));
       expect(result).toBeDefined();
       expect(result?.type).toBe(ChatResponseType.REFUSAL);
       expect(result?.responseStream).toBeDefined();
@@ -556,7 +581,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory, mockPageContext);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, mockPageContext);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, mockPageContext, expect.any(Object));
       expect(result).toBeDefined();
       expect(result?.type).toBe(ChatResponseType.REFUSAL);
       expect(result?.responseStream).toBeDefined();
@@ -571,7 +596,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined, expect.any(Object));
       expect(result).toBeNull();
     });
 
@@ -584,7 +609,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined, expect.any(Object));
       expect(result).toBeNull();
     });
 
@@ -597,7 +622,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined, expect.any(Object));
       expect(result).toBeNull();
     });
 
@@ -610,7 +635,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined, expect.any(Object));
       expect(result).toBeNull();
     });
 
@@ -623,7 +648,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined, expect.any(Object));
       expect(result).toBeNull();
     });
 
@@ -641,7 +666,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory, mockPageContext);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, mockPageContext);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, mockPageContext, expect.any(Object));
       expect(result).toBeNull();
     });
   });

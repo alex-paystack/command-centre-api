@@ -250,13 +250,70 @@ SUMMARIZATION_THRESHOLD=20
 MAX_SUMMARIES=2
 ```
 
+**Langfuse AI Observability** (Optional):
+
+```env
+LANGFUSE_ENABLED=false                              # Enable Langfuse observability
+LANGFUSE_SECRET_KEY=sk-lf-...                       # Required if enabled
+LANGFUSE_PUBLIC_KEY=pk-lf-...                       # Required if enabled
+LANGFUSE_BASE_URL=https://cloud.langfuse.com        # Cloud EU, US, or self-hosted URL
+LANGFUSE_SAMPLE_RATE=1.0                            # Sampling rate (0.0-1.0)
+```
+
 ### Observability
 
-The app uses `@paystackhq/nestjs-observability` for OpenTelemetry instrumentation:
+The app uses dual observability systems:
 
-- Traces, metrics, and logs are automatically collected
+**1. OpenTelemetry** (`@paystackhq/nestjs-observability`)
+
+- Infrastructure-level traces, metrics, and logs
 - Configured via `OTEL_*` environment variables
 - Local dev disables exporters for performance: `OTEL_TRACES_EXPORTER=none`
+
+**2. Langfuse** (Optional AI-specific observability)
+
+- LLM call tracking with tokens, costs, and latencies
+- AI tool execution monitoring
+- User session analytics and conversation tracking
+- Prompt versioning and A/B testing support
+- Works with both Langfuse Cloud and self-hosted instances
+- Graceful degradation: app works normally if Langfuse is unavailable or disabled
+
+**Langfuse Configuration Options**:
+
+- **Cloud (EU)**: `LANGFUSE_BASE_URL=https://cloud.langfuse.com` (default)
+- **Cloud (US)**: `LANGFUSE_BASE_URL=https://us.cloud.langfuse.com`
+- **Self-hosted**: `LANGFUSE_BASE_URL=http://your-domain:3000`
+
+**Checking Langfuse Status**:
+
+```bash
+curl http://localhost:3000/health/langfuse
+```
+
+**Instrumented Operations**:
+
+- Chat streaming (`gpt-4o-mini` with tool execution)
+- Conversation title generation (`gpt-3.5-turbo`)
+- Conversation summarization (`gpt-4o-mini`)
+- Message classification (`gpt-4o-mini`)
+- All 10 AI tools (retrieval, export, visualization)
+
+**Trace Architecture**:
+
+- Trace ID = Conversation ID (one trace per conversation)
+- Session ID = User ID (tracks user across conversations)
+- User ID = Extracted from JWT token
+- Parent-child spans link classification → chat → tool executions
+
+**Prompt Management**:
+Prompts can be versioned in Langfuse UI and fetched dynamically (optional):
+
+- `chat-agent-prompt` - Main chat system prompt
+- `page-scoped-prompt` - Page-scoped chat prompt
+- `classifier-prompt` - Message classification prompt
+- `title-generation-prompt` - Title generation prompt
+- `summary-prompt` - Conversation summary prompt
 
 ## Testing Patterns
 
