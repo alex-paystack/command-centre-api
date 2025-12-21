@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
-import { ObservabilityModule } from '@paystackhq/nestjs-observability';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthModule } from './modules/health/health.module';
@@ -28,7 +27,6 @@ import { DatabaseModule } from './database/database.module';
     HealthModule,
     ChatModule,
     ChartsModule,
-    ObservabilityModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [

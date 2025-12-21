@@ -3,7 +3,6 @@ import type { Response } from 'express';
 import { ResponseCode, ResponseType } from '@paystackhq/pkg-response-code';
 import { PaystackErrorResponse } from './types';
 import { PaystackError } from '../helpers/paystack.error';
-import { LoggerService } from '@paystackhq/nestjs-observability';
 
 /**
  * Global exception filter that catches all unhandled exceptions
@@ -14,8 +13,6 @@ import { LoggerService } from '@paystackhq/nestjs-observability';
  */
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
-  private readonly logger = new LoggerService();
-
   /**
    * Main exception handling method that catches all unhandled exceptions
    * @param exception The thrown exception of any type
@@ -27,8 +24,6 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     const errorResponse = this.buildErrorResponse(exception);
     const status = this.getHttpStatus(exception);
-
-    this.logger.error(`${errorResponse.type}: ${errorResponse.message}`);
 
     response.status(status).json(errorResponse);
   }

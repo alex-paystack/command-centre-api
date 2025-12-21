@@ -1,6 +1,5 @@
 import { Controller, Get, HttpStatus } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { NoLogClass, NoTraceClass } from '@paystackhq/nestjs-observability';
 import { HealthCheckService, HttpHealthIndicator, TypeOrmHealthIndicator } from '@nestjs/terminus';
 import { PaystackResponse, APIError } from '~/common';
 
@@ -10,8 +9,6 @@ export type HealthDetails = {
 };
 
 @ApiTags('health')
-@NoLogClass()
-@NoTraceClass()
 @Controller('health')
 export class HealthController {
   constructor(

@@ -24,6 +24,9 @@ export async function generateConversationTitle(message: UIMessage) {
       model: openai('gpt-3.5-turbo'),
       system: CONVERSATION_TITLE_GENERATION_PROMPT,
       prompt: getTextFromMessage(message),
+      experimental_telemetry: {
+        isEnabled: true,
+      },
     });
 
     const title = text.trim();
@@ -97,6 +100,9 @@ export async function classifyMessage(messages: UIMessage[], pageContext?: PageC
       schema: ClassifierSchema,
       system: systemPrompt,
       prompt: getClassifierUserPrompt(formattedConversation, latestUserMessage),
+      experimental_telemetry: {
+        isEnabled: true,
+      },
     });
 
     return object;

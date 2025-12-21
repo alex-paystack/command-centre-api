@@ -544,6 +544,9 @@ export class ChatService {
           messages: convertToModelMessages(validatedMessages),
           stopWhen: stepCountIs(10),
           tools,
+          experimental_telemetry: {
+            isEnabled: true,
+          },
         });
 
         /**
