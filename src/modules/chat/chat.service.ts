@@ -9,6 +9,7 @@ import {
   TypeValidationError,
   UIMessage,
   validateUIMessages,
+  LanguageModelUsage,
 } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { randomUUID } from 'crypto';
@@ -359,24 +360,27 @@ export class ChatService {
     }
   }
 
-  async handleMessageSummarization(conversation: Conversation, userId: string, savedMessages: MessageResponseDto[]) {
-    const summarizationThreshold = this.configService.get<number>('SUMMARIZATION_THRESHOLD', 20);
-    const maxSummaries = this.configService.get<number>('MAX_SUMMARIES', 2);
-
-    let messageCount: number;
-
-    if (conversation.lastSummarizedMessageId) {
-      messageCount = await this.messageRepository.countUserMessagesAfterMessageId(
-        conversation.id,
-        conversation.lastSummarizedMessageId,
-      );
-    } else {
-      messageCount = await this.messageRepository.countUserMessagesByConversationId(conversation.id);
+  async handleMessageSummarization(
+    conversation: Conversation,
+    userId: string,
+    savedMessages: MessageResponseDto[],
+    tokenCountForThisInteraction?: number,
+  ) {
+    if (tokenCountForThisInteraction) {
+      conversation.totalTokensUsed += tokenCountForThisInteraction;
+      await this.conversationRepository.save(conversation);
     }
 
+    const maxSummaries = this.configService.get<number>('MAX_SUMMARIES', 2);
     const currentSummaryCount = conversation.summaryCount;
 
-    if (messageCount >= summarizationThreshold && currentSummaryCount < maxSummaries) {
+    const contextWindowSize = this.configService.get<number>('CONTEXT_WINDOW_SIZE', 128000);
+    const thresholdPercentage = this.configService.get<number>('TOKEN_THRESHOLD_PERCENTAGE', 0.6);
+    const tokenThreshold = Math.floor(contextWindowSize * thresholdPercentage);
+
+    const shouldSummarize = conversation.totalTokensUsed >= tokenThreshold;
+
+    if (shouldSummarize && currentSummaryCount < maxSummaries) {
       try {
         // Only summarize messages that haven't been summarized yet to avoid reprocessing full history
         const messagesNeedingSummary = conversation.lastSummarizedMessageId
@@ -409,6 +413,7 @@ export class ChatService {
               summaryCount: newSummaryCount,
               lastSummarizedMessageId: lastMessageId || conversation.lastSummarizedMessageId,
               isClosed: newSummaryCount >= maxSummaries,
+              totalTokensUsed: 0, // Reset token counter after summarization -- TODO: Instead, use the number of tokens that makes up the summary
             };
 
             await this.conversationRepository.save({
@@ -434,7 +439,7 @@ export class ChatService {
         // Log validation error for monitoring
         // eslint-disable-next-line no-console
         console.error('Database messages validation failed:', error);
-        // Could implement message migration or filtering here
+        // TODO: Could implement message migration or filtering here
         // For now, start with empty history
         return [];
       } else {
@@ -531,6 +536,8 @@ export class ChatService {
 
     const validatedMessages = await this.validateMessages(uiMessages, tools);
 
+    let capturedUsage: LanguageModelUsage;
+
     const stream = createUIMessageStream({
       execute: ({ writer }) => {
         writer.write({
@@ -544,6 +551,9 @@ export class ChatService {
           messages: convertToModelMessages(validatedMessages),
           stopWhen: stepCountIs(10),
           tools,
+          onFinish: ({ totalUsage }) => {
+            capturedUsage = totalUsage;
+          },
         });
 
         /**
@@ -569,7 +579,7 @@ export class ChatService {
 
         const savedMessages = await this.saveMessages(formattedMessages, userId);
 
-        await this.handleMessageSummarization(conversation, userId, savedMessages);
+        await this.handleMessageSummarization(conversation, userId, savedMessages, capturedUsage?.totalTokens);
       },
     });
 

@@ -91,17 +91,26 @@ The chat system operates in two distinct modes:
 
 ### Conversation Lifecycle & Summarization
 
-Conversations follow a lifecycle with automatic summarization:
+Conversations follow a lifecycle with automatic summarization based on token usage:
 
-1. **Active Phase**: Up to `SUMMARIZATION_THRESHOLD` (default: 20) user messages
-2. **First Summary**: Generated after threshold, conversation continues
+1. **Active Phase**: Conversation continues until token usage reaches 60% of model's context window (default: 76,800 tokens for gpt-4o-mini)
+2. **First Summary**: Generated after threshold, conversation continues with reset token counter
 3. **Second Summary**: Generated after another threshold, conversation closes
 4. **Continuation**: User can create new conversation via `/conversations/from-summary` with carried-over context
 
+**Token-Based Summarization**:
+
+- Tracks cumulative token usage from AI SDK's `streamText` usage data
+- Triggers when `totalTokensUsed >= (CONTEXT_WINDOW_SIZE * TOKEN_THRESHOLD_PERCENTAGE)`
+- Default: 76,800 tokens (128,000 \* 0.6) for gpt-4o-mini
+- Token counter resets to 0 after each summary generation
+- Automatic and intelligent: adapts to actual conversation length regardless of message count
+
 **Configuration**:
 
-- `SUMMARIZATION_THRESHOLD=20` - Messages before triggering summary
-- `MAX_SUMMARIES=2` - Summaries before closing conversation
+- `CONTEXT_WINDOW_SIZE=128000` - Model context window (adjust for different models)
+- `TOKEN_THRESHOLD_PERCENTAGE=0.6` - Percentage of context window before triggering summary (60%)
+- `MAX_SUMMARIES=2` - Maximum summaries before closing conversation
 - `MESSAGE_HISTORY_LIMIT=40` - Messages kept in AI context
 
 ### Request Flow & Authentication

@@ -357,37 +357,45 @@ const title = await generateConversationTitle(message);
 - Generates concise, descriptive titles (typically 3-6 words)
 - Falls back gracefully if generation fails
 
-## Message Summarization
+## Token-Based Summarization
 
-The system automatically summarizes long conversations to maintain context while managing token limits and conversation length.
+The system automatically summarizes long conversations using intelligent token-based tracking. Instead of counting messages, it tracks actual token usage from the AI model to determine when summarization is needed.
 
 ### How It Works
 
-1. **Threshold Monitoring**: After a configurable number of user messages (default: 20), summarization is triggered
-2. **Summary Generation**: GPT-4o-mini generates a comprehensive summary of the conversation
-3. **Context Preservation**: Key information, transaction IDs, customer details, and decisions are preserved
-4. **Incremental Updates**: Subsequent summaries incorporate previous summaries for continuity
-5. **Conversation Closure**: After reaching the maximum number of summaries (default: 2), the conversation is closed
+1. **Token Tracking**: Captures cumulative token usage from each `streamText` call via AI SDK's usage data
+2. **Threshold Monitoring**: When `totalTokensUsed` reaches 60% of the model's context window (default: 76,800 tokens for gpt-4o-mini), summarization is triggered
+3. **Summary Generation**: GPT-4o-mini generates a comprehensive summary of the conversation
+4. **Context Preservation**: Key information, transaction IDs, customer details, and decisions are preserved
+5. **Token Reset**: Token counter resets to 0 after each successful summarization
+6. **Incremental Updates**: Subsequent summaries incorporate previous summaries for continuity
+7. **Conversation Closure**: After reaching the maximum number of summaries (default: 2), the conversation is closed
 
 ### Configuration
 
 ```env
-SUMMARIZATION_THRESHOLD=20  # User messages before triggering summarization (default: 20)
-MAX_SUMMARIES=2             # Maximum summaries before conversation closes (default: 2)
+CONTEXT_WINDOW_SIZE=128000          # Model context window in tokens (default: 128k for gpt-4o-mini)
+TOKEN_THRESHOLD_PERCENTAGE=0.6      # Trigger summarization at 60% of context window (default: 0.6)
+MAX_SUMMARIES=2                     # Maximum summaries before conversation closes (default: 2)
 ```
+
+**Default threshold calculation:**
+
+- Context window: 128,000 tokens
+- Threshold: 128,000 × 0.6 = **76,800 tokens**
 
 ### Conversation Lifecycle
 
 ```mermaid
 flowchart TD
-    Start([New Conversation]) --> Messages[User sends messages]
-    Messages --> Check{20+ messages<br/>since last summary?}
+    Start([New Conversation<br/>totalTokensUsed = 0]) --> Messages[User sends messages<br/>tokens accumulate]
+    Messages --> Check{totalTokensUsed ≥<br/>76,800 tokens?}
     Check -->|No| Messages
-    Check -->|Yes| Summarize[Generate Summary]
+    Check -->|Yes| Summarize[Generate Summary<br/>Reset tokens to 0]
     Summarize --> Count{Summary count < 2?}
-    Count -->|Yes| Continue[Continue conversation]
+    Count -->|Yes| Continue[Continue conversation<br/>summaryCount++]
     Continue --> Messages
-    Count -->|No| Close[Close conversation]
+    Count -->|No| Close[Close conversation<br/>isClosed = true]
     Close --> Continue2{User wants to continue?}
     Continue2 -->|Yes| NewConv[Create new conversation<br/>with carried-over summary]
     NewConv --> Messages
@@ -422,13 +430,24 @@ The new conversation inherits the combined summary from the closed conversation,
 
 ### Conversation Response Fields
 
-| Field                     | Description                                            |
-| ------------------------- | ------------------------------------------------------ |
-| `summary`                 | Current conversation summary (if generated)            |
-| `summaryCount`            | Number of summaries generated (0-2)                    |
-| `previousSummary`         | Summary carried over from a previous conversation      |
-| `lastSummarizedMessageId` | Watermark tracking last summarized message             |
-| `isClosed`                | Whether the conversation is closed (after 2 summaries) |
+| Field                     | Description                                                                |
+| ------------------------- | -------------------------------------------------------------------------- |
+| `summary`                 | Current conversation summary (if generated)                                |
+| `summaryCount`            | Number of summaries generated (0-2)                                        |
+| `previousSummary`         | Summary carried over from a previous conversation                          |
+| `lastSummarizedMessageId` | Watermark tracking last summarized message                                 |
+| `totalTokensUsed`         | Cumulative token usage since last summary (resets to 0 after each summary) |
+| `isClosed`                | Whether the conversation is closed (after 2 summaries)                     |
+
+### Why Token-Based?
+
+Token-based summarization provides several advantages over message counting:
+
+- **More Accurate**: Directly measures what the model sees and processes
+- **Adaptive**: Handles varying message lengths naturally (short vs long conversations)
+- **Model-Aware**: Respects actual context window limits of different AI models
+- **Predictable**: Prevents unexpected context overflows or truncation
+- **Cost-Effective**: Optimizes summarization frequency based on actual token usage
 
 ## Chat Streaming
 
@@ -442,12 +461,13 @@ The API provides real-time AI chat capabilities with streaming responses using S
 - Maintains conversation history context (last 40 messages by default)
 - Supports AI tools for dynamic actions
 - Dual-mode support: global or resource-scoped
-- **Automatic summarization** for long conversations with context carry-over
+- **Automatic token-based summarization** for long conversations with context carry-over
 
 ### Configuration
 
 ```env
-MESSAGE_HISTORY_LIMIT=40    # Number of past messages kept in AI context
-SUMMARIZATION_THRESHOLD=20  # User messages before triggering summarization
-MAX_SUMMARIES=2             # Maximum summaries before conversation closes
+MESSAGE_HISTORY_LIMIT=40           # Number of past messages kept in AI context
+CONTEXT_WINDOW_SIZE=128000         # Model context window in tokens
+TOKEN_THRESHOLD_PERCENTAGE=0.6     # Trigger summarization at 60% of context window
+MAX_SUMMARIES=2                    # Maximum summaries before conversation closes
 ```
