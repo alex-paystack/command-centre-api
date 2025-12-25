@@ -38,6 +38,9 @@ export class Conversation {
   @Column({ nullable: true })
   lastSummarizedMessageId?: string;
 
+  @Column({ default: 0 })
+  totalTokensUsed: number;
+
   @Column({ default: false })
   isClosed: boolean;
 

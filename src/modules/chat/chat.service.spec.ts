@@ -45,6 +45,7 @@ describe('ChatService', () => {
     mode: ChatMode.PAGE,
     summaryCount: 0,
     isClosed: false,
+    totalTokensUsed: 0,
   };
 
   const mockMessage: Message = {

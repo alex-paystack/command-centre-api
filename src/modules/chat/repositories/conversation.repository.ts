@@ -56,6 +56,7 @@ export class ConversationRepository extends MongoRepository<Conversation> {
     const conversation = this.create({
       ...data,
       summaryCount: data.summaryCount ?? 0,
+      totalTokensUsed: data.totalTokensUsed ?? 0,
       isClosed: data.isClosed ?? false,
       lastActivityAt: data.lastActivityAt ?? new Date(),
       expiresAt: data.expiresAt ?? ConversationRepository.defaultExpiresAt(),

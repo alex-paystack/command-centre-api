@@ -27,6 +27,7 @@ Stores chat conversation metadata, context, and summarization state.
   summaryCount: number,          // Number of summaries generated (0-2)
   previousSummary: string | null,// Summary carried over from previous conversation
   lastSummarizedMessageId: string | null, // Watermark for incremental summarization
+  totalTokensUsed: number,       // Cumulative token usage since last summary (resets to 0 after each summary)
   isClosed: boolean,             // True after max summaries reached
   createdAt: Date
 }
@@ -34,21 +35,22 @@ Stores chat conversation metadata, context, and summarization state.
 
 #### Fields
 
-| Field                     | Type    | Default | Description                                       |
-| ------------------------- | ------- | ------- | ------------------------------------------------- |
-| `id`                      | string  | -       | UUID (client-generated)                           |
-| `title`                   | string  | -       | Conversation title (auto-generated or custom)     |
-| `userId`                  | string  | -       | Owner user ID                                     |
-| `mode`                    | enum    | -       | Chat mode: `global` or `page`                     |
-| `pageContext`             | object  | null    | Resource context for page-scoped conversations    |
-| `summary`                 | string  | null    | AI-generated summary of conversation              |
-| `summaryCount`            | number  | 0       | Count of summaries (conversation closes at 2)     |
-| `previousSummary`         | string  | null    | Summary inherited from a closed conversation      |
-| `lastSummarizedMessageId` | string  | null    | Last message ID included in summary (watermark)   |
-| `isClosed`                | boolean | false   | Whether conversation is closed (no new messages)  |
-| `lastActivityAt`          | Date    | -       | Last activity timestamp (updated on each message) |
-| `expiresAt`               | Date    | -       | Absolute expiry timestamp for TTL deletion        |
-| `createdAt`               | Date    | -       | Creation timestamp                                |
+| Field                     | Type    | Default | Description                                                            |
+| ------------------------- | ------- | ------- | ---------------------------------------------------------------------- |
+| `id`                      | string  | -       | UUID (client-generated)                                                |
+| `title`                   | string  | -       | Conversation title (auto-generated or custom)                          |
+| `userId`                  | string  | -       | Owner user ID                                                          |
+| `mode`                    | enum    | -       | Chat mode: `global` or `page`                                          |
+| `pageContext`             | object  | null    | Resource context for page-scoped conversations                         |
+| `summary`                 | string  | null    | AI-generated summary of conversation                                   |
+| `summaryCount`            | number  | 0       | Count of summaries (conversation closes at 2)                          |
+| `previousSummary`         | string  | null    | Summary inherited from a closed conversation                           |
+| `lastSummarizedMessageId` | string  | null    | Last message ID included in summary (watermark)                        |
+| `totalTokensUsed`         | number  | 0       | Cumulative token count since last summary (resets after summarization) |
+| `isClosed`                | boolean | false   | Whether conversation is closed (no new messages)                       |
+| `lastActivityAt`          | Date    | -       | Last activity timestamp (updated on each message)                      |
+| `expiresAt`               | Date    | -       | Absolute expiry timestamp for TTL deletion                             |
+| `createdAt`               | Date    | -       | Creation timestamp                                                     |
 
 #### Indexes
 
@@ -340,6 +342,7 @@ erDiagram
         number summaryCount "0-2"
         string previousSummary "optional"
         string lastSummarizedMessageId "optional"
+        number totalTokensUsed "default 0"
         boolean isClosed "default false"
         Date createdAt
     }

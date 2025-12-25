@@ -44,8 +44,9 @@ MESSAGE_HISTORY_LIMIT=40       # Number of past messages kept in AI context (def
 CONVERSATION_TTL_DAYS=3        # Days of inactivity before auto-deletion via TTL indexes (default: 3)
 
 # Conversation Summarization
-SUMMARIZATION_THRESHOLD=20     # User messages before triggering summarization (default: 20)
-MAX_SUMMARIES=2                # Maximum summaries per conversation before closing (default: 2)
+MAX_SUMMARIES=2                     # Maximum summaries per conversation before closing (default: 2)
+CONTEXT_WINDOW_SIZE=128000          # Model context window in tokens (default: 128000 for gpt-4o-mini)
+TOKEN_THRESHOLD_PERCENTAGE=0.6      # Trigger summarization at 60% of context window (default: 0.6)
 
 # Logging
 LOG_LEVEL=info
@@ -60,27 +61,28 @@ OTEL_METRICS_EXPORTER=console
 
 ### Variable Reference
 
-| Variable                  | Required | Default                          | Description                             |
-| ------------------------- | -------- | -------------------------------- | --------------------------------------- |
-| `DATABASE_HOST`           | Yes      | -                                | MongoDB host                            |
-| `DATABASE_USERNAME`       | Yes      | -                                | MongoDB username                        |
-| `DATABASE_PASSWORD`       | Yes      | -                                | MongoDB password                        |
-| `DATABASE_NAME`           | Yes      | -                                | Database name                           |
-| `OPENAI_API_KEY`          | Yes      | -                                | OpenAI API key (starts with `sk-`)      |
-| `JWT_SECRET`              | Yes      | -                                | Secret for JWT signing                  |
-| `JWT_EXPIRES_IN`          | No       | `24h`                            | JWT expiration time                     |
-| `NODE_ENV`                | No       | `development`                    | Environment mode                        |
-| `APP_NAME`                | No       | `command-centre-api`             | Application name                        |
-| `APP_VERSION`             | No       | `1.0.0`                          | Application version                     |
-| `PAYSTACK_API_BASE_URL`   | No       | `https://studio-api.paystack.co` | Paystack API base URL                   |
-| `MESSAGE_LIMIT`           | No       | `100`                            | Rate limit message count                |
-| `RATE_LIMIT_PERIOD_HOURS` | No       | `24`                             | Rate limit time window                  |
-| `MESSAGE_HISTORY_LIMIT`   | No       | `40`                             | AI context message limit                |
-| `CONVERSATION_TTL_DAYS`   | No       | `3`                              | Inactivity days before auto-deletion    |
-| `SUMMARIZATION_THRESHOLD` | No       | `20`                             | User messages before summarization      |
-| `MAX_SUMMARIES`           | No       | `2`                              | Max summaries before conversation close |
-| `LOG_LEVEL`               | No       | `info`                           | Logging verbosity                       |
-| `OTEL_SERVICE_NAME`       | No       | `command-centre-api`             | OpenTelemetry service name              |
+| Variable                     | Required | Default                          | Description                               |
+| ---------------------------- | -------- | -------------------------------- | ----------------------------------------- |
+| `DATABASE_HOST`              | Yes      | -                                | MongoDB host                              |
+| `DATABASE_USERNAME`          | Yes      | -                                | MongoDB username                          |
+| `DATABASE_PASSWORD`          | Yes      | -                                | MongoDB password                          |
+| `DATABASE_NAME`              | Yes      | -                                | Database name                             |
+| `OPENAI_API_KEY`             | Yes      | -                                | OpenAI API key (starts with `sk-`)        |
+| `JWT_SECRET`                 | Yes      | -                                | Secret for JWT signing                    |
+| `JWT_EXPIRES_IN`             | No       | `24h`                            | JWT expiration time                       |
+| `NODE_ENV`                   | No       | `development`                    | Environment mode                          |
+| `APP_NAME`                   | No       | `command-centre-api`             | Application name                          |
+| `APP_VERSION`                | No       | `1.0.0`                          | Application version                       |
+| `PAYSTACK_API_BASE_URL`      | No       | `https://studio-api.paystack.co` | Paystack API base URL                     |
+| `MESSAGE_LIMIT`              | No       | `100`                            | Rate limit message count                  |
+| `RATE_LIMIT_PERIOD_HOURS`    | No       | `24`                             | Rate limit time window                    |
+| `MESSAGE_HISTORY_LIMIT`      | No       | `40`                             | AI context message limit                  |
+| `CONVERSATION_TTL_DAYS`      | No       | `3`                              | Inactivity days before auto-deletion      |
+| `MAX_SUMMARIES`              | No       | `2`                              | Max summaries before conversation close   |
+| `CONTEXT_WINDOW_SIZE`        | No       | `128000`                         | Model context window in tokens            |
+| `TOKEN_THRESHOLD_PERCENTAGE` | No       | `0.6`                            | Percentage (0-1) triggering summarization |
+| `LOG_LEVEL`                  | No       | `info`                           | Logging verbosity                         |
+| `OTEL_SERVICE_NAME`          | No       | `command-centre-api`             | OpenTelemetry service name                |
 
 ## Rate Limiting
 
@@ -172,6 +174,92 @@ Day 1: User sends another message
 Day 4: No activity for 3 days
        └─> MongoDB deletes conversation + messages
 ```
+
+## Token-Based Summarization
+
+The API uses intelligent token-based summarization to manage conversation context and prevent hitting model limits. Instead of counting messages, the system tracks actual token usage from the AI model.
+
+### How It Works
+
+- **Automatic Tracking**: Captures token usage from every `streamText` call via AI SDK's usage data
+- **Cumulative Counter**: `totalTokensUsed` field on conversation accumulates tokens across all interactions
+- **Smart Triggering**: Summarizes when reaching a percentage of the model's context window
+- **Reset After Summary**: Token counter resets to 0 after each successful summarization
+- **Conversation Closure**: After `MAX_SUMMARIES` summaries, conversation closes (user can continue via new conversation with carried-over context)
+
+### Configuration
+
+```env
+CONTEXT_WINDOW_SIZE=128000          # Model's max context window (gpt-4o-mini: 128k tokens)
+TOKEN_THRESHOLD_PERCENTAGE=0.6      # Trigger at 60% of context window (76,800 tokens)
+MAX_SUMMARIES=2                     # Close conversation after 2 summaries
+```
+
+### Example Calculation
+
+For `gpt-4o-mini` with default settings:
+
+- Context window: 128,000 tokens
+- Threshold: 128,000 × 0.6 = **76,800 tokens**
+- First summary triggered at ~76,800 tokens
+- Token counter resets to 0
+- Second summary triggered at another ~76,800 tokens
+- Conversation closes after 2nd summary
+
+### Adjusting for Different Models
+
+When switching AI models, update `CONTEXT_WINDOW_SIZE`:
+
+```env
+# GPT-4 Turbo (128k)
+CONTEXT_WINDOW_SIZE=128000
+
+# GPT-4o (128k)
+CONTEXT_WINDOW_SIZE=128000
+
+# Claude 3.5 Sonnet (200k)
+CONTEXT_WINDOW_SIZE=200000
+
+# GPT-3.5 Turbo (16k)
+CONTEXT_WINDOW_SIZE=16000
+```
+
+### Token Lifecycle
+
+```text
+Conversation Start:
+  └─> totalTokensUsed = 0
+
+Turn 1: User message + AI response
+  └─> totalTokensUsed = 15,000 tokens
+
+Turn 2: User message + AI response
+  └─> totalTokensUsed = 32,000 tokens
+
+... more turns ...
+
+Turn N: totalTokensUsed reaches 77,000 (> 76,800 threshold)
+  └─> Summary #1 generated
+  └─> totalTokensUsed reset to 0
+  └─> summaryCount = 1
+
+... conversation continues ...
+
+Turn M: totalTokensUsed reaches 78,000 (> 76,800 threshold)
+  └─> Summary #2 generated
+  └─> totalTokensUsed reset to 0
+  └─> summaryCount = 2
+  └─> Conversation closed (isClosed = true)
+```
+
+### Why Token-Based?
+
+**Advantages over message counting:**
+
+- More accurate: Directly measures what the model sees
+- Adaptive: Handles varying message lengths (short vs long messages)
+- Model-aware: Respects actual context window limits
+- Predictable: Prevents unexpected context overflows
 
 ## Environment-Specific Configuration
 

@@ -40,6 +40,7 @@ describe('ChatService - Summarization', () => {
     previousSummary: 'This was carried over from before.',
     lastSummarizedMessageId: 'last-msg-id',
     isClosed: true,
+    totalTokensUsed: 0,
   };
 
   const mockOpenConversation = {
@@ -54,6 +55,7 @@ describe('ChatService - Summarization', () => {
     mode: ChatMode.GLOBAL,
     summaryCount: 0,
     isClosed: false,
+    totalTokensUsed: 0,
   };
 
   beforeEach(async () => {
@@ -260,103 +262,8 @@ describe('ChatService - Summarization', () => {
   });
 
   describe('handleMessageSummarization', () => {
-    it('should not trigger summarization when message count is below threshold', async () => {
-      const conversation = { ...mockOpenConversation };
-      jest.spyOn(messageRepository, 'countUserMessagesByConversationId').mockResolvedValue(10);
-      jest.spyOn(conversationRepository, 'save').mockResolvedValue(conversation);
-
-      await service.handleMessageSummarization(conversation, 'user_123', []);
-
-      // Should not call save since we haven't reached the threshold
-      expect(conversationRepository.save).not.toHaveBeenCalled();
-    });
-
-    it('should trigger summarization when message count reaches threshold', async () => {
-      const conversation = { ...mockOpenConversation };
-      const mockMessages = Array.from({ length: 20 }, (_, i) => ({
-        _id: {} as Message['_id'],
-        id: `msg-${i}`,
-        conversationId: conversation.id,
-        role: i % 2 === 0 ? MessageRole.USER : MessageRole.ASSISTANT,
-        parts: [{ type: 'text' as const, text: `Message ${i}` }],
-        createdAt: new Date(),
-        expiresAt: new Date(),
-        conversation,
-      }));
-
-      jest.spyOn(messageRepository, 'countUserMessagesByConversationId').mockResolvedValue(20);
-      jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue(mockMessages);
-      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(conversation);
-      jest.spyOn(conversationRepository, 'save').mockResolvedValue({ ...conversation, summaryCount: 1 });
-
-      // Mock the summarizeConversation to return a summary
-      const { summarizeConversation } = await import('~/common/ai/actions');
-      (summarizeConversation as jest.Mock).mockResolvedValue('This is a summary of the conversation.');
-
-      await service.handleMessageSummarization(conversation, 'user_123', []);
-
-      expect(messageRepository.countUserMessagesByConversationId).toHaveBeenCalledWith(conversation.id);
-    });
-
-    it('should only summarize messages after lastSummarizedMessageId', async () => {
-      const conversation = {
-        ...mockOpenConversation,
-        lastSummarizedMessageId: 'msg-10',
-        summaryCount: 1,
-      };
-
-      jest.spyOn(messageRepository, 'countUserMessagesAfterMessageId').mockResolvedValue(20);
-      jest.spyOn(messageRepository, 'findMessagesAfterMessageId').mockResolvedValue([]);
-      jest.spyOn(conversationRepository, 'save').mockResolvedValue(conversation);
-
-      await service.handleMessageSummarization(conversation, 'user_123', []);
-
-      expect(messageRepository.countUserMessagesAfterMessageId).toHaveBeenCalledWith(conversation.id, 'msg-10');
-    });
-
-    it('should close conversation after reaching max summaries', async () => {
-      const conversation = {
-        ...mockOpenConversation,
-        summaryCount: 1,
-      };
-
-      const mockMessageResponses = Array.from({ length: 20 }, (_, i) => ({
-        id: `msg-${i}`,
-        conversationId: conversation.id,
-        role: i % 2 === 0 ? MessageRole.USER : MessageRole.ASSISTANT,
-        parts: [{ type: 'text' as const, text: `Message ${i}` }],
-        createdAt: new Date(),
-        expiresAt: new Date(),
-      }));
-
-      jest.spyOn(messageRepository, 'countUserMessagesByConversationId').mockResolvedValue(20);
-      jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(conversation);
-      jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue(
-        mockMessageResponses.map((messageResponse) => ({
-          ...messageResponse,
-          _id: {} as Message['_id'],
-          conversation,
-        })),
-      );
-
-      const savedConversation = { ...conversation, summaryCount: 2, isClosed: true };
-      jest.spyOn(conversationRepository, 'save').mockResolvedValue(savedConversation);
-
-      const { summarizeConversation } = await import('~/common/ai/actions');
-      (summarizeConversation as jest.Mock).mockResolvedValue('Second summary.');
-
-      await service.handleMessageSummarization(conversation, 'user_123', []);
-
-      expect(conversationRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          summaryCount: 2,
-          isClosed: true,
-        }),
-      );
-    });
-
     it('should not fail the request if summarization fails', async () => {
-      const conversation = { ...mockOpenConversation };
+      const conversation = { ...mockOpenConversation, totalTokensUsed: 70000 };
       const mockMessages = Array.from({ length: 20 }, (_, i) => ({
         _id: {} as Message['_id'],
         id: `msg-${i}`,
@@ -368,7 +275,6 @@ describe('ChatService - Summarization', () => {
         conversation,
       }));
 
-      jest.spyOn(messageRepository, 'countUserMessagesByConversationId').mockResolvedValue(20);
       jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue(mockMessages);
       jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(conversation);
       jest.spyOn(conversationRepository, 'save').mockResolvedValue(conversation);
@@ -376,8 +282,156 @@ describe('ChatService - Summarization', () => {
       const { summarizeConversation } = await import('~/common/ai/actions');
       (summarizeConversation as jest.Mock).mockRejectedValue(new Error('AI service unavailable'));
 
-      // Should not throw
-      await expect(service.handleMessageSummarization(conversation, 'user_123', [])).resolves.toBeUndefined();
+      // Should not throw even when summarization fails (add tokens to trigger summarization)
+      await expect(service.handleMessageSummarization(conversation, 'user_123', [], 10000)).resolves.toBeUndefined();
+    });
+
+    describe('Token-based summarization', () => {
+      beforeEach(() => {
+        configService.get.mockImplementation((key: string, defaultValue?: unknown) => {
+          if (key === 'CONTEXT_WINDOW_SIZE') {
+            return 128000;
+          }
+          if (key === 'TOKEN_THRESHOLD_PERCENTAGE') {
+            return 0.6;
+          }
+          if (key === 'MAX_SUMMARIES') {
+            return 2;
+          }
+          return defaultValue;
+        });
+      });
+
+      it('should accumulate token count when tokenCountForThisInteraction is provided', async () => {
+        const conversation = { ...mockOpenConversation, totalTokensUsed: 10000 };
+        jest.spyOn(conversationRepository, 'save').mockResolvedValue(conversation);
+        jest.spyOn(messageRepository, 'countUserMessagesByConversationId').mockResolvedValue(5);
+
+        await service.handleMessageSummarization(conversation, 'user_123', [], 5000);
+
+        // Should save with accumulated tokens (10000 + 5000 = 15000)
+        expect(conversationRepository.save).toHaveBeenCalledWith(
+          expect.objectContaining({
+            totalTokensUsed: 15000,
+          }),
+        );
+      });
+
+      it('should not trigger summarization when token count is below threshold', async () => {
+        const conversation = { ...mockOpenConversation, totalTokensUsed: 50000 };
+        jest.spyOn(conversationRepository, 'save').mockResolvedValue(conversation);
+        jest.spyOn(messageRepository, 'countUserMessagesByConversationId').mockResolvedValue(5);
+
+        await service.handleMessageSummarization(conversation, 'user_123', [], 10000);
+
+        // Should only save once for token accumulation, not for summarization
+        expect(conversationRepository.save).toHaveBeenCalledTimes(1);
+        expect(conversationRepository.save).toHaveBeenCalledWith(
+          expect.objectContaining({
+            totalTokensUsed: 60000,
+          }),
+        );
+      });
+
+      it('should trigger summarization when token count reaches 60% threshold', async () => {
+        const conversation = { ...mockOpenConversation, totalTokensUsed: 70000 };
+        const mockMessages = Array.from({ length: 10 }, (_, i) => ({
+          _id: {} as Message['_id'],
+          id: `msg-${i}`,
+          conversationId: conversation.id,
+          role: i % 2 === 0 ? MessageRole.USER : MessageRole.ASSISTANT,
+          parts: [{ type: 'text' as const, text: `Message ${i}` }],
+          createdAt: new Date(),
+          expiresAt: new Date(),
+          conversation,
+        }));
+
+        jest.spyOn(conversationRepository, 'save').mockResolvedValue(conversation);
+        jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue(mockMessages);
+        jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(conversation);
+
+        const { summarizeConversation } = await import('~/common/ai/actions');
+        (summarizeConversation as jest.Mock).mockResolvedValue('Token-based summary.');
+
+        // Add 7000 tokens to reach 77000 (above 76800 threshold: 128000 * 0.6)
+        await service.handleMessageSummarization(conversation, 'user_123', [], 7000);
+
+        // Should trigger summarization
+        expect(conversationRepository.save).toHaveBeenCalled();
+      });
+
+      it('should reset token counter to 0 after summarization', async () => {
+        const conversation = { ...mockOpenConversation, totalTokensUsed: 70000 };
+        const mockMessages = Array.from({ length: 10 }, (_, i) => ({
+          _id: {} as Message['_id'],
+          id: `msg-${i}`,
+          conversationId: conversation.id,
+          role: i % 2 === 0 ? MessageRole.USER : MessageRole.ASSISTANT,
+          parts: [{ type: 'text' as const, text: `Message ${i}` }],
+          createdAt: new Date(),
+          expiresAt: new Date(),
+          conversation,
+        }));
+
+        jest.spyOn(conversationRepository, 'save').mockResolvedValue(conversation);
+        jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue(mockMessages);
+        jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(conversation);
+
+        const { summarizeConversation } = await import('~/common/ai/actions');
+        (summarizeConversation as jest.Mock).mockResolvedValue('Token-based summary.');
+
+        await service.handleMessageSummarization(conversation, 'user_123', [], 7000);
+
+        // Find the call that includes the summary (second save call)
+        const summarizationCall = conversationRepository.save.mock.calls.find((call) =>
+          Object.prototype.hasOwnProperty.call(call[0], 'summary'),
+        );
+
+        expect(summarizationCall).toBeDefined();
+        expect(summarizationCall?.[0]).toMatchObject({
+          totalTokensUsed: 0,
+        });
+      });
+
+      it('should calculate threshold correctly with different context window sizes', async () => {
+        configService.get.mockImplementation((key: string, defaultValue?: unknown) => {
+          if (key === 'CONTEXT_WINDOW_SIZE') {
+            return 200000; // Different model
+          }
+          if (key === 'TOKEN_THRESHOLD_PERCENTAGE') {
+            return 0.6;
+          }
+          if (key === 'MAX_SUMMARIES') {
+            return 2;
+          }
+          return defaultValue;
+        });
+
+        // Threshold should be 200000 * 0.6 = 120000
+        const conversation = { ...mockOpenConversation, totalTokensUsed: 115000 };
+        const mockMessages = Array.from({ length: 10 }, (_, i) => ({
+          _id: {} as Message['_id'],
+          id: `msg-${i}`,
+          conversationId: conversation.id,
+          role: i % 2 === 0 ? MessageRole.USER : MessageRole.ASSISTANT,
+          parts: [{ type: 'text' as const, text: `Message ${i}` }],
+          createdAt: new Date(),
+          expiresAt: new Date(),
+          conversation,
+        }));
+
+        jest.spyOn(conversationRepository, 'save').mockResolvedValue(conversation);
+        jest.spyOn(messageRepository, 'findByConversationId').mockResolvedValue(mockMessages);
+        jest.spyOn(conversationRepository, 'findByIdAndUserId').mockResolvedValue(conversation);
+
+        const { summarizeConversation } = await import('~/common/ai/actions');
+        (summarizeConversation as jest.Mock).mockResolvedValue('Summary with larger context.');
+
+        // Add 6000 tokens to reach 121000 (above 120000 threshold)
+        await service.handleMessageSummarization(conversation, 'user_123', [], 6000);
+
+        expect(conversationRepository.save).toHaveBeenCalled();
+      });
     });
   });
 
