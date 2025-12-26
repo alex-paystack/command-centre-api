@@ -60,14 +60,15 @@ The assistant can only operate on merchant data exposed by these tools (all requ
 
 ### Data Retrieval Tools
 
-| Tool                | Description                    | Key Filters                                       |
-| ------------------- | ------------------------------ | ------------------------------------------------- |
-| `getTransactions`   | Fetch payment transactions     | status, channel, customer, date, amount, currency |
-| `getCustomers`      | List/search customers          | email, account_number, pagination                 |
-| `getRefunds`        | Fetch refund data              | status, date, amount (with operators: gt, lt, eq) |
-| `getPayouts`        | Fetch payout/settlement data   | status, date, subaccount                          |
-| `getDisputes`       | Fetch dispute data             | status, date, transaction, category               |
-| `generateChartData` | Generate chart-ready analytics | resourceType, aggregationType, date range         |
+| Tool                | Description                                               | Key Filters                                                                                         |
+| ------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `getTransactions`   | Fetch payment transactions                                | status, channel, customer, date, amount, currency                                                   |
+| `getCustomers`      | List/search customers                                     | email, account_number, pagination                                                                   |
+| `getRefunds`        | Fetch refund data                                         | status, date, amount (with operators: gt, lt, eq)                                                   |
+| `getPayouts`        | Fetch payout/settlement data                              | status, date, subaccount                                                                            |
+| `getDisputes`       | Fetch dispute data                                        | status, date, transaction, category                                                                 |
+| `generateChartData` | Generate chart-ready analytics                            | resourceType, aggregationType, date range                                                           |
+| `compareChartData`  | Compare two date ranges for the same resource/aggregation | resourceType, aggregationType, rangeA {from,to}, rangeB {from,to}, optional status/currency/channel |
 
 ### Data Export Tools
 
@@ -178,6 +179,31 @@ The `generateChartData` tool provides powerful analytics capabilities across mul
 - Resource-specific validation of aggregation types
 - **Centralized validation system** (`chart-validation.ts`) for consistent parameter validation
 - **Channel filtering** for transaction-specific payment channel analysis
+
+## Period Comparison (compareChartData)
+
+Use `compareChartData` when users say “compare”, “vs last week/month”, or provide two date ranges. It runs the same aggregation twice (rangeA vs rangeB) and returns:
+
+- `chartType`: matches the underlying aggregation (falls back to `area` if ranges differ)
+- `current` / `previous`: either `chartSeries` (time-based) or `chartData` (categorical), ready for Recharts
+- `summary`: per-range summaries plus `deltas` (count/volume/average); `totalVolume`/`overallAverage` remain `null` when mixed currencies
+- Same 30-day-per-range validation and resource/aggregation rules as `generateChartData`
+
+Example (time-based, simplified):
+
+```json
+{
+  "label": "Daily Transaction Metrics vs Daily Transaction Metrics",
+  "chartType": "area",
+  "current": [{ "currency": "USD", "points": [{ "name": "Mon, Dec 8", "count": 42 }] }],
+  "previous": [{ "currency": "USD", "points": [{ "name": "Mon, Dec 1", "count": 38 }] }],
+  "summary": {
+    "current": { "totalCount": 42, "totalVolume": null, "overallAverage": null },
+    "previous": { "totalCount": 38, "totalVolume": null, "overallAverage": null },
+    "deltas": { "totalCount": 4, "totalVolume": 0, "overallAverage": 0 }
+  }
+}
+```
 
 ## Guardrails & Classification
 

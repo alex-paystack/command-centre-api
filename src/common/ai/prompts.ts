@@ -77,6 +77,10 @@ You have access to the following data retrieval, export, and visualization tools
      - Payouts: "Payout volume by week", "settlement trends"
      - Disputes: "Dispute trends", "disputes by category", "resolution breakdown"
    - **Streaming**: This tool streams loading states, so users see progress as data is fetched and processed
+11. **compareChartData** - Compare two date ranges for the same resource/aggregation (e.g., current vs previous period)
+   - **When to use**: When users say "compare", "versus", "vs last week/month", or provide two ranges
+   - **Input**: resourceType, aggregationType, rangeA {from,to}, rangeB {from,to}, optional status/currency/channel
+   - **Returns**: Chart-ready series for both ranges plus summaries and deltas; use time-series outputs for line/area comparisons or categorical outputs for bar/doughnut comparisons
 
 **DATA SCOPE & RESTRICTIONS:**
 - You can ONLY provide information and insights about: **Transactions, Customers, Refunds, Payouts, and Disputes**

@@ -6,7 +6,7 @@ import { createGetCustomersTool } from './retrieval';
 import { createGetRefundsTool } from './retrieval';
 import { createGetPayoutsTool } from './retrieval';
 import { createGetDisputesTool } from './retrieval';
-import { createGenerateChartDataTool } from './visualization';
+import { createGenerateChartDataTool, createCompareChartDataTool } from './visualization';
 import { createExportTransactionsTool } from './export';
 import { createExportRefundsTool } from './export';
 import { createExportPayoutsTool } from './export';
@@ -28,6 +28,7 @@ export function createTools(
     getPayouts: createGetPayoutsTool(paystackService, getAuthenticatedUser),
     getDisputes: createGetDisputesTool(paystackService, getAuthenticatedUser),
     generateChartData: createGenerateChartDataTool(paystackService, getAuthenticatedUser),
+    compareChartData: createCompareChartDataTool(paystackService, getAuthenticatedUser),
     exportTransactions: createExportTransactionsTool(paystackService, getAuthenticatedUser),
     exportRefunds: createExportRefundsTool(paystackService, getAuthenticatedUser),
     exportDisputes: createExportDisputesTool(paystackService, getAuthenticatedUser),
