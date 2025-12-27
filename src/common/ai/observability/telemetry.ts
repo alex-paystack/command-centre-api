@@ -1,6 +1,8 @@
 import { Langfuse } from 'langfuse';
 import { ChatMode, PageContext } from '../types';
 
+// TODO: LLM trace should include user email so it is easier to identify the user
+
 /**
  * LLM operation types for telemetry tracking
  */
@@ -66,12 +68,12 @@ export interface TelemetryContext {
 /**
  * Builds tags array for Langfuse filtering
  */
-function buildTags(context: TelemetryContext): string[] {
+function buildTags(context: TelemetryContext) {
   const serviceName = process.env['OTEL_SERVICE_NAME'] ?? 'command-centre-api';
   const environment = process.env['OTEL_SERVICE_ENV'] ?? 'local';
   const version = process.env['OTEL_SERVICE_VERSION'] ?? '1.0.0';
 
-  const tags: string[] = [
+  const tags = [
     `service:${serviceName}`,
     `env:${environment}`,
     `version:${version}`,
@@ -160,20 +162,32 @@ export function createTelemetryConfig(context: TelemetryContext) {
 }
 
 /**
+ * Parameters for creating a minimal telemetry context
+ */
+export interface CreateMinimalTelemetryContextParams {
+  /** Conversation ID - used as Langfuse sessionId to group all LLM calls */
+  conversationId: string;
+  /** User ID from JWT authentication */
+  userId: string;
+  /** Type of LLM operation */
+  operationType: LLMOperationType;
+  /** Parent trace ID - used to group all LLM calls in a conversation */
+  parentTraceId: string;
+}
+
+/**
  * Creates a minimal telemetry context for operations that don't have full conversation context.
  * Used for title generation which happens before the conversation is fully established.
  *
- * @param conversationId - The conversation ID
- * @param userId - The user ID
- * @param operationType - The type of LLM operation
+ * @param params - Object containing conversation ID, user ID, operation type, and parent trace ID
  * @returns Telemetry context with minimal required fields
  */
-export function createMinimalTelemetryContext(
-  conversationId: string,
-  userId: string,
-  operationType: LLMOperationType,
-  parentTraceId: string,
-): TelemetryContext {
+export function createMinimalTelemetryContext({
+  conversationId,
+  userId,
+  operationType,
+  parentTraceId,
+}: CreateMinimalTelemetryContextParams): TelemetryContext {
   return {
     conversationId,
     parentTraceId,
@@ -183,23 +197,37 @@ export function createMinimalTelemetryContext(
 }
 
 /**
+ * Parameters for creating a full chat telemetry context
+ */
+export interface CreateChatTelemetryContextParams {
+  /** Conversation ID - used as Langfuse sessionId to group all LLM calls */
+  conversationId: string;
+  /** User ID from JWT authentication */
+  userId: string;
+  /** Chat mode (global or page) */
+  mode?: ChatMode;
+  /** Page context for page-scoped conversations */
+  pageContext?: PageContext;
+  /** Type of LLM operation */
+  operationType: LLMOperationType;
+  /** Parent trace ID - used to group all LLM calls in a conversation */
+  parentTraceId: string;
+}
+
+/**
  * Creates a full telemetry context for chat operations.
  *
- * @param conversationId - The conversation ID
- * @param userId - The user ID
- * @param mode - Chat mode (global or page)
- * @param pageContext - Optional page context for page-scoped conversations
- * @param operationType - The type of LLM operation
+ * @param params - Object containing conversation ID, user ID, mode, page context, operation type, and parent trace ID
  * @returns Full telemetry context
  */
-export function createChatTelemetryContext(
-  conversationId: string,
-  userId: string,
-  mode: ChatMode | undefined,
-  pageContext: PageContext | undefined,
-  operationType: LLMOperationType,
-  parentTraceId: string,
-): TelemetryContext {
+export function createChatTelemetryContext({
+  conversationId,
+  userId,
+  mode,
+  pageContext,
+  operationType,
+  parentTraceId,
+}: CreateChatTelemetryContextParams): TelemetryContext {
   return {
     conversationId,
     parentTraceId,

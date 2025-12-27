@@ -372,13 +372,19 @@ export class ChatService {
     }
   }
 
-  async handleMessageSummarization(
-    conversation: Conversation,
-    userId: string,
-    savedMessages: MessageResponseDto[],
-    tokenCountForThisInteraction?: number,
-    telemetryContext?: TelemetryContext,
-  ) {
+  async handleMessageSummarization({
+    conversation,
+    userId,
+    savedMessages,
+    tokenCountForThisInteraction,
+    telemetryContext,
+  }: {
+    conversation: Conversation;
+    userId: string;
+    savedMessages: MessageResponseDto[];
+    tokenCountForThisInteraction?: number;
+    telemetryContext?: TelemetryContext;
+  }) {
     if (tokenCountForThisInteraction) {
       conversation.totalTokensUsed += tokenCountForThisInteraction;
       await this.conversationRepository.save(conversation);
@@ -480,13 +486,12 @@ export class ChatService {
 
     if (!conversation) {
       try {
-        // Create telemetry context for title generation
-        const titleTelemetryContext = createMinimalTelemetryContext(
+        const titleTelemetryContext = createMinimalTelemetryContext({
           conversationId,
           userId,
-          LLMOperationType.TITLE_GENERATION,
+          operationType: LLMOperationType.TITLE_GENERATION,
           parentTraceId,
-        );
+        });
 
         const title = await generateConversationTitle(message, titleTelemetryContext);
 
@@ -517,18 +522,16 @@ export class ChatService {
     // Build messages with summary support
     const uiMessages = await this.buildMessagesForLLM(conversation, conversationId, userId, message);
 
-    // Extract user message text for tracing
     const userMessageText = getTextFromMessage(message);
 
-    // Create telemetry context for classification
-    const classificationTelemetryContext = createChatTelemetryContext(
+    const classificationTelemetryContext = createChatTelemetryContext({
       conversationId,
       userId,
       mode,
       pageContext,
-      LLMOperationType.CLASSIFICATION,
+      operationType: LLMOperationType.CLASSIFICATION,
       parentTraceId,
-    );
+    });
 
     // Create parent Langfuse trace for this chat interaction
     const conversationTrace = createConversationTrace(classificationTelemetryContext, parentTraceId, {
@@ -569,7 +572,6 @@ export class ChatService {
         expiresAt: this.calculateExpiry(retentionDays),
       });
 
-      // Update trace with refusal output
       if (conversationTrace) {
         conversationTrace.update({
           output: {
@@ -599,15 +601,14 @@ export class ChatService {
 
     const validatedMessages = await this.validateMessages(uiMessages, tools);
 
-    // Create telemetry context for chat response streaming
-    const chatTelemetryContext = createChatTelemetryContext(
+    const chatTelemetryContext = createChatTelemetryContext({
       conversationId,
       userId,
       mode,
       pageContext,
-      LLMOperationType.CHAT_RESPONSE,
+      operationType: LLMOperationType.CHAT_RESPONSE,
       parentTraceId,
-    );
+    });
 
     let capturedUsage: LanguageModelUsage;
     let assistantResponse = '';
@@ -654,8 +655,7 @@ export class ChatService {
 
         const savedMessages = await this.saveMessages(formattedMessages, userId);
 
-        // Extract assistant response text for tracing
-        const assistantMessage = messages.find((msg) => msg.role === 'assistant');
+        const assistantMessage = messages.find((message) => message.role === 'assistant');
         if (assistantMessage) {
           assistantResponse = getTextFromMessage(assistantMessage);
         }
@@ -672,14 +672,13 @@ export class ChatService {
           await getLangfuseClient()?.flushAsync();
         }
 
-        // Pass telemetry context for summarization (will be modified with SUMMARIZATION operation type)
-        await this.handleMessageSummarization(
+        await this.handleMessageSummarization({
           conversation,
           userId,
           savedMessages,
-          capturedUsage?.totalTokens,
-          chatTelemetryContext,
-        );
+          tokenCountForThisInteraction: capturedUsage?.totalTokens,
+          telemetryContext: chatTelemetryContext,
+        });
       },
     });
 
