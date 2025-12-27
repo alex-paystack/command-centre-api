@@ -65,12 +65,17 @@ For LLM observability and tracing via Langfuse:
 
 ```env
 # Langfuse Configuration
-LANGFUSE_PUBLIC_KEY=pk-lf-...          # Langfuse public key
-LANGFUSE_SECRET_KEY=sk-lf-...          # Langfuse secret key
-LANGFUSE_BASE_URL=https://cloud.langfuse.com  # Langfuse API URL (defaults to cloud)
+LANGFUSE_ENABLED=true                             # Enable Langfuse observability (default: false)
+LANGFUSE_PUBLIC_KEY=pk-lf-...                     # Langfuse public key
+LANGFUSE_SECRET_KEY=sk-lf-...                     # Langfuse secret key
+LANGFUSE_BASE_URL=https://cloud.langfuse.com      # Langfuse API URL (defaults to cloud)
 
 # Span Processor Hook (enables Langfuse integration)
 OTEL_SPAN_PROCESSORS_PATH=./dist/common/ai/observability/langfuse.config.js
+
+# Performance Tuning (Optional)
+LANGFUSE_FLUSH_INTERVAL=5000                      # Flush interval in milliseconds (default: 5000)
+LANGFUSE_FLUSH_AT=15                              # Flush after N spans (default: 15)
 ```
 
 When configured, all LLM calls are traced to Langfuse with:
@@ -80,17 +85,25 @@ When configured, all LLM calls are traced to Langfuse with:
 - **User identification**: User ID from JWT authentication
 - **Metadata**: Mode, page context, service, environment, version
 - **Tags**: Filterable tags like `mode:global`, `page:transaction`, `env:production`
+- **Span filtering**: Only AI-related spans are exported (excludes HTTP, DB, infrastructure spans)
+- **Batching**: Configurable span batching for performance optimization
 
 **Trace Structure**: Each user message creates a parent trace named `chat-interaction` that groups all operations:
 
-1. **Classification** - Intent classification span
+1. **Classification** - Intent classification span (out-of-scope/out-of-page-scope detection)
 2. **Chat Response** - Main LLM response span (with tool calls if applicable)
-3. **Summarization** - Optional summarization span (when threshold reached)
+3. **Summarization** - Optional summarization span (when token threshold reached)
+4. **Title Generation** - Optional title generation span (for new conversations)
 
 The parent trace includes:
 
 - **Input**: User message, mode, and page context
 - **Output**: Assistant response, usage statistics, or refusal message
+
+**Performance Tuning:**
+
+- `LANGFUSE_FLUSH_INTERVAL`: Controls how frequently spans are sent to Langfuse. Lower values provide faster visibility but increase network overhead. Recommended: 5000ms for production, 1000ms for development.
+- `LANGFUSE_FLUSH_AT`: Number of spans to accumulate before forcing a flush. Lower values reduce memory usage but increase API calls. Recommended: 15 for balanced performance.
 
 ### Variable Reference
 
@@ -116,9 +129,12 @@ The parent trace includes:
 | `TOKEN_THRESHOLD_PERCENTAGE` | No       | `0.6`                            | Percentage (0-1) triggering summarization |
 | `LOG_LEVEL`                  | No       | `info`                           | Logging verbosity                         |
 | `OTEL_SERVICE_NAME`          | No       | `command-centre-api`             | OpenTelemetry service name                |
+| `LANGFUSE_ENABLED`           | No       | `false`                          | Enable Langfuse LLM observability         |
 | `LANGFUSE_PUBLIC_KEY`        | No       | -                                | Langfuse public key for LLM observability |
 | `LANGFUSE_SECRET_KEY`        | No       | -                                | Langfuse secret key for LLM observability |
 | `LANGFUSE_BASE_URL`          | No       | `https://cloud.langfuse.com`     | Langfuse API base URL                     |
+| `LANGFUSE_FLUSH_INTERVAL`    | No       | `5000`                           | Flush interval in milliseconds            |
+| `LANGFUSE_FLUSH_AT`          | No       | `15`                             | Flush after N spans                       |
 | `OTEL_SPAN_PROCESSORS_PATH`  | No       | -                                | Path to custom span processors hook file  |
 
 ## Rate Limiting

@@ -80,12 +80,10 @@ function buildTags(context: TelemetryContext) {
     `operation:${context.operationType}`,
   ];
 
-  // Add mode tag
   if (context.mode) {
     tags.push(`mode:${context.mode}`);
   }
 
-  // Add page context tag
   if (context.pageContext?.type) {
     tags.push(`page:${context.pageContext.type}`);
   } else {
@@ -253,6 +251,7 @@ export function createConversationTrace(
   input: { message: string; mode?: string; pageContext?: PageContext },
 ) {
   const langfuse = getLangfuseClient();
+
   if (!langfuse) {
     return null;
   }

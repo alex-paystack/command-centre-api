@@ -27,10 +27,16 @@ const shouldExportSpan: ShouldExportSpan = (span) => {
 export function getSpanProcessors(): SpanProcessor[] {
   const publicKey = process.env['LANGFUSE_PUBLIC_KEY'];
   const secretKey = process.env['LANGFUSE_SECRET_KEY'];
-  const flushInterval = process.env['LANGFUSE_FLUSH_INTERVAL'] ?? 1000;
-  const flushAt = process.env['LANGFUSE_FLUSH_AT'] ?? 1;
+  const flushInterval = process.env['LANGFUSE_FLUSH_INTERVAL'] ?? 5000;
+  const flushAt = process.env['LANGFUSE_FLUSH_AT'] ?? 15;
+  const langfuseEnabled = process.env['LANGFUSE_ENABLED'] === 'true';
 
-  // Skip Langfuse if credentials are not configured
+  if (!langfuseEnabled) {
+    // eslint-disable-next-line no-console
+    console.log('Langfuse LLM observability disabled for environment: ${environment}');
+    return [];
+  }
+
   if (!publicKey || !secretKey) {
     // eslint-disable-next-line no-console
     console.warn(
