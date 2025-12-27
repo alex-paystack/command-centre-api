@@ -73,6 +73,24 @@ Manages saved chart configurations and regeneration:
 - Deletes saved charts with ownership verification
 - Validates chart configurations (aggregation types, date ranges)
 
+### Telemetry Module
+
+Provides comprehensive LLM observability through Langfuse integration:
+
+- **Trace Management**: Creates parent traces for each chat interaction
+- **Context Tracking**: Captures conversation ID, user ID, mode, and page context
+- **Metadata Enrichment**: Tags traces with service, environment, operation type
+- **Session Grouping**: Groups all operations in a conversation under one session
+- **Langfuse Client**: Singleton client for direct SDK access
+- **Span Processing**: Custom OpenTelemetry span processor for Langfuse export
+- **Input/Output Capture**: Records user messages and assistant responses
+- **Token Usage Tracking**: Monitors LLM token consumption and costs
+
+**Key Files:**
+
+- `src/common/ai/observability/telemetry.ts` - Telemetry context and trace creation
+- `src/common/ai/observability/langfuse.config.ts` - Langfuse span processor configuration
+
 ## Project Structure
 
 ```md
@@ -85,6 +103,9 @@ src/
 │ │ ├── policy.ts # Classification policy and refusal messages
 │ │ ├── prompts.ts # AI system prompts (global & page-scoped)
 │ │ ├── utils.ts # Helper functions for AI (date validation, conversions)
+│ │ ├── observability/ # LLM observability
+│ │ │ ├── telemetry.ts # Trace management and telemetry context
+│ │ │ └── langfuse.config.ts # Langfuse span processor configuration
 │ │ ├── tools/ # AI tools (organized by category)
 │ │ │ ├── index.ts # Main tool exports & page-scoped filtering
 │ │ │ ├── retrieval.ts # Data retrieval tools (get*)
@@ -149,19 +170,20 @@ src/
 
 ## Technology Stack
 
-| Category           | Technology                              | Version     |
-| ------------------ | --------------------------------------- | ----------- |
-| **Framework**      | NestJS                                  | v11         |
-| **Database**       | MongoDB with TypeORM                    | v6.8 / v0.3 |
-| **AI SDK**         | Vercel AI SDK with OpenAI               | v5.0.110    |
-| **Language**       | TypeScript                              | v5.7        |
-| **Validation**     | class-validator, class-transformer, Zod | v4.0        |
-| **HTTP Client**    | Axios via @nestjs/axios                 | v1.6        |
-| **Date Utilities** | date-fns                                | v4.1        |
-| **Documentation**  | Swagger/OpenAPI (@nestjs/swagger)       | v11         |
-| **Observability**  | @paystackhq/nestjs-observability        | v1.2        |
-| **Error Handling** | @paystackhq/pkg-response-code           | v3.0        |
-| **Build Tool**     | SWC                                     | v1.10       |
+| Category              | Technology                              | Version      |
+| --------------------- | --------------------------------------- | ------------ |
+| **Framework**         | NestJS                                  | v11          |
+| **Database**          | MongoDB with TypeORM                    | v6.8 / v0.3  |
+| **AI SDK**            | Vercel AI SDK with OpenAI               | v5.0.110     |
+| **Language**          | TypeScript                              | v5.7         |
+| **Validation**        | class-validator, class-transformer, Zod | v4.0         |
+| **HTTP Client**       | Axios via @nestjs/axios                 | v1.6         |
+| **Date Utilities**    | date-fns                                | v4.1         |
+| **Documentation**     | Swagger/OpenAPI (@nestjs/swagger)       | v11          |
+| **Observability**     | @paystackhq/nestjs-observability        | v1.2         |
+| **LLM Observability** | Langfuse SDK & @langfuse/otel           | v3.38 / v4.5 |
+| **Error Handling**    | @paystackhq/pkg-response-code           | v3.0         |
+| **Build Tool**        | SWC                                     | v1.10        |
 
 ### AI Models
 

@@ -531,7 +531,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined, undefined);
       expect(result).toBeDefined();
       expect(result?.type).toBe(ChatResponseType.REFUSAL);
       expect(result?.responseStream).toBeDefined();
@@ -557,7 +557,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory, mockPageContext);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, mockPageContext);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, mockPageContext, undefined);
       expect(result).toBeDefined();
       expect(result?.type).toBe(ChatResponseType.REFUSAL);
       expect(result?.responseStream).toBeDefined();
@@ -572,7 +572,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined, undefined);
       expect(result).toBeNull();
     });
 
@@ -585,7 +585,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined, undefined);
       expect(result).toBeNull();
     });
 
@@ -598,7 +598,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined, undefined);
       expect(result).toBeNull();
     });
 
@@ -611,7 +611,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined, undefined);
       expect(result).toBeNull();
     });
 
@@ -624,7 +624,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, undefined, undefined);
       expect(result).toBeNull();
     });
 
@@ -642,7 +642,7 @@ describe('ChatService', () => {
 
       const result = await service.handleMessageClassification(mockHistory, mockPageContext);
 
-      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, mockPageContext);
+      expect(classifyMessage).toHaveBeenCalledWith(mockHistory, mockPageContext, undefined);
       expect(result).toBeNull();
     });
   });

@@ -17,6 +17,7 @@ Command Centre API is a NestJS-based backend service that powers an AI-driven me
 - 🧭 **Guardrails** — Dual-layer classification for out-of-scope protection
 - 🛡️ **Rate Limiting** — Configurable message entitlement with sliding window enforcement
 - 📝 **Smart Summarization** — Automatic conversation summarization with context carry-over
+- 📈 **LLM Observability** — Comprehensive tracing and monitoring with Langfuse integration
 - 🗑️ **Automatic Cleanup** — TTL-based data retention with configurable expiry periods
 
 ## Quick Start
@@ -75,14 +76,15 @@ See [Configuration Guide](./docs/configuration.md) for all options.
 
 ## Technology Stack
 
-| Category      | Technology                                         |
-| ------------- | -------------------------------------------------- |
-| Framework     | NestJS v11                                         |
-| Database      | MongoDB with TypeORM                               |
-| AI            | Vercel AI SDK v5.0.110 with OpenAI                 |
-| Language      | TypeScript v5.7                                    |
-| Validation    | Zod v4.0, class-validator                          |
-| Observability | OpenTelemetry via @paystackhq/nestjs-observability |
+| Category          | Technology                                         |
+| ----------------- | -------------------------------------------------- |
+| Framework         | NestJS v11                                         |
+| Database          | MongoDB with TypeORM                               |
+| AI                | Vercel AI SDK v5.0.110 with OpenAI                 |
+| Language          | TypeScript v5.7                                    |
+| Validation        | Zod v4.0, class-validator                          |
+| Observability     | OpenTelemetry via @paystackhq/nestjs-observability |
+| LLM Observability | Langfuse SDK v3.38 with OpenTelemetry integration  |
 
 ## Available Scripts
 

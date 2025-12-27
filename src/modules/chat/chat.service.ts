@@ -37,6 +37,14 @@ import {
   ChatResponseType,
   ClassificationUIMessage,
   EnrichedPageContext,
+  TelemetryContext,
+  LLMOperationType,
+  createTelemetryConfig,
+  createChatTelemetryContext,
+  createMinimalTelemetryContext,
+  createConversationTrace,
+  getLangfuseClient,
+  getTextFromMessage,
 } from '~/common/ai';
 import { PaystackApiService } from '~/common/services/paystack-api.service';
 import { PageContextService } from '~/common/services/page-context.service';
@@ -223,8 +231,12 @@ export class ChatService {
     }
   }
 
-  async handleMessageClassification(messages: UIMessage[], pageContext?: PageContext) {
-    const messageClassification = await classifyMessage(messages, pageContext);
+  async handleMessageClassification(
+    messages: UIMessage[],
+    pageContext?: PageContext,
+    telemetryContext?: TelemetryContext,
+  ) {
+    const messageClassification = await classifyMessage(messages, pageContext, telemetryContext);
     const confidence = messageClassification?.confidence ?? 1;
     const LOW_CONFIDENCE_THRESHOLD = 0.6;
 
@@ -365,6 +377,7 @@ export class ChatService {
     userId: string,
     savedMessages: MessageResponseDto[],
     tokenCountForThisInteraction?: number,
+    telemetryContext?: TelemetryContext,
   ) {
     if (tokenCountForThisInteraction) {
       conversation.totalTokensUsed += tokenCountForThisInteraction;
@@ -393,9 +406,15 @@ export class ChatService {
           : await this.getMessagesByConversationId(conversation.id, userId);
 
         if (messagesNeedingSummary.length > 0) {
+          // Create summarization telemetry context if not provided
+          const summaryTelemetryContext = telemetryContext
+            ? { ...telemetryContext, operationType: LLMOperationType.SUMMARIZATION }
+            : undefined;
+
           const newSummary = await summarizeConversation(
             convertToUIMessages(messagesNeedingSummary),
             conversation.summary,
+            summaryTelemetryContext,
           );
 
           if (newSummary) {
@@ -451,6 +470,7 @@ export class ChatService {
   // TODO: Consider decoding the JWT here to get the userId
   async handleStreamingChat(dto: ChatRequestDto, userId: string, jwtToken: string) {
     const { conversationId, message, mode, pageContext } = dto;
+    const parentTraceId = randomUUID();
 
     await this.checkUserEntitlement(userId);
 
@@ -460,7 +480,15 @@ export class ChatService {
 
     if (!conversation) {
       try {
-        const title = await generateConversationTitle(message);
+        // Create telemetry context for title generation
+        const titleTelemetryContext = createMinimalTelemetryContext(
+          conversationId,
+          userId,
+          LLMOperationType.TITLE_GENERATION,
+          parentTraceId,
+        );
+
+        const title = await generateConversationTitle(message, titleTelemetryContext);
 
         conversation = await this.conversationRepository.createConversation({
           id: conversationId,
@@ -489,7 +517,31 @@ export class ChatService {
     // Build messages with summary support
     const uiMessages = await this.buildMessagesForLLM(conversation, conversationId, userId, message);
 
-    const messageClassification = await this.handleMessageClassification(uiMessages, pageContext);
+    // Extract user message text for tracing
+    const userMessageText = getTextFromMessage(message);
+
+    // Create telemetry context for classification
+    const classificationTelemetryContext = createChatTelemetryContext(
+      conversationId,
+      userId,
+      mode,
+      pageContext,
+      LLMOperationType.CLASSIFICATION,
+      parentTraceId,
+    );
+
+    // Create parent Langfuse trace for this chat interaction
+    const conversationTrace = createConversationTrace(classificationTelemetryContext, parentTraceId, {
+      message: userMessageText,
+      mode: mode || ChatMode.GLOBAL,
+      pageContext,
+    });
+
+    const messageClassification = await this.handleMessageClassification(
+      uiMessages,
+      pageContext,
+      classificationTelemetryContext,
+    );
 
     await this.saveMessages(
       [
@@ -517,6 +569,17 @@ export class ChatService {
         expiresAt: this.calculateExpiry(retentionDays),
       });
 
+      // Update trace with refusal output
+      if (conversationTrace) {
+        conversationTrace.update({
+          output: {
+            type: messageClassification.type,
+            text: messageClassification.text,
+          },
+        });
+        await getLangfuseClient()?.flushAsync();
+      }
+
       return {
         type: messageClassification.type,
         responseStream: messageClassification.responseStream,
@@ -536,7 +599,18 @@ export class ChatService {
 
     const validatedMessages = await this.validateMessages(uiMessages, tools);
 
+    // Create telemetry context for chat response streaming
+    const chatTelemetryContext = createChatTelemetryContext(
+      conversationId,
+      userId,
+      mode,
+      pageContext,
+      LLMOperationType.CHAT_RESPONSE,
+      parentTraceId,
+    );
+
     let capturedUsage: LanguageModelUsage;
+    let assistantResponse = '';
 
     const stream = createUIMessageStream({
       execute: ({ writer }) => {
@@ -551,6 +625,7 @@ export class ChatService {
           messages: convertToModelMessages(validatedMessages),
           stopWhen: stepCountIs(10),
           tools,
+          experimental_telemetry: createTelemetryConfig(chatTelemetryContext),
           onFinish: ({ totalUsage }) => {
             capturedUsage = totalUsage;
           },
@@ -579,7 +654,32 @@ export class ChatService {
 
         const savedMessages = await this.saveMessages(formattedMessages, userId);
 
-        await this.handleMessageSummarization(conversation, userId, savedMessages, capturedUsage?.totalTokens);
+        // Extract assistant response text for tracing
+        const assistantMessage = messages.find((msg) => msg.role === 'assistant');
+        if (assistantMessage) {
+          assistantResponse = getTextFromMessage(assistantMessage);
+        }
+
+        // Update trace with final output
+        if (conversationTrace) {
+          conversationTrace.update({
+            output: {
+              type: ChatResponseType.CHAT_RESPONSE,
+              response: assistantResponse,
+              usage: capturedUsage,
+            },
+          });
+          await getLangfuseClient()?.flushAsync();
+        }
+
+        // Pass telemetry context for summarization (will be modified with SUMMARIZATION operation type)
+        await this.handleMessageSummarization(
+          conversation,
+          userId,
+          savedMessages,
+          capturedUsage?.totalTokens,
+          chatTelemetryContext,
+        );
       },
     });
 

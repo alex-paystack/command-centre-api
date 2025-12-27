@@ -267,6 +267,47 @@ The app uses `@paystackhq/nestjs-observability` for OpenTelemetry instrumentatio
 - Configured via `OTEL_*` environment variables
 - Local dev disables exporters for performance: `OTEL_TRACES_EXPORTER=none`
 
+### LLM Observability with Langfuse
+
+The app integrates with Langfuse for LLM-specific observability via the Vercel AI SDK's telemetry:
+
+- All LLM calls (`generateText`, `generateObject`, `streamText`) are traced
+- Parent traces created for each chat interaction with proper naming and input/output
+- Traces are grouped by conversation (session ID = conversation ID)
+- User identification from JWT authentication
+- Rich metadata: mode, page context, operation type
+- Filterable tags: `mode:global`, `page:transaction`, `env:production`, etc.
+
+**Configuration**:
+
+```env
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_BASE_URL=https://cloud.langfuse.com
+OTEL_SPAN_PROCESSORS_PATH=./dist/common/ai/observability/langfuse.config.js
+```
+
+**Key files**:
+
+- `src/common/ai/observability/langfuse.config.ts` - Langfuse span processor configuration
+- `src/common/ai/observability/telemetry.ts` - Telemetry context helpers and trace management
+- `src/modules/chat/chat.service.ts` - Chat service with trace creation and updates
+
+**Trace Structure**:
+
+Each user message creates a parent Langfuse trace named `chat-interaction` that groups all operations:
+
+1. **Classification** - Intent classification span
+2. **Chat Response** - Main LLM response span (with tool calls if applicable)
+3. **Summarization** - Optional summarization span (when threshold reached)
+
+The parent trace includes:
+
+- **Input**: User message, mode, and page context
+- **Output**: Assistant response, usage statistics, or refusal message
+- **Metadata**: Service info, environment, mode, page context, operation type
+- **Tags**: Filterable tags for mode, page type, operation, environment, etc.
+
 ## Testing Patterns
 
 - **Unit tests**: Mock `PaystackApiService` and test business logic
@@ -279,7 +320,7 @@ The app uses `@paystackhq/nestjs-observability` for OpenTelemetry instrumentatio
 
 Uses Conventional Commits with commitlint:
 
-```
+```md
 feat(scope): description
 fix(scope): description
 docs(scope): description
