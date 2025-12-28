@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { SavedChartResponseDto } from './saved-chart-response.dto';
-import { ChartDataPoint, ChartSeries, ChartSummary } from '~/common/ai/aggregation';
+import { ChartDataPoint, ChartSeries, ChartSummary } from '~/common/ai/utilities/aggregation';
 
 export class SavedChartWithDataResponseDto extends SavedChartResponseDto {
   @ApiProperty({

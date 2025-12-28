@@ -101,11 +101,14 @@ src/
 ├── common/
 │ ├── ai/ # AI utilities and integrations
 │ │ ├── actions.ts # AI action functions (title generation, classification)
-│ │ ├── aggregation.ts # Chart data aggregation logic
-│ │ ├── chart-config.ts # Resource-specific chart configuration
 │ │ ├── policy.ts # Classification policy and refusal messages
 │ │ ├── prompts.ts # AI system prompts (global & page-scoped)
-│ │ ├── utils.ts # Helper functions for AI (date validation, conversions)
+│ │ ├── utilities/ # Chart and data processing utilities
+│ │ │ ├── aggregation.ts # Chart data aggregation logic
+│ │ │ ├── chart-config.ts # Resource-specific chart configuration
+│ │ │ ├── chart-generator.ts # Chart generation orchestration
+│ │ │ ├── chart-validation.ts # Chart parameter validation
+│ │ │ └── utils.ts # Helper functions for AI (date validation, conversions)
 │ │ ├── observability/ # LLM observability
 │ │ │ ├── telemetry.ts # Trace management and telemetry context
 │ │ │ ├── langfuse.config.ts # Langfuse span processor configuration

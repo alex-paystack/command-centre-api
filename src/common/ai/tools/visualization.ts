@@ -2,8 +2,8 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import type { PaystackApiService } from '../../services/paystack-api.service';
 import type { AuthenticatedUser } from '../types';
-import { AggregationType, ChartResourceType } from '../chart-config';
-import { generateChartData } from '../chart-generator';
+import { AggregationType, ChartResourceType } from '../utilities/chart-config';
+import { generateChartData } from '../utilities/chart-generator';
 import { PaymentChannel } from '../types/data';
 
 /**

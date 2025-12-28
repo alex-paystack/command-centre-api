@@ -7,13 +7,13 @@ import { PaystackApiService } from '~/common/services/paystack-api.service';
 import { SavedChart } from './entities/saved-chart.entity';
 import { SaveChartDto } from './dto/save-chart.dto';
 import { UpdateChartDto } from './dto/update-chart.dto';
-import { ChartResourceType, AggregationType } from '~/common/ai/chart-config';
+import { ChartResourceType, AggregationType } from '~/common/ai/utilities/chart-config';
 
-jest.mock('~/common/ai/chart-generator', () => ({
+jest.mock('~/common/ai/utilities/chart-generator', () => ({
   generateChartData: jest.fn(),
 }));
 
-import { generateChartData } from '~/common/ai/chart-generator';
+import { generateChartData } from '~/common/ai/utilities/chart-generator';
 
 describe('SavedChartService', () => {
   let service: SavedChartService;

@@ -17,7 +17,7 @@ import {
   DisputeStatusSlug,
   DisputeCategory,
 } from '../types/data';
-import { amountInBaseUnitToSubUnit, validateDateRange } from '../utils';
+import { amountInBaseUnitToSubUnit, validateDateRange } from '../utilities/utils';
 
 /**
  * Create the getTransactions tool

@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource, EntityManager } from 'typeorm';
 import { SavedChartRepository } from './saved-chart.repository';
 import { SavedChart } from '../entities/saved-chart.entity';
-import { ChartResourceType, AggregationType } from '~/common/ai/chart-config';
+import { ChartResourceType, AggregationType } from '~/common/ai/utilities/chart-config';
 
 describe('SavedChartRepository', () => {
   let repository: SavedChartRepository;

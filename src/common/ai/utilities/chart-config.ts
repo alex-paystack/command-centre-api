@@ -1,6 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import { ResponseCode } from '@paystackhq/pkg-response-code';
-import type { PaystackTransaction, PaystackRefund, PaystackPayout, PaystackDispute } from './types/index';
+import type { PaystackTransaction, PaystackRefund, PaystackPayout, PaystackDispute } from '../types/index';
 import {
   DisputeCategory,
   DisputeResolutionSlug,
@@ -10,8 +10,8 @@ import {
   RefundStatus,
   RefundType,
   TransactionStatus,
-} from './types/data';
-import { APIError } from '../exceptions/api.exception';
+} from '../types/data';
+import { APIError } from '../../exceptions/api.exception';
 
 /**
  * Supported resource types for chart generation

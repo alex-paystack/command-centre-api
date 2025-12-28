@@ -1,4 +1,4 @@
-import { ErrorCodes } from '..';
+import { ErrorCodes } from '../..';
 import {
   AggregationType,
   ChartResourceType,
@@ -6,7 +6,7 @@ import {
   STATUS_VALUES,
   VALID_AGGREGATIONS,
 } from './chart-config';
-import { PaymentChannel } from './types/data';
+import { PaymentChannel } from '../types/data';
 import { validateDateRange } from './utils';
 
 export type ChartValidationParams = {
@@ -18,13 +18,13 @@ export type ChartValidationParams = {
   channel?: PaymentChannel;
 };
 
-export type ValidationError = {
+export type ChartValidationError = {
   isValid: false;
   error: string;
   code: (typeof ErrorCodes)[keyof typeof ErrorCodes];
 };
 
-export type ChartValidationResult = { isValid: true } | ValidationError;
+export type ChartValidationResult = { isValid: true } | ChartValidationError;
 
 /**
  * Shared validator for chart configuration used by chart generation and saved charts.

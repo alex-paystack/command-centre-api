@@ -9,7 +9,7 @@ import { UpdateChartDto } from './dto/update-chart.dto';
 import { SavedChartResponseDto } from './dto/saved-chart-response.dto';
 import { SavedChartWithDataResponseDto } from './dto/saved-chart-with-data-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ChartResourceType, AggregationType } from '~/common/ai/chart-config';
+import { ChartResourceType, AggregationType } from '~/common/ai/utilities/chart-config';
 
 describe('ChartsController', () => {
   let controller: ChartsController;

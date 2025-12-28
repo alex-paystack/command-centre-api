@@ -150,7 +150,7 @@ export function createMyNewTool(paystackService: PaystackApiService, getAuthenti
 
 ### Adding Chart Resource Types
 
-1. Add new type to `ChartResourceType` enum in `src/common/ai/chart-config.ts`
+1. Add new type to `ChartResourceType` enum in `src/common/ai/utilities/chart-config.ts`
 2. Add field accessor configuration (`ResourceFieldConfig`) for the new resource
 3. Update `VALID_AGGREGATIONS` with supported aggregation types
 4. Update `STATUS_VALUES` with valid status values for the resource
@@ -160,7 +160,7 @@ export function createMyNewTool(paystackService: PaystackApiService, getAuthenti
 **Example**:
 
 ```typescript
-// In chart-config.ts
+// In utilities/chart-config.ts
 export const myResourceFieldConfig: ResourceFieldConfig<MyResource> = {
   getAmount: (r) => r.amount,
   getCurrency: (r) => r.currency,

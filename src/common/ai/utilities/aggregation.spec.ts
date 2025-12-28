@@ -23,7 +23,7 @@ import {
   disputeFieldConfig,
 } from './chart-config';
 import type { ChartableRecord } from './chart-config';
-import type { PaystackCustomer, PaystackTransaction, PaystackRefund, PaystackDispute } from './types/index';
+import type { PaystackCustomer, PaystackTransaction, PaystackRefund, PaystackDispute } from '../types/index';
 import {
   Authorization,
   Log,
@@ -35,7 +35,7 @@ import {
   DisputeStatusSlug,
   Currency,
   DisputeResolutionSlug,
-} from './types/data';
+} from '../types/data';
 
 describe('Aggregation Functions', () => {
   const createMockTransaction = (

@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SavedChart } from '../entities/saved-chart.entity';
-import { ChartResourceType, AggregationType } from '~/common/ai/chart-config';
+import { ChartResourceType, AggregationType } from '~/common/ai/utilities/chart-config';
 import { PaymentChannel } from '~/common/ai/types/data';
 
 export class SavedChartResponseDto {

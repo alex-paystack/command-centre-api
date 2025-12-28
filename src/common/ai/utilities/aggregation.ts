@@ -4,7 +4,7 @@ import { format, getISOWeek, getISOWeekYear, isValid, parseISO } from 'date-fns'
 import type { ChartableRecord } from './chart-config';
 import { AggregationType, ChartResourceType, getResourceDisplayName } from './chart-config';
 import { amountInSubUnitToBaseUnit } from './utils';
-import { APIError } from '../exceptions/api.exception';
+import { APIError } from '../../exceptions/api.exception';
 
 export { AggregationType } from './chart-config';
 
