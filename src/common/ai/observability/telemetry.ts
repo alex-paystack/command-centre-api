@@ -19,9 +19,20 @@ export enum LLMOperationType {
 let langfuseClient: Langfuse | null = null;
 
 /**
+ * Checks if Langfuse telemetry is explicitly enabled.
+ */
+function isLangfuseEnabled(): boolean {
+  return process.env['LANGFUSE_ENABLED'] === 'true';
+}
+
+/**
  * Get or create the Langfuse client instance
  */
 export function getLangfuseClient(): Langfuse | null {
+  if (!isLangfuseEnabled()) {
+    return null;
+  }
+
   if (langfuseClient) {
     return langfuseClient;
   }
@@ -148,9 +159,10 @@ function buildMetadata(context: TelemetryContext): Record<string, string | boole
 export function createTelemetryConfig(context: TelemetryContext) {
   const tags = buildTags(context);
   const metadata = buildMetadata(context);
+  const langfuseEnabled = isLangfuseEnabled();
 
   return {
-    isEnabled: true,
+    isEnabled: langfuseEnabled,
     functionId: context.operationType,
     metadata: {
       ...metadata,

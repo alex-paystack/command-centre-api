@@ -19,8 +19,8 @@ const shouldExportSpan: ShouldExportSpan = (span) => {
  * - LANGFUSE_PUBLIC_KEY: Langfuse public key
  * - LANGFUSE_SECRET_KEY: Langfuse secret key
  * - LANGFUSE_BASE_URL: Langfuse base URL (defaults to https://cloud.langfuse.com)
- * - LANGFUSE_FLUSH_INTERVAL: Flush interval in milliseconds (defaults to 1000)
- * - LANGFUSE_FLUSH_AT: Flush at number of spans (defaults to 1)
+ * - LANGFUSE_FLUSH_INTERVAL: Flush interval in milliseconds (defaults to 5000)
+ * - LANGFUSE_FLUSH_AT: Flush at number of spans (defaults to 15)
  * - OTEL_SERVICE_ENV: Environment name for Langfuse (defaults to 'local')
  *
  * @returns Array of span processors containing the LangfuseSpanProcessor
@@ -31,10 +31,11 @@ export function getSpanProcessors(): SpanProcessor[] {
   const flushInterval = process.env['LANGFUSE_FLUSH_INTERVAL'] ?? 5000;
   const flushAt = process.env['LANGFUSE_FLUSH_AT'] ?? 15;
   const langfuseEnabled = process.env['LANGFUSE_ENABLED'] === 'true';
+  const environment = process.env['OTEL_SERVICE_ENV'] ?? 'local';
 
   if (!langfuseEnabled) {
     // eslint-disable-next-line no-console
-    console.log('Langfuse LLM observability disabled for environment: ${environment}');
+    console.log(`Langfuse LLM observability disabled for environment: ${environment}`);
     return [];
   }
 
@@ -47,7 +48,6 @@ export function getSpanProcessors(): SpanProcessor[] {
   }
 
   const baseUrl = process.env['LANGFUSE_BASE_URL'] ?? 'https://cloud.langfuse.com';
-  const environment = process.env['OTEL_SERVICE_ENV'] ?? 'local';
 
   const langfuseProcessor = new LangfuseSpanProcessor({
     publicKey,
