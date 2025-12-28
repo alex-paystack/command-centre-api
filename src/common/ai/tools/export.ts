@@ -17,7 +17,7 @@ import {
   DisputeStatusSlug,
   DisputeCategory,
 } from '../types/data';
-import { amountInBaseUnitToSubUnit } from '../utils';
+import { amountInBaseUnitToSubUnit } from '../utilities/utils';
 
 /**
  * Create the exportTransactions tool

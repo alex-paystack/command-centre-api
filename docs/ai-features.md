@@ -176,7 +176,7 @@ The `generateChartData` tool provides powerful analytics capabilities across mul
 - Comprehensive summary statistics with per-currency breakdown
 - Date range validation (30-day maximum)
 - Resource-specific validation of aggregation types
-- **Centralized validation system** (`chart-validation.ts`) for consistent parameter validation
+- **Centralized validation system** (`utilities/chart-validation.ts`) for consistent parameter validation
 - **Channel filtering** for transaction-specific payment channel analysis
 
 ## Guardrails & Classification

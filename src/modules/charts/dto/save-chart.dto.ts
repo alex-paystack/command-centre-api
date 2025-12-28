@@ -1,6 +1,6 @@
 import { IsString, IsNotEmpty, IsEnum, IsOptional, MaxLength, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ChartResourceType, AggregationType } from '~/common/ai/chart-config';
+import { ChartResourceType, AggregationType } from '~/common/ai/utilities/chart-config';
 import { PaymentChannel } from '~/common/ai/types/data';
 
 export class SaveChartDto {

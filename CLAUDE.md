@@ -124,12 +124,14 @@ All `/chat/*` and `/charts/*` endpoints require JWT authentication:
 
 ### Chart Aggregation System
 
-Charts are generated via `src/common/ai/aggregation.ts` with resource-specific configurations in `chart-config.ts`:
+Charts are generated via utilities in `src/common/ai/utilities/`:
 
 - **Time-based**: `by-day`, `by-hour`, `by-week`, `by-month` (returns per-currency series)
 - **Categorical**: `by-status`, `by-channel`, `by-type`, `by-category`, `by-resolution` (returns flat data)
-- **Resource-specific configs** define field accessors (`getAmount`, `getCurrency`, `getStatus`, etc.)
-- **Centralized validation**: `chart-validation.ts` provides shared validation for chart parameters
+- **Resource-specific configs** in `utilities/chart-config.ts` define field accessors (`getAmount`, `getCurrency`, `getStatus`, etc.)
+- **Centralized validation**: `utilities/chart-validation.ts` provides shared validation for chart parameters
+- **Aggregation logic**: `utilities/aggregation.ts` handles data aggregation and series generation
+- **Chart generation**: `utilities/chart-generator.ts` coordinates the end-to-end chart creation process
 - **Channel filtering**: Transaction-specific payment channel analysis (`by-channel` aggregation)
 - **Validation**: 30-day max date range, resource-specific aggregation type validation, channel filter validation
 - **Recharts-compatible** output format with comprehensive summary statistics
@@ -172,14 +174,14 @@ export function createMyTool(paystackService: PaystackApiService, getAuthenticat
 
 ### Adding a Chart Resource Type
 
-1. Add to `ChartResourceType` enum in `chart-config.ts`
+1. Add to `ChartResourceType` enum in `utilities/chart-config.ts`
 2. Define `ResourceFieldConfig` with field accessors (including optional model-specific fields like `getChannel`)
 3. Update `VALID_AGGREGATIONS` map
 4. Update `STATUS_VALUES` map
 5. Add to `API_ENDPOINTS` map
 6. Update `getFieldConfig()` function
-7. Update `chart-validation.ts` if adding resource-specific validation rules
-8. If adding categorical aggregations, update `getChartType()` in `aggregation.ts`
+7. Update `utilities/chart-validation.ts` if adding resource-specific validation rules
+8. If adding categorical aggregations, update `getChartType()` in `utilities/aggregation.ts`
 
 ### Adding a Page Context Resource Type
 
@@ -191,7 +193,7 @@ export function createMyTool(paystackService: PaystackApiService, getAuthenticat
 
 ### Using Chart Validation
 
-The `chart-validation.ts` module provides centralized validation for chart parameters. Use `validateChartParams()` when:
+The `utilities/chart-validation.ts` module provides centralized validation for chart parameters. Use `validateChartParams()` when:
 
 - Creating new saved charts (`SavedChartService.saveChart()`)
 - Regenerating charts with overrides (`SavedChartService.getSavedChartWithData()`)
@@ -200,7 +202,7 @@ The `chart-validation.ts` module provides centralized validation for chart param
 **Example**:
 
 ```typescript
-import { validateChartParams } from '~/common/ai/chart-validation';
+import { validateChartParams } from '~/common/ai/utilities/chart-validation';
 
 const validation = validateChartParams({
   resourceType: ChartResourceType.TRANSACTION,

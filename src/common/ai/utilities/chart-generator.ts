@@ -1,5 +1,5 @@
 import { format, parseISO } from 'date-fns';
-import type { PaystackApiService } from '../services/paystack-api.service';
+import type { PaystackApiService } from '../../services/paystack-api.service';
 import {
   AggregationType,
   ChartResourceType,
@@ -10,7 +10,7 @@ import {
   ChartableResource,
 } from './chart-config';
 import { generateChartLabel, getChartType, calculateSummary, aggregateRecords, ChartResult } from './aggregation';
-import { PaymentChannel } from './types/data';
+import { PaymentChannel } from '../types/data';
 import { validateChartParams } from './chart-validation';
 
 /**

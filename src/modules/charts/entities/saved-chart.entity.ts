@@ -1,7 +1,7 @@
 import { Entity, ObjectIdColumn, Column, CreateDateColumn, UpdateDateColumn, Index, BeforeInsert } from 'typeorm';
 import { ObjectId } from 'mongodb';
 import { randomUUID } from 'crypto';
-import { ChartResourceType, AggregationType } from '~/common/ai/chart-config';
+import { ChartResourceType, AggregationType } from '~/common/ai/utilities/chart-config';
 import { PaymentChannel } from '~/common/ai/types/data';
 
 @Entity('saved_charts')

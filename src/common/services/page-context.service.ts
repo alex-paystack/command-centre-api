@@ -10,7 +10,7 @@ import type {
   PaystackPayout,
   PaystackDispute,
 } from '../ai/types';
-import { amountInSubUnitToBaseUnit } from '../ai/utils';
+import { amountInSubUnitToBaseUnit } from '../ai/utilities/utils';
 import { NotFoundError, ValidationError } from '../exceptions/api.exception';
 import { ErrorCodes } from '../exceptions/error-codes';
 

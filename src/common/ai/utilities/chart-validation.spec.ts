@@ -1,7 +1,7 @@
-import { validateChartParams, ValidationError } from './chart-validation';
+import { validateChartParams, ChartValidationError } from './chart-validation';
 import { AggregationType, ChartResourceType } from './chart-config';
-import { PaymentChannel } from './types/data';
-import { ErrorCodes } from '..';
+import { PaymentChannel } from '../types/data';
+import { ErrorCodes } from '../..';
 
 describe('validateChartParams', () => {
   it('accepts a valid aggregation/resource combination', () => {
@@ -20,7 +20,7 @@ describe('validateChartParams', () => {
     });
 
     expect(result.isValid).toBe(false);
-    expect((result as ValidationError).code).toBe(ErrorCodes.INVALID_AGGREGATION_TYPE);
+    expect((result as ChartValidationError).code).toBe(ErrorCodes.INVALID_AGGREGATION_TYPE);
   });
 
   it('rejects invalid status for resource type', () => {
@@ -31,7 +31,7 @@ describe('validateChartParams', () => {
     });
 
     expect(result.isValid).toBe(false);
-    expect((result as ValidationError).code).toBe(ErrorCodes.INVALID_STATUS);
+    expect((result as ChartValidationError).code).toBe(ErrorCodes.INVALID_STATUS);
   });
 
   it('allows transaction channel when value is valid', () => {
@@ -52,7 +52,7 @@ describe('validateChartParams', () => {
     });
 
     expect(result.isValid).toBe(false);
-    expect((result as ValidationError).code).toBe(ErrorCodes.INVALID_CHANNEL);
+    expect((result as ChartValidationError).code).toBe(ErrorCodes.INVALID_CHANNEL);
   });
 
   it('rejects channel when resource type is not transaction', () => {
@@ -63,7 +63,7 @@ describe('validateChartParams', () => {
     });
 
     expect(result.isValid).toBe(false);
-    expect((result as ValidationError).code).toBe(ErrorCodes.INVALID_AGGREGATION_TYPE);
+    expect((result as ChartValidationError).code).toBe(ErrorCodes.INVALID_AGGREGATION_TYPE);
   });
 
   it('rejects invalid date format', () => {
@@ -75,7 +75,7 @@ describe('validateChartParams', () => {
     });
 
     expect(result.isValid).toBe(false);
-    expect((result as ValidationError).code).toBe(ErrorCodes.INVALID_DATE_RANGE);
+    expect((result as ChartValidationError).code).toBe(ErrorCodes.INVALID_DATE_RANGE);
   });
 
   it('rejects from date after to date', () => {
@@ -87,7 +87,7 @@ describe('validateChartParams', () => {
     });
 
     expect(result.isValid).toBe(false);
-    expect((result as ValidationError).code).toBe(ErrorCodes.INVALID_DATE_RANGE);
+    expect((result as ChartValidationError).code).toBe(ErrorCodes.INVALID_DATE_RANGE);
   });
 
   it('rejects date ranges exceeding 30 days', () => {
@@ -99,7 +99,7 @@ describe('validateChartParams', () => {
     });
 
     expect(result.isValid).toBe(false);
-    expect((result as ValidationError).code).toBe(ErrorCodes.INVALID_DATE_RANGE);
+    expect((result as ChartValidationError).code).toBe(ErrorCodes.INVALID_DATE_RANGE);
   });
 
   it('accepts date ranges within 30 days', () => {

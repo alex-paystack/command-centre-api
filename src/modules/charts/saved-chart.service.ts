@@ -6,8 +6,8 @@ import { UpdateChartDto } from './dto/update-chart.dto';
 import { RegenerateChartQueryDto } from './dto/regenerate-chart-query.dto';
 import { SavedChartResponseDto } from './dto/saved-chart-response.dto';
 import { SavedChartWithDataResponseDto } from './dto/saved-chart-with-data-response.dto';
-import { validateChartParams } from '~/common/ai/chart-validation';
-import { generateChartData, ChartGenerationState } from '~/common/ai/chart-generator';
+import { validateChartParams } from '~/common/ai/utilities/chart-validation';
+import { generateChartData, ChartGenerationState } from '~/common/ai/utilities/chart-generator';
 import { NotFoundError, ValidationError, ErrorCodes } from '~/common';
 
 @Injectable()

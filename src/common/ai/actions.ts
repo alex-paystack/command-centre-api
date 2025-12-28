@@ -7,7 +7,7 @@ import {
   getClassifierUserPrompt,
   PAGE_SCOPED_CLASSIFIER_SYSTEM_PROMPT,
 } from './prompts';
-import { getTextFromMessage, getTextFromMessages, buildClassifierConversation } from './utils';
+import { getTextFromMessage, getTextFromMessages, buildClassifierConversation } from './utilities/utils';
 import { z } from 'zod';
 import { MessageClassificationIntent, PageContext } from './types';
 import { TelemetryContext, createTelemetryConfig } from './observability/telemetry';
