@@ -51,6 +51,7 @@ import { PageContextService } from '~/common/services/page-context.service';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
 import { Conversation } from './entities/conversation.entity';
 import { NotFoundError, ValidationError, APIError, ErrorCodes } from '~/common';
+import { trace } from '@opentelemetry/api';
 
 @Injectable()
 export class ChatService {
@@ -476,7 +477,7 @@ export class ChatService {
   // TODO: Consider decoding the JWT here to get the userId
   async handleStreamingChat(dto: ChatRequestDto, userId: string, jwtToken: string) {
     const { conversationId, message, mode, pageContext } = dto;
-    const parentTraceId = randomUUID();
+    const parentTraceId = trace.getActiveSpan()?.spanContext().traceId ?? randomUUID();
 
     await this.checkUserEntitlement(userId);
 
@@ -534,11 +535,7 @@ export class ChatService {
     });
 
     // Create parent Langfuse trace for this chat interaction
-    const conversationTrace = createConversationTrace(classificationTelemetryContext, parentTraceId, {
-      message: userMessageText,
-      mode: mode || ChatMode.GLOBAL,
-      pageContext,
-    });
+    const conversationTrace = createConversationTrace(classificationTelemetryContext, parentTraceId, userMessageText);
 
     const messageClassification = await this.handleMessageClassification(
       uiMessages,
@@ -663,11 +660,7 @@ export class ChatService {
         // Update trace with final output
         if (conversationTrace) {
           conversationTrace.update({
-            output: {
-              type: ChatResponseType.CHAT_RESPONSE,
-              response: assistantResponse,
-              usage: capturedUsage,
-            },
+            output: assistantResponse,
           });
           await getLangfuseClient()?.flushAsync();
         }

@@ -46,6 +46,7 @@
     "@nestjs/swagger": "^11.1.2",
     "@nestjs/terminus": "^11.0.0",
     "@nestjs/typeorm": "^11.0.0",
+    "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/sdk-node": "^0.208.0",
     "@paystackhq/nestjs-observability": "^1.2.0",
     "@paystackhq/pkg-response-code": "^3.0.0",

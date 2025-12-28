@@ -245,11 +245,7 @@ export function createChatTelemetryContext({
  * @param input - The input data for the trace (user message)
  * @returns The Langfuse trace instance, or null if Langfuse is not configured
  */
-export function createConversationTrace(
-  context: TelemetryContext,
-  traceId: string,
-  input: { message: string; mode?: string; pageContext?: PageContext },
-) {
+export function createConversationTrace(context: TelemetryContext, traceId: string, input: string) {
   const langfuse = getLangfuseClient();
 
   if (!langfuse) {
@@ -260,7 +256,7 @@ export function createConversationTrace(
   const metadata = buildMetadata(context);
 
   // Create a trace with a descriptive name based on the operation
-  const traceName = `chat-interaction`;
+  const traceName = 'chat-session';
 
   return langfuse.trace({
     id: traceId,
