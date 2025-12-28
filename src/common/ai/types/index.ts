@@ -36,6 +36,11 @@ export enum MessageClassificationIntent {
   OUT_OF_PAGE_SCOPE = 'OUT_OF_PAGE_SCOPE',
 }
 
+export enum ToolIntent {
+  FETCH = 'fetch',
+  COUNT = 'count',
+}
+
 export enum ChatResponseType {
   CHAT_RESPONSE = 'CHAT_RESPONSE',
   REFUSAL = 'REFUSAL',
