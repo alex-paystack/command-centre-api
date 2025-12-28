@@ -1,3 +1,5 @@
+// TODO: Patch and reinstate @paystackhq/nestjs-observability
+import './common/ai/observability/instrumentation';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';

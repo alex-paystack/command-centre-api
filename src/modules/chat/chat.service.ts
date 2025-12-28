@@ -37,12 +37,21 @@ import {
   ChatResponseType,
   ClassificationUIMessage,
   EnrichedPageContext,
+  TelemetryContext,
+  LLMOperationType,
+  createTelemetryConfig,
+  createChatTelemetryContext,
+  createMinimalTelemetryContext,
+  createConversationTrace,
+  getLangfuseClient,
+  getTextFromMessage,
 } from '~/common/ai';
 import { PaystackApiService } from '~/common/services/paystack-api.service';
 import { PageContextService } from '~/common/services/page-context.service';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
 import { Conversation } from './entities/conversation.entity';
 import { NotFoundError, ValidationError, APIError, ErrorCodes } from '~/common';
+import { trace } from '@opentelemetry/api';
 
 @Injectable()
 export class ChatService {
@@ -223,8 +232,12 @@ export class ChatService {
     }
   }
 
-  async handleMessageClassification(messages: UIMessage[], pageContext?: PageContext) {
-    const messageClassification = await classifyMessage(messages, pageContext);
+  async handleMessageClassification(
+    messages: UIMessage[],
+    pageContext?: PageContext,
+    telemetryContext?: TelemetryContext,
+  ) {
+    const messageClassification = await classifyMessage(messages, pageContext, telemetryContext);
     const confidence = messageClassification?.confidence ?? 1;
     const LOW_CONFIDENCE_THRESHOLD = 0.6;
 
@@ -360,12 +373,19 @@ export class ChatService {
     }
   }
 
-  async handleMessageSummarization(
-    conversation: Conversation,
-    userId: string,
-    savedMessages: MessageResponseDto[],
-    tokenCountForThisInteraction?: number,
-  ) {
+  async handleMessageSummarization({
+    conversation,
+    userId,
+    savedMessages,
+    tokenCountForThisInteraction,
+    telemetryContext,
+  }: {
+    conversation: Conversation;
+    userId: string;
+    savedMessages: MessageResponseDto[];
+    tokenCountForThisInteraction?: number;
+    telemetryContext?: TelemetryContext;
+  }) {
     if (tokenCountForThisInteraction) {
       conversation.totalTokensUsed += tokenCountForThisInteraction;
       await this.conversationRepository.save(conversation);
@@ -393,9 +413,15 @@ export class ChatService {
           : await this.getMessagesByConversationId(conversation.id, userId);
 
         if (messagesNeedingSummary.length > 0) {
+          // Create summarization telemetry context if not provided
+          const summaryTelemetryContext = telemetryContext
+            ? { ...telemetryContext, operationType: LLMOperationType.SUMMARIZATION }
+            : undefined;
+
           const newSummary = await summarizeConversation(
             convertToUIMessages(messagesNeedingSummary),
             conversation.summary,
+            summaryTelemetryContext,
           );
 
           if (newSummary) {
@@ -451,6 +477,7 @@ export class ChatService {
   // TODO: Consider decoding the JWT here to get the userId
   async handleStreamingChat(dto: ChatRequestDto, userId: string, jwtToken: string) {
     const { conversationId, message, mode, pageContext } = dto;
+    const parentTraceId = trace.getActiveSpan()?.spanContext().traceId ?? randomUUID();
 
     await this.checkUserEntitlement(userId);
 
@@ -460,7 +487,14 @@ export class ChatService {
 
     if (!conversation) {
       try {
-        const title = await generateConversationTitle(message);
+        const titleTelemetryContext = createMinimalTelemetryContext({
+          conversationId,
+          userId,
+          operationType: LLMOperationType.TITLE_GENERATION,
+          parentTraceId,
+        });
+
+        const title = await generateConversationTitle(message, titleTelemetryContext);
 
         conversation = await this.conversationRepository.createConversation({
           id: conversationId,
@@ -489,7 +523,25 @@ export class ChatService {
     // Build messages with summary support
     const uiMessages = await this.buildMessagesForLLM(conversation, conversationId, userId, message);
 
-    const messageClassification = await this.handleMessageClassification(uiMessages, pageContext);
+    const userMessageText = getTextFromMessage(message);
+
+    const classificationTelemetryContext = createChatTelemetryContext({
+      conversationId,
+      userId,
+      mode,
+      pageContext,
+      operationType: LLMOperationType.CLASSIFICATION,
+      parentTraceId,
+    });
+
+    // Create parent Langfuse trace for this chat interaction
+    const conversationTrace = createConversationTrace(classificationTelemetryContext, parentTraceId, userMessageText);
+
+    const messageClassification = await this.handleMessageClassification(
+      uiMessages,
+      pageContext,
+      classificationTelemetryContext,
+    );
 
     await this.saveMessages(
       [
@@ -517,6 +569,17 @@ export class ChatService {
         expiresAt: this.calculateExpiry(retentionDays),
       });
 
+      if (conversationTrace) {
+        conversationTrace.update({
+          output: {
+            type: messageClassification.type,
+            text: messageClassification.text,
+          },
+        });
+
+        await getLangfuseClient()?.flushAsync();
+      }
+
       return {
         type: messageClassification.type,
         responseStream: messageClassification.responseStream,
@@ -536,7 +599,17 @@ export class ChatService {
 
     const validatedMessages = await this.validateMessages(uiMessages, tools);
 
+    const chatTelemetryContext = createChatTelemetryContext({
+      conversationId,
+      userId,
+      mode,
+      pageContext,
+      operationType: LLMOperationType.CHAT_RESPONSE,
+      parentTraceId,
+    });
+
     let capturedUsage: LanguageModelUsage;
+    let assistantResponse = '';
 
     const stream = createUIMessageStream({
       execute: ({ writer }) => {
@@ -551,6 +624,7 @@ export class ChatService {
           messages: convertToModelMessages(validatedMessages),
           stopWhen: stepCountIs(10),
           tools,
+          experimental_telemetry: createTelemetryConfig(chatTelemetryContext),
           onFinish: ({ totalUsage }) => {
             capturedUsage = totalUsage;
           },
@@ -579,7 +653,26 @@ export class ChatService {
 
         const savedMessages = await this.saveMessages(formattedMessages, userId);
 
-        await this.handleMessageSummarization(conversation, userId, savedMessages, capturedUsage?.totalTokens);
+        const assistantMessage = messages.find((message) => message.role === 'assistant');
+        if (assistantMessage) {
+          assistantResponse = getTextFromMessage(assistantMessage);
+        }
+
+        if (conversationTrace) {
+          conversationTrace.update({
+            output: assistantResponse,
+          });
+
+          await getLangfuseClient()?.flushAsync();
+        }
+
+        await this.handleMessageSummarization({
+          conversation,
+          userId,
+          savedMessages,
+          tokenCountForThisInteraction: capturedUsage?.totalTokens,
+          telemetryContext: chatTelemetryContext,
+        });
       },
     });
 

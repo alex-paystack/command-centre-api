@@ -17,6 +17,7 @@ Command Centre API is a NestJS-based backend service that powers an AI-driven me
 - 🧭 **Guardrails** — Dual-layer classification for out-of-scope protection
 - 🛡️ **Rate Limiting** — Configurable message entitlement with sliding window enforcement
 - 📝 **Smart Summarization** — Automatic conversation summarization with context carry-over
+- 📈 **LLM Observability** — Comprehensive tracing and monitoring with Langfuse integration
 - 🗑️ **Automatic Cleanup** — TTL-based data retention with configurable expiry periods
 
 ## Quick Start
@@ -61,28 +62,29 @@ See [Configuration Guide](./docs/configuration.md) for all options.
 
 ## Documentation
 
-| Document                                   | Description                                                 |
-| ------------------------------------------ | ----------------------------------------------------------- |
-| [Architecture](./docs/architecture.md)     | Core services, project structure, technology stack          |
-| [AI Features](./docs/ai-features.md)       | Chat modes, tools, charting, guardrails, context enrichment |
-| [API Reference](./docs/api-reference.md)   | Complete endpoint documentation                             |
-| [Database](./docs/database.md)             | MongoDB collections and migrations                          |
-| [Configuration](./docs/configuration.md)   | Environment variables and rate limiting                     |
-| [Deployment](./docs/deployment.md)         | Docker, CI/CD, production checklist                         |
-| [Contributing](./docs/contributing.md)     | Code style, adding features, troubleshooting                |
-| [Authentication](./docs/authentication.md) | JWT implementation details                                  |
-| [Error Handling](./docs/error-handling.md) | Error patterns and best practices                           |
+| Document                                        | Description                                                 |
+| ----------------------------------------------- | ----------------------------------------------------------- |
+| [Architecture](./docs/architecture.md)          | Core services, project structure, technology stack          |
+| [AI Features](./docs/ai-features.md)            | Chat modes, tools, charting, guardrails, context enrichment |
+| [API Reference](./docs/api-reference.md)        | Complete endpoint documentation                             |
+| [Database](./docs/database.md)                  | MongoDB collections and migrations                          |
+| [Configuration](./docs/configuration.md)        | Environment variables and rate limiting                     |
+| [Deployment](./docs/deployment.md)              | Docker, CI/CD, production checklist                         |
+| [Contributing](./docs/contributing.md)          | Code style, adding features, troubleshooting                |
+| [Authentication](./docs/user-authentication.md) | JWT implementation details                                  |
+| [Error Handling](./docs/error-handling.md)      | Error patterns and best practices                           |
 
 ## Technology Stack
 
-| Category      | Technology                                         |
-| ------------- | -------------------------------------------------- |
-| Framework     | NestJS v11                                         |
-| Database      | MongoDB with TypeORM                               |
-| AI            | Vercel AI SDK v5.0.110 with OpenAI                 |
-| Language      | TypeScript v5.7                                    |
-| Validation    | Zod v4.0, class-validator                          |
-| Observability | OpenTelemetry via @paystackhq/nestjs-observability |
+| Category          | Technology                                         |
+| ----------------- | -------------------------------------------------- |
+| Framework         | NestJS v11                                         |
+| Database          | MongoDB with TypeORM                               |
+| AI                | Vercel AI SDK v5.0.110 with OpenAI                 |
+| Language          | TypeScript v5.7                                    |
+| Validation        | Zod v4.0, class-validator                          |
+| Observability     | OpenTelemetry via @paystackhq/nestjs-observability |
+| LLM Observability | Langfuse SDK v3.38 with OpenTelemetry integration  |
 
 ## Available Scripts
 

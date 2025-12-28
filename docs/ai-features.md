@@ -471,3 +471,221 @@ CONTEXT_WINDOW_SIZE=128000         # Model context window in tokens
 TOKEN_THRESHOLD_PERCENTAGE=0.6     # Trigger summarization at 60% of context window
 MAX_SUMMARIES=2                    # Maximum summaries before conversation closes
 ```
+
+## LLM Observability with Langfuse
+
+The API integrates comprehensive LLM observability using Langfuse, providing detailed tracing and monitoring of all AI interactions.
+
+### Overview
+
+All LLM operations are automatically traced and sent to Langfuse for analysis, debugging, and monitoring. The system creates structured parent traces that group related operations together, providing a complete view of each chat interaction.
+
+### Trace Architecture
+
+Each user message creates a hierarchical trace structure in Langfuse:
+
+```md
+📊 Parent Trace: "chat-session"
+├─ 📥 Input: User message
+├─ 🔍 Classification Span: Intent classification (out-of-scope detection)
+├─ 💬 Chat Response Span: Main LLM response with tool calls
+│ ├─ 🛠️ Tool Call: getTransactions
+│ ├─ 🛠️ Tool Call: generateChartData
+│ └─ ...
+├─ 📝 Summarization Span: Optional conversation summarization
+└─ 📤 Output: Assistant response
+```
+
+### Trace Metadata
+
+Each trace includes rich metadata for filtering and analysis:
+
+**Session Tracking:**
+
+- `sessionId`: Conversation ID (groups all messages in a conversation)
+- `userId`: Authenticated user ID from JWT
+
+**Context Information:**
+
+- `mode`: Chat mode (global or page)
+- `pageContextType`: Resource type if page-scoped (transaction, customer, etc.)
+- `pageContextResourceId`: Specific resource ID being discussed
+- `operationType`: Type of LLM operation (classification, chat-response, summarization, title-generation)
+
+**Service Information:**
+
+- `service`: Service name from `OTEL_SERVICE_NAME` (e.g., command-centre-api)
+- `environment`: Deployment environment from `OTEL_SERVICE_ENV` (local, staging, production)
+- `version`: Application version from `OTEL_SERVICE_VERSION` (e.g., 1.0.0)
+
+### Filterable Tags
+
+Every trace is tagged for easy filtering in the Langfuse UI:
+
+- `service:command-centre-api`
+- `env:{environment}` (e.g., `env:production`)
+- `version:{version}` (e.g., `version:1.0.0`)
+- `operation:{type}` (e.g., `operation:chat-response`)
+- `mode:global` or `mode:page`
+- `page:global` or `page:{resourceType}` (e.g., `page:transaction`)
+
+### Trace Input & Output
+
+**Input Structure:**
+
+```text
+"What is my revenue today?"
+```
+
+**Output Structure (Chat Response):**
+
+```text
+"Based on your transactions..."
+```
+
+**Output Structure (Refusal):**
+
+```json
+{
+  "type": "refusal",
+  "text": "I can only help with questions about your Paystack merchant dashboard..."
+}
+```
+
+### Configuration
+
+Enable Langfuse observability with these environment variables:
+
+```env
+# Service Identification (Required for proper trace attribution)
+OTEL_SERVICE_NAME=command-centre-api    # Service name for traces
+OTEL_SERVICE_VERSION=1.0.0              # Service version for release tracking
+OTEL_SERVICE_ENV=production             # Environment (local/staging/production)
+
+# Langfuse Credentials
+LANGFUSE_ENABLED=true                   # Enable Langfuse observability
+LANGFUSE_PUBLIC_KEY=pk-lf-...           # Langfuse public key
+LANGFUSE_SECRET_KEY=sk-lf-...           # Langfuse secret key
+LANGFUSE_BASE_URL=https://cloud.langfuse.com  # Langfuse API URL
+
+# OpenTelemetry Integration
+OTEL_SPAN_PROCESSORS_PATH=./dist/common/ai/observability/langfuse.config.js
+
+# Optional Configuration
+LANGFUSE_FLUSH_INTERVAL=5000            # Flush interval in ms (default: 5000)
+LANGFUSE_FLUSH_AT=15                    # Flush after N spans (default: 15)
+LANGFUSE_FILTER_VERBOSE_METADATA=true   # Filter verbose metadata (default: true)
+```
+
+### Benefits
+
+**Debugging & Monitoring:**
+
+- Track LLM performance across conversations
+- Identify slow or failing operations
+- Monitor token usage and costs
+- Debug classification and tool call issues
+
+**Analytics & Insights:**
+
+- Analyze user interaction patterns
+- Measure response quality and latency
+- Track most-used features and tools
+- Monitor conversation flow and success rates
+
+**Session Analysis:**
+
+- View complete conversation history grouped by session
+- Understand user journey across multiple interactions
+- Identify conversation patterns that lead to success or failure
+
+### Metadata Filtering
+
+To reduce verbosity and improve performance, the system automatically filters verbose metadata before exporting spans to Langfuse:
+
+**What Gets Filtered:**
+
+1. **Resource Attributes**: Removes infrastructure-level attributes that add noise
+   - `process.*` attributes (PID, runtime, command, executable path)
+   - `host.*` attributes (hostname, architecture, type)
+
+2. **Tools Arrays**: Completely removes the `tools` key from span attributes
+   - Full Zod schemas with input/output types
+   - Execute functions and parameter descriptions
+   - Reduces span payload significantly
+
+**What Gets Preserved:**
+
+- Service identification (`service.name`, `service.version`)
+- SDK metadata (`telemetry.sdk.name`, `telemetry.sdk.version`)
+- All custom telemetry attributes (mode, page context, operation type)
+- User ID, session ID, and trace IDs
+- All business logic attributes and metadata
+
+**Configuration:**
+
+```env
+LANGFUSE_FILTER_VERBOSE_METADATA=true  # Enable filtering (default: true)
+```
+
+**Impact:**
+
+- **30-50% reduction** in span payload size
+- Cleaner, more focused traces in Langfuse dashboard
+- Reduced network bandwidth and storage costs
+- Faster trace export and processing
+
+**How It Works:**
+
+The system uses a `FilteringSpanProcessor` that wraps the `LangfuseSpanProcessor`:
+
+1. Span ends and enters the processor pipeline
+2. If filtering is enabled, attributes are filtered using `filterSpanAttributes()` and `filterResourceAttributes()`
+3. Filtered span is passed to LangfuseSpanProcessor for export
+4. Original span data remains unchanged in OpenTelemetry
+
+**Implementation Files:**
+
+- `src/common/ai/observability/filtering-span-processor.ts` - Filtering span processor wrapper
+- `src/common/ai/observability/attribute-filters.ts` - Filtering utilities
+- `src/common/ai/observability/langfuse.config.ts` - Integration point
+
+### Key Implementation Files
+
+- `src/common/ai/observability/telemetry.ts` - Telemetry context and trace creation
+- `src/common/ai/observability/langfuse.config.ts` - Langfuse span processor configuration
+- `src/common/ai/observability/filtering-span-processor.ts` - Metadata filtering span processor
+- `src/common/ai/observability/attribute-filters.ts` - Attribute filtering utilities
+- `src/modules/chat/chat.service.ts` - Trace lifecycle management
+
+### Usage in Code
+
+The system automatically creates and manages traces. For reference, here's how traces are created:
+
+```typescript
+import { createConversationTrace, createChatTelemetryContext } from '~/common/ai';
+
+// Create telemetry context
+const telemetryContext = createChatTelemetryContext(
+  conversationId,
+  userId,
+  mode,
+  pageContext,
+  LLMOperationType.CHAT_RESPONSE,
+  parentTraceId,
+);
+
+// Create parent trace
+const trace = createConversationTrace(telemetryContext, parentTraceId, userMessageText);
+
+// AI SDK spans automatically nest under this parent trace
+// ...
+
+// Update trace with output
+trace.update({
+  output: assistantResponse,
+});
+
+// Flush to Langfuse
+await getLangfuseClient()?.flushAsync();
+```

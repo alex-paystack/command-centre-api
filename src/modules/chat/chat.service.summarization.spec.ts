@@ -283,7 +283,14 @@ describe('ChatService - Summarization', () => {
       (summarizeConversation as jest.Mock).mockRejectedValue(new Error('AI service unavailable'));
 
       // Should not throw even when summarization fails (add tokens to trigger summarization)
-      await expect(service.handleMessageSummarization(conversation, 'user_123', [], 10000)).resolves.toBeUndefined();
+      await expect(
+        service.handleMessageSummarization({
+          conversation,
+          userId: 'user_123',
+          savedMessages: [],
+          tokenCountForThisInteraction: 10000,
+        }),
+      ).resolves.toBeUndefined();
     });
 
     describe('Token-based summarization', () => {
@@ -307,7 +314,12 @@ describe('ChatService - Summarization', () => {
         jest.spyOn(conversationRepository, 'save').mockResolvedValue(conversation);
         jest.spyOn(messageRepository, 'countUserMessagesByConversationId').mockResolvedValue(5);
 
-        await service.handleMessageSummarization(conversation, 'user_123', [], 5000);
+        await service.handleMessageSummarization({
+          conversation,
+          userId: 'user_123',
+          savedMessages: [],
+          tokenCountForThisInteraction: 5000,
+        });
 
         // Should save with accumulated tokens (10000 + 5000 = 15000)
         expect(conversationRepository.save).toHaveBeenCalledWith(
@@ -322,7 +334,12 @@ describe('ChatService - Summarization', () => {
         jest.spyOn(conversationRepository, 'save').mockResolvedValue(conversation);
         jest.spyOn(messageRepository, 'countUserMessagesByConversationId').mockResolvedValue(5);
 
-        await service.handleMessageSummarization(conversation, 'user_123', [], 10000);
+        await service.handleMessageSummarization({
+          conversation,
+          userId: 'user_123',
+          savedMessages: [],
+          tokenCountForThisInteraction: 10000,
+        });
 
         // Should only save once for token accumulation, not for summarization
         expect(conversationRepository.save).toHaveBeenCalledTimes(1);
@@ -354,7 +371,12 @@ describe('ChatService - Summarization', () => {
         (summarizeConversation as jest.Mock).mockResolvedValue('Token-based summary.');
 
         // Add 7000 tokens to reach 77000 (above 76800 threshold: 128000 * 0.6)
-        await service.handleMessageSummarization(conversation, 'user_123', [], 7000);
+        await service.handleMessageSummarization({
+          conversation,
+          userId: 'user_123',
+          savedMessages: [],
+          tokenCountForThisInteraction: 7000,
+        });
 
         // Should trigger summarization
         expect(conversationRepository.save).toHaveBeenCalled();
@@ -380,7 +402,12 @@ describe('ChatService - Summarization', () => {
         const { summarizeConversation } = await import('~/common/ai/actions');
         (summarizeConversation as jest.Mock).mockResolvedValue('Token-based summary.');
 
-        await service.handleMessageSummarization(conversation, 'user_123', [], 7000);
+        await service.handleMessageSummarization({
+          conversation,
+          userId: 'user_123',
+          savedMessages: [],
+          tokenCountForThisInteraction: 7000,
+        });
 
         // Find the call that includes the summary (second save call)
         const summarizationCall = conversationRepository.save.mock.calls.find((call) =>
@@ -428,7 +455,12 @@ describe('ChatService - Summarization', () => {
         (summarizeConversation as jest.Mock).mockResolvedValue('Summary with larger context.');
 
         // Add 6000 tokens to reach 121000 (above 120000 threshold)
-        await service.handleMessageSummarization(conversation, 'user_123', [], 6000);
+        await service.handleMessageSummarization({
+          conversation,
+          userId: 'user_123',
+          savedMessages: [],
+          tokenCountForThisInteraction: 6000,
+        });
 
         expect(conversationRepository.save).toHaveBeenCalled();
       });

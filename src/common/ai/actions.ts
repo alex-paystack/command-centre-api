@@ -10,20 +10,23 @@ import {
 import { getTextFromMessage, getTextFromMessages, buildClassifierConversation } from './utils';
 import { z } from 'zod';
 import { MessageClassificationIntent, PageContext } from './types';
+import { TelemetryContext, createTelemetryConfig } from './observability/telemetry';
 
 /**
  * Generate a conversation title from a message
  * Uses GPT-3.5-turbo for cost efficiency
  *
  * @param message - The first user message in the conversation
+ * @param telemetryContext - Optional telemetry context for LLM observability
  * @returns A generated title or a fallback if generation fails
  */
-export async function generateConversationTitle(message: UIMessage) {
+export async function generateConversationTitle(message: UIMessage, telemetryContext?: TelemetryContext) {
   try {
     const { text } = await generateText({
       model: openai('gpt-3.5-turbo'),
       system: CONVERSATION_TITLE_GENERATION_PROMPT,
       prompt: getTextFromMessage(message),
+      experimental_telemetry: telemetryContext ? createTelemetryConfig(telemetryContext) : undefined,
     });
 
     const title = text.trim();
@@ -41,9 +44,14 @@ export async function generateConversationTitle(message: UIMessage) {
  *
  * @param messages - The full conversation history to summarize
  * @param existingSummary - Optional existing summary to build upon
+ * @param telemetryContext - Optional telemetry context for LLM observability
  * @returns A generated summary or empty string if generation fails
  */
-export async function summarizeConversation(messages: UIMessage[], existingSummary?: string) {
+export async function summarizeConversation(
+  messages: UIMessage[],
+  existingSummary?: string,
+  telemetryContext?: TelemetryContext,
+) {
   try {
     const conversationText = getTextFromMessages(messages);
     let prompt = conversationText;
@@ -56,6 +64,7 @@ export async function summarizeConversation(messages: UIMessage[], existingSumma
       model: openai('gpt-4o-mini'),
       system: CONVERSATION_SUMMARY_PROMPT,
       prompt,
+      experimental_telemetry: telemetryContext ? createTelemetryConfig(telemetryContext) : undefined,
     });
 
     return text.trim();
@@ -79,9 +88,15 @@ const ClassifierSchema = z.object({
  * Uses a fast model to ensure a quick response.
  *
  * @param messages - The conversation history
+ * @param pageContext - Optional page context for page-scoped conversations
+ * @param telemetryContext - Optional telemetry context for LLM observability
  * @returns The classified intent
  */
-export async function classifyMessage(messages: UIMessage[], pageContext?: PageContext) {
+export async function classifyMessage(
+  messages: UIMessage[],
+  pageContext?: PageContext,
+  telemetryContext?: TelemetryContext,
+) {
   try {
     let systemPrompt = CLASSIFIER_SYSTEM_PROMPT;
 
@@ -97,6 +112,7 @@ export async function classifyMessage(messages: UIMessage[], pageContext?: PageC
       schema: ClassifierSchema,
       system: systemPrompt,
       prompt: getClassifierUserPrompt(formattedConversation, latestUserMessage),
+      experimental_telemetry: telemetryContext ? createTelemetryConfig(telemetryContext) : undefined,
     });
 
     return object;

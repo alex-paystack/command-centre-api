@@ -14,7 +14,7 @@ The project documentation is organized as follows:
 - `docs/configuration.md` — Environment variables and rate limiting
 - `docs/deployment.md` — Docker, CI/CD, production checklist
 - `docs/contributing.md` — Code style, adding features, troubleshooting
-- `docs/authentication.md` — JWT implementation details
+- `docs/user-authentication.md` — JWT implementation details
 - `docs/error-handling.md` — Error patterns and best practices
 
 ## Instructions
@@ -62,18 +62,18 @@ Compare your findings with the current documentation:
 
 Update the appropriate documentation files:
 
-| Change Type                          | Update In                |
-| ------------------------------------ | ------------------------ |
-| New/changed services                 | `docs/architecture.md`   |
-| AI tools, chat modes, charting       | `docs/ai-features.md`    |
-| API endpoints                        | `docs/api-reference.md`  |
-| Database schema, migrations          | `docs/database.md`       |
-| Environment variables, rate limiting | `docs/configuration.md`  |
-| Docker, CI/CD, deployment            | `docs/deployment.md`     |
-| Code style, troubleshooting          | `docs/contributing.md`   |
-| Authentication changes               | `docs/AUTHENTICATION.md` |
-| Error handling patterns              | `docs/error-handling.md` |
-| Overview, quick start                | `README.md`              |
+| Change Type                          | Update In                     |
+| ------------------------------------ | ----------------------------- |
+| New/changed services                 | `docs/architecture.md`        |
+| AI tools, chat modes, charting       | `docs/ai-features.md`         |
+| API endpoints                        | `docs/api-reference.md`       |
+| Database schema, migrations          | `docs/database.md`            |
+| Environment variables, rate limiting | `docs/configuration.md`       |
+| Docker, CI/CD, deployment            | `docs/deployment.md`          |
+| Code style, troubleshooting          | `docs/contributing.md`        |
+| Authentication changes               | `docs/user-authentication.md` |
+| Error handling patterns              | `docs/error-handling.md`      |
+| Overview, quick start                | `README.md`                   |
 
 **Guidelines:**
 

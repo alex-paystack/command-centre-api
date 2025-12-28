@@ -27,6 +27,8 @@ NODE_ENV=development
 APP_NAME=command-centre-api
 APP_VERSION=1.0.0
 OTEL_SERVICE_NAME=command-centre-api
+OTEL_SERVICE_VERSION=1.0.0
+OTEL_SERVICE_ENV=local
 ```
 
 ### Optional Variables
@@ -59,30 +61,115 @@ OTEL_TRACES_EXPORTER=console
 OTEL_METRICS_EXPORTER=console
 ```
 
+### Langfuse LLM Observability (Optional)
+
+For LLM observability and tracing via Langfuse:
+
+```env
+# Service Identification (Required for proper trace attribution)
+OTEL_SERVICE_NAME=command-centre-api              # Service name for traces
+OTEL_SERVICE_VERSION=1.0.0                        # Service version for release tracking
+OTEL_SERVICE_ENV=production                       # Environment (local/staging/production)
+
+# Langfuse Configuration
+LANGFUSE_ENABLED=true                             # Enable Langfuse observability (default: false)
+LANGFUSE_PUBLIC_KEY=pk-lf-...                     # Langfuse public key
+LANGFUSE_SECRET_KEY=sk-lf-...                     # Langfuse secret key
+LANGFUSE_BASE_URL=https://cloud.langfuse.com      # Langfuse API URL (defaults to cloud)
+
+# Span Processor Hook (enables Langfuse integration)
+OTEL_SPAN_PROCESSORS_PATH=./dist/common/ai/observability/langfuse.config.js
+
+# Performance Tuning (Optional)
+LANGFUSE_FLUSH_INTERVAL=5000                      # Flush interval in milliseconds (default: 5000)
+LANGFUSE_FLUSH_AT=15                              # Flush after N spans (default: 15)
+
+# Metadata Filtering (Optional)
+LANGFUSE_FILTER_VERBOSE_METADATA=true             # Filter verbose OTEL metadata (default: true)
+```
+
+**Service Identification Variables:**
+
+- **`OTEL_SERVICE_NAME`**: Identifies the service in Langfuse traces and tags (e.g., `service:command-centre-api`)
+- **`OTEL_SERVICE_VERSION`**: Tracks release version for filtering and analysis (e.g., `version:1.0.0`)
+- **`OTEL_SERVICE_ENV`**: Identifies deployment environment (e.g., `env:production`, `env:staging`, `env:local`)
+
+These variables are used for:
+
+- Langfuse client initialization (`release` and `environment` fields)
+- Trace metadata (`service`, `environment`, `version`)
+- Filterable tags for analysis and debugging
+
+When configured, all LLM calls are traced to Langfuse with:
+
+- **Parent traces**: Each chat interaction creates a named trace with input/output
+- **Session tracking**: Conversation ID groups all LLM calls in a conversation
+- **User identification**: User ID from JWT authentication
+- **Metadata**: Mode, page context, service (`OTEL_SERVICE_NAME`), environment (`OTEL_SERVICE_ENV`), version (`OTEL_SERVICE_VERSION`)
+- **Tags**: Filterable tags like `service:command-centre-api`, `version:1.0.0`, `env:production`, `mode:global`, `page:transaction`
+- **Span filtering**: Only AI-related spans are exported (excludes HTTP, DB, infrastructure spans)
+- **Metadata filtering**: Removes verbose resource attributes (`process.*`, `host.*`) and tools arrays from spans (30-50% size reduction)
+- **Batching**: Configurable span batching for performance optimization
+
+**Trace Structure**: Each user message creates a parent trace named `chat-interaction` that groups all operations:
+
+1. **Classification** - Intent classification span (out-of-scope/out-of-page-scope detection)
+2. **Chat Response** - Main LLM response span (with tool calls if applicable)
+3. **Summarization** - Optional summarization span (when token threshold reached)
+4. **Title Generation** - Optional title generation span (for new conversations)
+
+The parent trace includes:
+
+- **Input**: User message
+- **Output**: Assistant response, or refusal message
+
+**Performance Tuning:**
+
+- `LANGFUSE_FLUSH_INTERVAL`: Controls how frequently spans are sent to Langfuse. Lower values provide faster visibility but increase network overhead. Recommended: 5000ms for production, 1000ms for development.
+- `LANGFUSE_FLUSH_AT`: Number of spans to accumulate before forcing a flush. Lower values reduce memory usage but increase API calls. Recommended: 15 for balanced performance.
+
+**Metadata Filtering:**
+
+- `LANGFUSE_FILTER_VERBOSE_METADATA`: Automatically filters verbose OpenTelemetry metadata from spans before export (default: `true`). When enabled:
+  - **Resource attributes**: Removes `process.*` (PID, runtime, command) and `host.*` (hostname, architecture) attributes
+  - **Tools arrays**: Completely removes tools keys from span attributes (strips full Zod schemas)
+  - **Impact**: 30-50% reduction in span payload size, cleaner traces in Langfuse
+  - **Preserved data**: Service name, SDK info, custom telemetry metadata, and all business logic attributes remain intact
+
 ### Variable Reference
 
-| Variable                     | Required | Default                          | Description                               |
-| ---------------------------- | -------- | -------------------------------- | ----------------------------------------- |
-| `DATABASE_HOST`              | Yes      | -                                | MongoDB host                              |
-| `DATABASE_USERNAME`          | Yes      | -                                | MongoDB username                          |
-| `DATABASE_PASSWORD`          | Yes      | -                                | MongoDB password                          |
-| `DATABASE_NAME`              | Yes      | -                                | Database name                             |
-| `OPENAI_API_KEY`             | Yes      | -                                | OpenAI API key (starts with `sk-`)        |
-| `JWT_SECRET`                 | Yes      | -                                | Secret for JWT signing                    |
-| `JWT_EXPIRES_IN`             | No       | `24h`                            | JWT expiration time                       |
-| `NODE_ENV`                   | No       | `development`                    | Environment mode                          |
-| `APP_NAME`                   | No       | `command-centre-api`             | Application name                          |
-| `APP_VERSION`                | No       | `1.0.0`                          | Application version                       |
-| `PAYSTACK_API_BASE_URL`      | No       | `https://studio-api.paystack.co` | Paystack API base URL                     |
-| `MESSAGE_LIMIT`              | No       | `100`                            | Rate limit message count                  |
-| `RATE_LIMIT_PERIOD_HOURS`    | No       | `24`                             | Rate limit time window                    |
-| `MESSAGE_HISTORY_LIMIT`      | No       | `40`                             | AI context message limit                  |
-| `CONVERSATION_TTL_DAYS`      | No       | `3`                              | Inactivity days before auto-deletion      |
-| `MAX_SUMMARIES`              | No       | `2`                              | Max summaries before conversation close   |
-| `CONTEXT_WINDOW_SIZE`        | No       | `128000`                         | Model context window in tokens            |
-| `TOKEN_THRESHOLD_PERCENTAGE` | No       | `0.6`                            | Percentage (0-1) triggering summarization |
-| `LOG_LEVEL`                  | No       | `info`                           | Logging verbosity                         |
-| `OTEL_SERVICE_NAME`          | No       | `command-centre-api`             | OpenTelemetry service name                |
+| Variable                           | Required | Default                          | Description                               |
+| ---------------------------------- | -------- | -------------------------------- | ----------------------------------------- |
+| `DATABASE_HOST`                    | Yes      | -                                | MongoDB host                              |
+| `DATABASE_USERNAME`                | Yes      | -                                | MongoDB username                          |
+| `DATABASE_PASSWORD`                | Yes      | -                                | MongoDB password                          |
+| `DATABASE_NAME`                    | Yes      | -                                | Database name                             |
+| `OPENAI_API_KEY`                   | Yes      | -                                | OpenAI API key (starts with `sk-`)        |
+| `JWT_SECRET`                       | Yes      | -                                | Secret for JWT signing                    |
+| `JWT_EXPIRES_IN`                   | No       | `24h`                            | JWT expiration time                       |
+| `NODE_ENV`                         | No       | `development`                    | Environment mode                          |
+| `APP_NAME`                         | No       | `command-centre-api`             | Application name                          |
+| `APP_VERSION`                      | No       | `1.0.0`                          | Application version                       |
+| `PAYSTACK_API_BASE_URL`            | No       | `https://studio-api.paystack.co` | Paystack API base URL                     |
+| `MESSAGE_LIMIT`                    | No       | `100`                            | Rate limit message count                  |
+| `RATE_LIMIT_PERIOD_HOURS`          | No       | `24`                             | Rate limit time window                    |
+| `MESSAGE_HISTORY_LIMIT`            | No       | `40`                             | AI context message limit                  |
+| `CONVERSATION_TTL_DAYS`            | No       | `3`                              | Inactivity days before auto-deletion      |
+| `MAX_SUMMARIES`                    | No       | `2`                              | Max summaries before conversation close   |
+| `CONTEXT_WINDOW_SIZE`              | No       | `128000`                         | Model context window in tokens            |
+| `TOKEN_THRESHOLD_PERCENTAGE`       | No       | `0.6`                            | Percentage (0-1) triggering summarization |
+| `LOG_LEVEL`                        | No       | `info`                           | Logging verbosity                         |
+| `OTEL_SERVICE_NAME`                | No       | `command-centre-api`             | OpenTelemetry service name                |
+| `OTEL_SERVICE_VERSION`             | No       | `1.0.0`                          | Service version for traces and tags       |
+| `OTEL_SERVICE_ENV`                 | No       | `local`                          | Environment name (local/staging/prod)     |
+| `LANGFUSE_ENABLED`                 | No       | `false`                          | Enable Langfuse LLM observability         |
+| `LANGFUSE_PUBLIC_KEY`              | No       | -                                | Langfuse public key for LLM observability |
+| `LANGFUSE_SECRET_KEY`              | No       | -                                | Langfuse secret key for LLM observability |
+| `LANGFUSE_BASE_URL`                | No       | `https://cloud.langfuse.com`     | Langfuse API base URL                     |
+| `LANGFUSE_FLUSH_INTERVAL`          | No       | `5000`                           | Flush interval in milliseconds            |
+| `LANGFUSE_FLUSH_AT`                | No       | `15`                             | Flush after N spans                       |
+| `LANGFUSE_FILTER_VERBOSE_METADATA` | No       | `true`                           | Filter verbose OTEL metadata from spans   |
+| `OTEL_SPAN_PROCESSORS_PATH`        | No       | -                                | Path to custom span processors hook file  |
 
 ## Rate Limiting
 

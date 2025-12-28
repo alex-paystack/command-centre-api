@@ -267,6 +267,136 @@ The app uses `@paystackhq/nestjs-observability` for OpenTelemetry instrumentatio
 - Configured via `OTEL_*` environment variables
 - Local dev disables exporters for performance: `OTEL_TRACES_EXPORTER=none`
 
+### LLM Observability with Langfuse
+
+The app integrates with Langfuse for LLM-specific observability via the Vercel AI SDK's telemetry:
+
+- All LLM calls (`generateText`, `generateObject`, `streamText`) are traced
+- Parent traces created for each chat interaction with proper naming and input/output
+- Traces are grouped by conversation (session ID = conversation ID)
+- User identification from JWT authentication
+- Rich metadata: mode, page context, operation type
+- Filterable tags: `mode:global`, `page:transaction`, `env:production`, etc.
+- Configurable span batching and flush behavior for performance optimization
+- Span filtering to only export AI-related operations (excludes HTTP, DB, infrastructure spans)
+
+**Configuration**:
+
+```env
+# Service Identification (Required for proper trace attribution)
+OTEL_SERVICE_NAME=command-centre-api                           # Service name for traces
+OTEL_SERVICE_VERSION=1.0.0                                     # Service version for release tracking
+OTEL_SERVICE_ENV=production                                    # Environment (local/staging/production)
+
+# Langfuse Configuration
+LANGFUSE_ENABLED=true                                          # Enable Langfuse observability (default: false)
+LANGFUSE_PUBLIC_KEY=pk-lf-...                                  # Langfuse public key
+LANGFUSE_SECRET_KEY=sk-lf-...                                  # Langfuse secret key
+LANGFUSE_BASE_URL=https://cloud.langfuse.com                   # Langfuse API URL (defaults to cloud)
+
+# OpenTelemetry Integration
+OTEL_SPAN_PROCESSORS_PATH=./dist/common/ai/observability/langfuse.config.js  # Span processor hook
+
+# Optional Performance Tuning
+LANGFUSE_FLUSH_INTERVAL=5000                                   # Flush interval in milliseconds (default: 5000)
+LANGFUSE_FLUSH_AT=15                                           # Flush after N spans (default: 15)
+```
+
+**Key files**:
+
+- `src/common/ai/observability/telemetry.ts` - Telemetry context helpers and trace management
+- `src/common/ai/observability/langfuse.config.ts` - Langfuse span processor configuration
+- `src/common/ai/observability/instrumentation.ts` - OpenTelemetry SDK initialization
+- `src/modules/chat/chat.service.ts` - Chat service with trace creation and updates
+
+**Core Telemetry Utilities**:
+
+The `telemetry.ts` module provides key functions for managing LLM observability:
+
+1. **`getLangfuseClient()`** - Returns singleton Langfuse client instance
+   - Initialized with credentials from environment variables
+   - Returns `null` if Langfuse is disabled or not configured
+
+2. **`createTelemetryConfig(context)`** - Creates `experimental_telemetry` config for AI SDK calls
+   - Enables OpenTelemetry tracing with Langfuse-specific metadata
+   - Adds tags and metadata for session tracking, filtering, and analysis
+
+3. **`createChatTelemetryContext(params)`** - Creates full telemetry context for chat operations
+   - Includes conversation ID, user ID, mode, page context, operation type, and parent trace ID
+   - Used for classification, chat responses, and summarization
+
+4. **`createMinimalTelemetryContext(params)`** - Creates minimal context for operations without full chat context
+   - Used for title generation which happens before conversation is fully established
+   - Includes only conversation ID, user ID, operation type, and parent trace ID
+
+5. **`createConversationTrace(context, traceId, input)`** - Creates parent Langfuse trace for a chat interaction
+   - Groups all LLM operations (classification, chat, summarization) for a single user message
+   - Includes input, metadata, tags, and session/user tracking
+
+**LLM Operation Types**:
+
+The `LLMOperationType` enum identifies different LLM operations for telemetry:
+
+- `TITLE_GENERATION` - Conversation title generation (uses minimal context)
+- `CLASSIFICATION` - Intent and scope classification
+- `CHAT_RESPONSE` - Main chat response with tool calls
+- `SUMMARIZATION` - Conversation summarization
+
+**Trace Structure**:
+
+Each user message creates a parent Langfuse trace named `chat-interaction` that groups all operations:
+
+1. **Classification** - Intent classification span (out-of-scope/out-of-page-scope detection)
+2. **Chat Response** - Main LLM response span (with tool calls if applicable)
+3. **Summarization** - Optional summarization span (when token threshold reached)
+4. **Title Generation** - Optional title generation span (for new conversations)
+
+The parent trace includes:
+
+- **Input**: User message
+- **Output**: Assistant response, or refusal message
+- **Metadata**: Service info, environment, mode, page context, operation type
+- **Tags**: Filterable tags for mode, page type, operation, environment, etc.
+- **Session ID**: Conversation ID to group all messages in a conversation
+- **User ID**: Authenticated user from JWT for user-level analytics
+
+#### Metadata Filtering
+
+To reduce verbosity in Langfuse traces, the system automatically filters verbose OTEL metadata before export:
+
+1. **Resource attributes**: Removes `process.*` and `host.*` attributes (e.g., `process.pid`, `host.arch`)
+2. **Tools array**: Completely removes the `tools` key from span attributes
+
+**Configuration:**
+
+```env
+LANGFUSE_FILTER_VERBOSE_METADATA=true  # Enable filtering (default: true)
+```
+
+**Filtered resource attributes:**
+
+- `process.pid`, `process.runtime.name`, `process.command`, `process.executable.path`
+- `host.name`, `host.arch`, `host.type`
+
+**Preserved attributes:**
+
+- `service.name`, `service.version`
+- `telemetry.sdk.name`, `telemetry.sdk.version`
+- All custom attributes from `createTelemetryConfig()`
+
+**Tools filtering:**
+
+- **Before**: Full tools array with Zod schemas, input/output types, execute functions
+- **After**: Tools key completely removed from spans
+
+**Key files:**
+
+- `src/common/ai/observability/attribute-filters.ts` - Filtering utilities
+- `src/common/ai/observability/filtering-span-processor.ts` - Span processor wrapper
+- `src/common/ai/observability/langfuse.config.ts` - Integration point
+
+**Impact:** 30-50% reduction in span payload size, cleaner traces in Langfuse dashboard
+
 ## Testing Patterns
 
 - **Unit tests**: Mock `PaystackApiService` and test business logic
@@ -279,7 +409,7 @@ The app uses `@paystackhq/nestjs-observability` for OpenTelemetry instrumentatio
 
 Uses Conventional Commits with commitlint:
 
-```
+```text
 feat(scope): description
 fix(scope): description
 docs(scope): description
