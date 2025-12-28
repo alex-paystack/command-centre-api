@@ -27,6 +27,8 @@ NODE_ENV=development
 APP_NAME=command-centre-api
 APP_VERSION=1.0.0
 OTEL_SERVICE_NAME=command-centre-api
+OTEL_SERVICE_VERSION=1.0.0
+OTEL_SERVICE_ENV=local
 ```
 
 ### Optional Variables
@@ -64,6 +66,11 @@ OTEL_METRICS_EXPORTER=console
 For LLM observability and tracing via Langfuse:
 
 ```env
+# Service Identification (Required for proper trace attribution)
+OTEL_SERVICE_NAME=command-centre-api              # Service name for traces
+OTEL_SERVICE_VERSION=1.0.0                        # Service version for release tracking
+OTEL_SERVICE_ENV=production                       # Environment (local/staging/production)
+
 # Langfuse Configuration
 LANGFUSE_ENABLED=true                             # Enable Langfuse observability (default: false)
 LANGFUSE_PUBLIC_KEY=pk-lf-...                     # Langfuse public key
@@ -81,13 +88,25 @@ LANGFUSE_FLUSH_AT=15                              # Flush after N spans (default
 LANGFUSE_FILTER_VERBOSE_METADATA=true             # Filter verbose OTEL metadata (default: true)
 ```
 
+**Service Identification Variables:**
+
+- **`OTEL_SERVICE_NAME`**: Identifies the service in Langfuse traces and tags (e.g., `service:command-centre-api`)
+- **`OTEL_SERVICE_VERSION`**: Tracks release version for filtering and analysis (e.g., `version:1.0.0`)
+- **`OTEL_SERVICE_ENV`**: Identifies deployment environment (e.g., `env:production`, `env:staging`, `env:local`)
+
+These variables are used for:
+
+- Langfuse client initialization (`release` and `environment` fields)
+- Trace metadata (`service`, `environment`, `version`)
+- Filterable tags for analysis and debugging
+
 When configured, all LLM calls are traced to Langfuse with:
 
 - **Parent traces**: Each chat interaction creates a named trace with input/output
 - **Session tracking**: Conversation ID groups all LLM calls in a conversation
 - **User identification**: User ID from JWT authentication
-- **Metadata**: Mode, page context, service, environment, version
-- **Tags**: Filterable tags like `mode:global`, `page:transaction`, `env:production`
+- **Metadata**: Mode, page context, service (`OTEL_SERVICE_NAME`), environment (`OTEL_SERVICE_ENV`), version (`OTEL_SERVICE_VERSION`)
+- **Tags**: Filterable tags like `service:command-centre-api`, `version:1.0.0`, `env:production`, `mode:global`, `page:transaction`
 - **Span filtering**: Only AI-related spans are exported (excludes HTTP, DB, infrastructure spans)
 - **Metadata filtering**: Removes verbose resource attributes (`process.*`, `host.*`) and tools arrays from spans (30-50% size reduction)
 - **Batching**: Configurable span batching for performance optimization
@@ -101,8 +120,8 @@ When configured, all LLM calls are traced to Langfuse with:
 
 The parent trace includes:
 
-- **Input**: User message, mode, and page context
-- **Output**: Assistant response, usage statistics, or refusal message
+- **Input**: User message
+- **Output**: Assistant response, or refusal message
 
 **Performance Tuning:**
 
@@ -141,6 +160,8 @@ The parent trace includes:
 | `TOKEN_THRESHOLD_PERCENTAGE`       | No       | `0.6`                            | Percentage (0-1) triggering summarization |
 | `LOG_LEVEL`                        | No       | `info`                           | Logging verbosity                         |
 | `OTEL_SERVICE_NAME`                | No       | `command-centre-api`             | OpenTelemetry service name                |
+| `OTEL_SERVICE_VERSION`             | No       | `1.0.0`                          | Service version for traces and tags       |
+| `OTEL_SERVICE_ENV`                 | No       | `local`                          | Environment name (local/staging/prod)     |
 | `LANGFUSE_ENABLED`                 | No       | `false`                          | Enable Langfuse LLM observability         |
 | `LANGFUSE_PUBLIC_KEY`              | No       | -                                | Langfuse public key for LLM observability |
 | `LANGFUSE_SECRET_KEY`              | No       | -                                | Langfuse secret key for LLM observability |

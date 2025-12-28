@@ -576,6 +576,7 @@ export class ChatService {
             text: messageClassification.text,
           },
         });
+
         await getLangfuseClient()?.flushAsync();
       }
 
@@ -657,11 +658,11 @@ export class ChatService {
           assistantResponse = getTextFromMessage(assistantMessage);
         }
 
-        // Update trace with final output
         if (conversationTrace) {
           conversationTrace.update({
             output: assistantResponse,
           });
+
           await getLangfuseClient()?.flushAsync();
         }
 

@@ -10,7 +10,7 @@ import { filterResourceAttributes, filterSpanAttributes } from './attribute-filt
  * @param span - Original span to filter
  * @returns Proxied span with filtered attributes
  */
-function createFilteredSpan(span: ReadableSpan): ReadableSpan {
+function createFilteredSpan(span: ReadableSpan) {
   const filteredAttributes = filterSpanAttributes(span.attributes);
   const filteredResource = {
     ...span.resource,
@@ -62,7 +62,7 @@ export class FilteringSpanProcessor implements SpanProcessor {
    * Called when a span is started.
    * Passes through to LangfuseProcessor without modification.
    */
-  onStart(span: Span, parentContext: Context): void {
+  onStart(span: Span, parentContext: Context) {
     this.langfuseProcessor.onStart(span, parentContext);
   }
 
@@ -72,7 +72,7 @@ export class FilteringSpanProcessor implements SpanProcessor {
    *
    * @param span - The span that has ended
    */
-  onEnd(span: ReadableSpan): void {
+  onEnd(span: ReadableSpan) {
     if (!this.enableFiltering) {
       this.langfuseProcessor.onEnd(span);
       return;
@@ -87,7 +87,7 @@ export class FilteringSpanProcessor implements SpanProcessor {
    * Forces the processor to flush any buffered spans.
    * Delegates to LangfuseProcessor.
    */
-  async forceFlush(): Promise<void> {
+  async forceFlush() {
     return this.langfuseProcessor.forceFlush();
   }
 
@@ -95,7 +95,7 @@ export class FilteringSpanProcessor implements SpanProcessor {
    * Shuts down the processor.
    * Delegates to LangfuseProcessor.
    */
-  async shutdown(): Promise<void> {
+  async shutdown() {
     return this.langfuseProcessor.shutdown();
   }
 }

@@ -62,17 +62,17 @@ See [Configuration Guide](./docs/configuration.md) for all options.
 
 ## Documentation
 
-| Document                                   | Description                                                 |
-| ------------------------------------------ | ----------------------------------------------------------- |
-| [Architecture](./docs/architecture.md)     | Core services, project structure, technology stack          |
-| [AI Features](./docs/ai-features.md)       | Chat modes, tools, charting, guardrails, context enrichment |
-| [API Reference](./docs/api-reference.md)   | Complete endpoint documentation                             |
-| [Database](./docs/database.md)             | MongoDB collections and migrations                          |
-| [Configuration](./docs/configuration.md)   | Environment variables and rate limiting                     |
-| [Deployment](./docs/deployment.md)         | Docker, CI/CD, production checklist                         |
-| [Contributing](./docs/contributing.md)     | Code style, adding features, troubleshooting                |
-| [Authentication](./docs/authentication.md) | JWT implementation details                                  |
-| [Error Handling](./docs/error-handling.md) | Error patterns and best practices                           |
+| Document                                        | Description                                                 |
+| ----------------------------------------------- | ----------------------------------------------------------- |
+| [Architecture](./docs/architecture.md)          | Core services, project structure, technology stack          |
+| [AI Features](./docs/ai-features.md)            | Chat modes, tools, charting, guardrails, context enrichment |
+| [API Reference](./docs/api-reference.md)        | Complete endpoint documentation                             |
+| [Database](./docs/database.md)                  | MongoDB collections and migrations                          |
+| [Configuration](./docs/configuration.md)        | Environment variables and rate limiting                     |
+| [Deployment](./docs/deployment.md)              | Docker, CI/CD, production checklist                         |
+| [Contributing](./docs/contributing.md)          | Code style, adding features, troubleshooting                |
+| [Authentication](./docs/user-authentication.md) | JWT implementation details                                  |
+| [Error Handling](./docs/error-handling.md)      | Error patterns and best practices                           |
 
 ## Technology Stack
 

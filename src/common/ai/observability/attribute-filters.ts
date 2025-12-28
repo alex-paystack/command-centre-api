@@ -1,9 +1,4 @@
 /**
- * Attribute filtering utilities for Langfuse OTEL exports.
- * Reduces verbose metadata by filtering resource attributes and tools arrays.
- */
-
-/**
  * Resource attribute prefixes to filter out
  */
 const FILTERED_RESOURCE_PREFIXES = ['process.', 'host.'];
@@ -37,6 +32,5 @@ export function filterSpanAttributes(attributes: Record<string, unknown>) {
     return {};
   }
 
-  // Filter out any keys that are 'tools' or end with '.tools'
   return Object.fromEntries(Object.entries(attributes).filter(([key]) => key !== 'tools' && !key.endsWith('.tools')));
 }

@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-
 import type { Context } from '@opentelemetry/api';
 import type { ReadableSpan, Span } from '@opentelemetry/sdk-trace-base';
 import type { LangfuseSpanProcessor } from '@langfuse/otel';

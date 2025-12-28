@@ -108,7 +108,10 @@ src/
 │ │ ├── utils.ts # Helper functions for AI (date validation, conversions)
 │ │ ├── observability/ # LLM observability
 │ │ │ ├── telemetry.ts # Trace management and telemetry context
-│ │ │ └── langfuse.config.ts # Langfuse span processor configuration
+│ │ │ ├── langfuse.config.ts # Langfuse span processor configuration
+│ │ │ ├── filtering-span-processor.ts # Metadata filtering span processor
+│ │ │ ├── attribute-filters.ts # Attribute filtering utilities
+│ │ │ └── instrumentation.ts # OpenTelemetry SDK initialization
 │ │ ├── tools/ # AI tools (organized by category)
 │ │ │ ├── index.ts # Main tool exports & page-scoped filtering
 │ │ │ ├── retrieval.ts # Data retrieval tools (get*)

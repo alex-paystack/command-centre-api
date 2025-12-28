@@ -283,7 +283,12 @@ The app integrates with Langfuse for LLM-specific observability via the Vercel A
 **Configuration**:
 
 ```env
-# Required
+# Service Identification (Required for proper trace attribution)
+OTEL_SERVICE_NAME=command-centre-api                           # Service name for traces
+OTEL_SERVICE_VERSION=1.0.0                                     # Service version for release tracking
+OTEL_SERVICE_ENV=production                                    # Environment (local/staging/production)
+
+# Langfuse Configuration
 LANGFUSE_ENABLED=true                                          # Enable Langfuse observability (default: false)
 LANGFUSE_PUBLIC_KEY=pk-lf-...                                  # Langfuse public key
 LANGFUSE_SECRET_KEY=sk-lf-...                                  # Langfuse secret key
@@ -348,8 +353,8 @@ Each user message creates a parent Langfuse trace named `chat-interaction` that 
 
 The parent trace includes:
 
-- **Input**: User message, mode, and page context
-- **Output**: Assistant response, usage statistics, or refusal message
+- **Input**: User message
+- **Output**: Assistant response, or refusal message
 - **Metadata**: Service info, environment, mode, page context, operation type
 - **Tags**: Filterable tags for mode, page type, operation, environment, etc.
 - **Session ID**: Conversation ID to group all messages in a conversation
@@ -404,7 +409,7 @@ LANGFUSE_FILTER_VERBOSE_METADATA=true  # Enable filtering (default: true)
 
 Uses Conventional Commits with commitlint:
 
-```md
+```text
 feat(scope): description
 fix(scope): description
 docs(scope): description

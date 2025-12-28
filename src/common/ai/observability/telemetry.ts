@@ -266,8 +266,6 @@ export function createConversationTrace(context: TelemetryContext, traceId: stri
 
   const tags = buildTags(context);
   const metadata = buildMetadata(context);
-
-  // Create a trace with a descriptive name based on the operation
   const traceName = 'chat-session';
 
   return langfuse.trace({
