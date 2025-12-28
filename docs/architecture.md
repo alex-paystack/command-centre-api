@@ -82,7 +82,8 @@ Provides comprehensive LLM observability through Langfuse integration:
 - **Metadata Enrichment**: Tags traces with service, environment, operation type
 - **Session Grouping**: Groups all operations in a conversation under one session
 - **Langfuse Client**: Singleton client for direct SDK access
-- **Span Processing**: Custom OpenTelemetry span processor for Langfuse export
+- **Span Processing**: Custom OpenTelemetry span processor with automatic metadata filtering
+- **Metadata Filtering**: Removes verbose resource attributes and tools arrays (30-50% size reduction)
 - **Input/Output Capture**: Records user messages and assistant responses
 - **Token Usage Tracking**: Monitors LLM token consumption and costs
 
@@ -90,6 +91,8 @@ Provides comprehensive LLM observability through Langfuse integration:
 
 - `src/common/ai/observability/telemetry.ts` - Telemetry context and trace creation
 - `src/common/ai/observability/langfuse.config.ts` - Langfuse span processor configuration
+- `src/common/ai/observability/filtering-span-processor.ts` - Metadata filtering span processor
+- `src/common/ai/observability/attribute-filters.ts` - Attribute filtering utilities
 
 ## Project Structure
 

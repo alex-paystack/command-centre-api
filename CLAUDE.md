@@ -355,6 +355,43 @@ The parent trace includes:
 - **Session ID**: Conversation ID to group all messages in a conversation
 - **User ID**: Authenticated user from JWT for user-level analytics
 
+#### Metadata Filtering
+
+To reduce verbosity in Langfuse traces, the system automatically filters verbose OTEL metadata before export:
+
+1. **Resource attributes**: Removes `process.*` and `host.*` attributes (e.g., `process.pid`, `host.arch`)
+2. **Tools array**: Completely removes the `tools` key from span attributes
+
+**Configuration:**
+
+```env
+LANGFUSE_FILTER_VERBOSE_METADATA=true  # Enable filtering (default: true)
+```
+
+**Filtered resource attributes:**
+
+- `process.pid`, `process.runtime.name`, `process.command`, `process.executable.path`
+- `host.name`, `host.arch`, `host.type`
+
+**Preserved attributes:**
+
+- `service.name`, `service.version`
+- `telemetry.sdk.name`, `telemetry.sdk.version`
+- All custom attributes from `createTelemetryConfig()`
+
+**Tools filtering:**
+
+- **Before**: Full tools array with Zod schemas, input/output types, execute functions
+- **After**: Tools key completely removed from spans
+
+**Key files:**
+
+- `src/common/ai/observability/attribute-filters.ts` - Filtering utilities
+- `src/common/ai/observability/filtering-span-processor.ts` - Span processor wrapper
+- `src/common/ai/observability/langfuse.config.ts` - Integration point
+
+**Impact:** 30-50% reduction in span payload size, cleaner traces in Langfuse dashboard
+
 ## Testing Patterns
 
 - **Unit tests**: Mock `PaystackApiService` and test business logic

@@ -1,5 +1,6 @@
 import { LangfuseSpanProcessor, ShouldExportSpan } from '@langfuse/otel';
 import type { SpanProcessor } from '@opentelemetry/sdk-trace-base';
+import { FilteringSpanProcessor } from './filtering-span-processor';
 
 /**
  * Filter to only export AI related spans to Langfuse
@@ -58,9 +59,15 @@ export function getSpanProcessors(): SpanProcessor[] {
     flushAt: Number(flushAt),
   });
 
-  // eslint-disable-next-line no-console
-  console.log(`Langfuse LLM observability enabled for environment: ${environment}`);
+  // Wrap with filtering processor to reduce verbose metadata
+  const enableFiltering = process.env['LANGFUSE_FILTER_VERBOSE_METADATA'] !== 'false';
+  const filteringProcessor = new FilteringSpanProcessor(langfuseProcessor, enableFiltering);
 
-  const processors: SpanProcessor[] = [langfuseProcessor as SpanProcessor];
+  // eslint-disable-next-line no-console
+  console.log(
+    `Langfuse LLM observability enabled for environment: ${environment} (metadata filtering: ${enableFiltering ? 'enabled' : 'disabled'})`,
+  );
+
+  const processors: SpanProcessor[] = [filteringProcessor as SpanProcessor];
   return processors;
 }
