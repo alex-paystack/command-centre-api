@@ -29,7 +29,7 @@ pnpm run format        # Fix formatting issues
 
 Commitlint enforces [Conventional Commits](https://www.conventionalcommits.org/):
 
-```
+```text
 type(scope): description
 
 [optional body]
@@ -41,7 +41,7 @@ type(scope): description
 
 **Examples**:
 
-```
+```text
 feat(chat): add support for page-scoped conversations
 fix(auth): handle expired JWT tokens gracefully
 docs(readme): update installation instructions
@@ -138,6 +138,163 @@ export function createMyNewTool(paystackService: PaystackApiService, getAuthenti
     },
   });
 }
+```
+
+**Important**: For data retrieval tools that return arrays of resources, apply sanitization before returning:
+
+```typescript
+import { sanitizeTransactions } from '../sanitization';
+
+const response = await paystackService.get<PaystackTransaction[]>('/transaction', jwtToken, params);
+
+// Sanitize to reduce token count
+const sanitized = sanitizeTransactions(response.data);
+
+return {
+  success: true,
+  transactions: sanitized, // Return sanitized data
+  meta: response.meta,
+  message: `Retrieved ${response.data.length} transaction(s)`,
+};
+```
+
+See the [Response Sanitization](#response-sanitization-for-new-retrieval-tools) section below for details.
+
+### Response Sanitization for New Retrieval Tools
+
+When adding new data retrieval tools, apply response sanitization to reduce token consumption in LLM context. The sanitization system provides 70-85% token reduction while preserving essential data.
+
+**Steps to Add Sanitization:**
+
+1. **Define Resource Type**: Add to `ResourceType` enum in `src/common/ai/sanitization/types.ts`
+
+```typescript
+export enum ResourceType {
+  TRANSACTION = 'transaction',
+  CUSTOMER = 'customer',
+  // ... existing types
+  MY_NEW_RESOURCE = 'my-new-resource', // Add here
+}
+```
+
+2. **Create Field Configuration**: Define what fields to keep at each sanitization level in `src/common/ai/sanitization/config.ts`
+
+```typescript
+export const MY_RESOURCE_FIELD_CONFIG: ResourceFieldConfigs<MyResource> = {
+  [SanitizationLevel.MINIMAL]: {
+    fields: ['id', 'amount', 'status'], // Only essentials
+  },
+
+  [SanitizationLevel.STANDARD]: {
+    fields: ['id', 'amount', 'status', 'reference', 'createdAt'], // Most common needs
+    nested: {
+      customer: {
+        fields: ['id', 'email'], // Simplified nested objects
+      },
+    },
+  },
+
+  [SanitizationLevel.DETAILED]: {
+    fields: ['id', 'amount', 'status', 'reference', 'createdAt', 'notes', 'updatedAt'], // More detail
+    nested: {
+      customer: {
+        fields: ['id', 'email', 'customer_code', 'phone'],
+      },
+    },
+  },
+};
+
+// Add to central config map
+export const RESOURCE_CONFIGS = {
+  // ... existing configs
+  [ResourceType.MY_NEW_RESOURCE]: MY_RESOURCE_FIELD_CONFIG,
+} as const;
+```
+
+3. **Create Convenience Function**: Add a helper function in `src/common/ai/sanitization/sanitizer.ts`
+
+```typescript
+export function sanitizeMyResources(
+  resources: MyResource[],
+  level: SanitizationLevel = SanitizationLevel.STANDARD,
+): Array<Partial<MyResource>> {
+  return ResourceSanitizer.sanitizeArray(resources, {
+    resourceType: ResourceType.MY_NEW_RESOURCE,
+    level,
+  });
+}
+```
+
+4. **Export from Index**: Add to `src/common/ai/sanitization/index.ts`
+
+```typescript
+export { sanitizeMyResources } from './sanitizer';
+```
+
+5. **Apply in Tool**: Use the sanitization function in your retrieval tool's execute function
+
+```typescript
+const response = await paystackService.get<MyResource[]>('/my-endpoint', jwtToken, params);
+const sanitized = sanitizeMyResources(response.data);
+
+return {
+  success: true,
+  myResources: sanitized, // Sanitized response
+  meta: response.meta,
+  message: `Retrieved ${response.data.length} resource(s)`,
+};
+```
+
+6. **Write Tests**: Add comprehensive tests in `src/common/ai/sanitization/sanitizer.spec.ts`
+
+```typescript
+describe('My Resource Sanitization', () => {
+  const mockResource = {
+    id: 1,
+    amount: 50000,
+    status: 'active',
+    reference: 'ref123',
+    // ... full resource with all fields
+  };
+
+  it('should sanitize with MINIMAL level', () => {
+    const result = sanitizeMyResources([mockResource], SanitizationLevel.MINIMAL)[0];
+
+    expect(result).toHaveProperty('id');
+    expect(result).toHaveProperty('amount');
+    expect(result).toHaveProperty('status');
+    // Verify verbose fields are removed
+    expect(result.notes).toBeUndefined();
+  });
+
+  // Add tests for STANDARD and DETAILED levels
+});
+```
+
+**Configuration Guidelines:**
+
+- **MINIMAL**: Only fields needed for basic identification (IDs, primary amounts, status)
+- **STANDARD** (default): Include fields commonly needed for most queries (references, dates, core metrics)
+- **DETAILED**: Add fields needed for complex analysis (notes, metadata, extended details)
+- **Nested Objects**: Only include fields actually needed by the AI for context
+- **Array Limiting**: Use `arrayLimit` to cap nested arrays (e.g., first 3-5 items)
+
+**Example Token Savings:**
+
+For a typical resource with 20+ fields returning 50 items:
+
+- MINIMAL: ~85% reduction (5 fields)
+- STANDARD: ~70% reduction (8-10 fields)
+- DETAILED: ~60% reduction (12-15 fields)
+
+**Testing Sanitization:**
+
+```bash
+# Run sanitization tests
+pnpm run test -- sanitizer.spec.ts
+
+# Run retrieval tool tests (includes sanitization verification)
+pnpm run test -- retrieval-tools.spec.ts
 ```
 
 ### Adding Resource Types
