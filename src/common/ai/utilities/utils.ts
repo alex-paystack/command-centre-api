@@ -55,7 +55,7 @@ function differenceInUtcDays(firstDate: Date, secondDate: Date) {
 }
 
 /**
- * Validates that the date range between from and to does not exceed 30 days
+ * Validates that the date range between from and to does not exceed 31 days
  * @param from - Start date (ISO 8601 format, e.g., 2024-01-01)
  * @param to - End date (ISO 8601 format, e.g., 2024-12-31)
  * @returns Object with isValid boolean and optional error message
@@ -64,7 +64,7 @@ export function validateDateRange(
   from?: string,
   to?: string,
 ): { isValid: boolean; error?: string; daysDifference?: number } {
-  const MAX_DAYS = 30;
+  const MAX_DAYS = 31;
   const today = new Date();
 
   if (!from && !to) {

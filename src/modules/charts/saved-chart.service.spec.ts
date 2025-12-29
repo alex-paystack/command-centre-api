@@ -147,11 +147,11 @@ describe('SavedChartService', () => {
       expect(savedChartRepository.createSavedChart).not.toHaveBeenCalled();
     });
 
-    it('should throw ValidationError for date range exceeding 30 days', async () => {
+    it('should throw ValidationError for date range exceeding 31 days', async () => {
       const invalidDto = {
         ...saveChartDto,
         from: '2024-01-01',
-        to: '2024-02-15', // More than 30 days
+        to: '2024-02-15', // More than 31 days
       };
 
       await expect(service.saveChart(invalidDto, 'user-123')).rejects.toThrow(ValidationError);
@@ -313,7 +313,7 @@ describe('SavedChartService', () => {
 
       const queryOverrides = {
         from: '2024-01-01',
-        to: '2024-12-31', // More than 30 days
+        to: '2024-12-31', // More than 31 days
       };
 
       await expect(service.getSavedChartWithData('chart-123', 'user-123', 'jwt-token', queryOverrides)).rejects.toThrow(

@@ -133,7 +133,7 @@ Charts are generated via utilities in `src/common/ai/utilities/`:
 - **Aggregation logic**: `utilities/aggregation.ts` handles data aggregation and series generation
 - **Chart generation**: `utilities/chart-generator.ts` coordinates the end-to-end chart creation process
 - **Channel filtering**: Transaction-specific payment channel analysis (`by-channel` aggregation)
-- **Validation**: 30-day max date range, resource-specific aggregation type validation, channel filter validation
+- **Validation**: 31-day max date range, resource-specific aggregation type validation, channel filter validation
 - **Recharts-compatible** output format with comprehensive summary statistics
 
 ## Development Patterns
@@ -222,7 +222,7 @@ if (!validation.isValid) {
 
 - Resource type and aggregation type compatibility
 - Status values must match resource-specific enums
-- Date range must not exceed 30 days
+- Date range must not exceed 31 days
 - Channel filter only valid for transactions
 - Channel must be a valid `PaymentChannel` enum value
 
@@ -424,6 +424,6 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 - **Don't create separate HTTP instances**: Always import `PaystackModule` for Paystack API access
 - **Don't skip page context validation**: Page-scoped conversations must validate context on every message
 - **Don't forget JWT passthrough**: All Paystack API calls must use the user's JWT token
-- **Don't exceed 30-day date ranges**: Chart and data retrieval tools have 30-day validation
+- **Don't exceed 31-day date ranges**: Chart and data retrieval tools have 31-day validation
 - **Don't modify conversation mode**: Global conversations cannot become page-scoped and vice versa
 - **Don't bypass tool filtering**: Page-scoped mode must filter tools via `filterToolsForPageContext()`

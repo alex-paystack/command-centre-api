@@ -66,7 +66,7 @@ export function validateChartParams(params: ChartValidationParams): ChartValidat
     }
   }
 
-  // Validate date range does not exceed 30 days
+  // Validate date range does not exceed 31 days
   const dateValidation = validateDateRange(from, to);
 
   if (!dateValidation.isValid) {

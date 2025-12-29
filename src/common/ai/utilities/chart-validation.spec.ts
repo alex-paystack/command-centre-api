@@ -90,7 +90,7 @@ describe('validateChartParams', () => {
     expect((result as ChartValidationError).code).toBe(ErrorCodes.INVALID_DATE_RANGE);
   });
 
-  it('rejects date ranges exceeding 30 days', () => {
+  it('rejects date ranges exceeding 31 days', () => {
     const result = validateChartParams({
       resourceType: ChartResourceType.TRANSACTION,
       aggregationType: AggregationType.BY_DAY,
@@ -102,7 +102,7 @@ describe('validateChartParams', () => {
     expect((result as ChartValidationError).code).toBe(ErrorCodes.INVALID_DATE_RANGE);
   });
 
-  it('accepts date ranges within 30 days', () => {
+  it('accepts date ranges within 31 days', () => {
     const result = validateChartParams({
       resourceType: ChartResourceType.TRANSACTION,
       aggregationType: AggregationType.BY_DAY,

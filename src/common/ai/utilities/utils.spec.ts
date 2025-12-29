@@ -19,7 +19,7 @@ describe('validateDateRange', () => {
   });
 
   describe('when only one date is provided', () => {
-    it('should return valid when only from date is provided within 30 days of today', () => {
+    it('should return valid when only from date is provided within 31 days of today', () => {
       const today = new Date();
       const tenDaysAgo = new Date(today.getTime() - 10 * 24 * 60 * 60 * 1000);
       const result = validateDateRange(tenDaysAgo.toISOString().split('T')[0], undefined);
@@ -28,16 +28,16 @@ describe('validateDateRange', () => {
       expect(result.error).toBeUndefined();
     });
 
-    it('should return error when only from date exceeds 30 days from today', () => {
+    it('should return error when only from date exceeds 31 days from today', () => {
       const today = new Date();
       const fortyDaysAgo = new Date(today.getTime() - 40 * 24 * 60 * 60 * 1000);
       const result = validateDateRange(fortyDaysAgo.toISOString().split('T')[0], undefined);
 
       expect(result.isValid).toBe(false);
-      expect(result.error).toContain('30 days');
+      expect(result.error).toContain('31 days');
     });
 
-    it('should return valid when only to date is provided within 30 days of today', () => {
+    it('should return valid when only to date is provided within 31 days of today', () => {
       const today = new Date();
       const tenDaysAhead = new Date(today.getTime() + 10 * 24 * 60 * 60 * 1000);
       const result = validateDateRange(undefined, tenDaysAhead.toISOString().split('T')[0]);
@@ -46,13 +46,13 @@ describe('validateDateRange', () => {
       expect(result.error).toBeUndefined();
     });
 
-    it('should return error when only to date exceeds 30 days from today', () => {
+    it('should return error when only to date exceeds 31 days from today', () => {
       const today = new Date();
       const fortyDaysAhead = new Date(today.getTime() + 40 * 24 * 60 * 60 * 1000);
       const result = validateDateRange(undefined, fortyDaysAhead.toISOString().split('T')[0]);
 
       expect(result.isValid).toBe(false);
-      expect(result.error).toContain('30 days');
+      expect(result.error).toContain('31 days');
     });
   });
 
@@ -104,16 +104,16 @@ describe('validateDateRange', () => {
     });
   });
 
-  describe('30-day limit validation', () => {
-    it('should return valid for a range of exactly 30 days', () => {
-      const result = validateDateRange('2024-01-01', '2024-01-31');
+  describe('31-day limit validation', () => {
+    it('should return valid for a range of exactly 31 days', () => {
+      const result = validateDateRange('2024-01-01', '2024-02-01');
 
       expect(result.isValid).toBe(true);
-      expect(result.daysDifference).toBe(30);
+      expect(result.daysDifference).toBe(31);
       expect(result.error).toBeUndefined();
     });
 
-    it('should return valid for a range less than 30 days', () => {
+    it('should return valid for a range less than 31 days', () => {
       const result = validateDateRange('2024-01-01', '2024-01-15');
 
       expect(result.isValid).toBe(true);
@@ -127,13 +127,21 @@ describe('validateDateRange', () => {
       expect(result.daysDifference).toBe(1);
     });
 
-    it('should return error for a range exceeding 30 days', () => {
-      const result = validateDateRange('2024-01-01', '2024-02-01');
+    it('should return valid for a range of exactly 30 days', () => {
+      const result = validateDateRange('2024-01-01', '2024-01-31');
+
+      expect(result.isValid).toBe(true);
+      expect(result.daysDifference).toBe(30);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('should return error for a range exceeding 31 days', () => {
+      const result = validateDateRange('2024-01-01', '2024-02-02');
 
       expect(result.isValid).toBe(false);
-      expect(result.daysDifference).toBe(31);
+      expect(result.daysDifference).toBe(32);
       expect(result.error).toBe(
-        'Date range exceeds the maximum allowed period of 30 days. The requested range is 31 days. Please narrow your date range.',
+        'Date range exceeds the maximum allowed period of 31 days. The requested range is 32 days. Please narrow your date range.',
       );
     });
 
@@ -163,10 +171,10 @@ describe('validateDateRange', () => {
     });
 
     it('should handle year boundary correctly', () => {
-      const result = validateDateRange('2023-12-15', '2024-01-14');
+      const result = validateDateRange('2023-12-15', '2024-01-15');
 
       expect(result.isValid).toBe(true);
-      expect(result.daysDifference).toBe(30);
+      expect(result.daysDifference).toBe(31);
     });
 
     it('should handle dates with time components (ISO 8601 datetime)', () => {
@@ -184,7 +192,7 @@ describe('validateDateRange', () => {
     });
 
     it('should handle dates with different month lengths', () => {
-      // January has 31 days
+      // January has 31 days - testing Jan 1 to Jan 31 (30 days difference)
       const result = validateDateRange('2024-01-01', '2024-01-31');
       expect(result.isValid).toBe(true);
       expect(result.daysDifference).toBe(30);
@@ -202,14 +210,14 @@ describe('validateDateRange', () => {
       expect(result.daysDifference).toBe(7);
     });
 
-    it('should validate "last 30 days" range', () => {
+    it('should validate "last 31 days" range', () => {
       const today = new Date('2024-06-15');
-      const thirtyDaysAgo = new Date('2024-05-16');
+      const thirtyOneDaysAgo = new Date('2024-05-15');
 
-      const result = validateDateRange(thirtyDaysAgo.toISOString().split('T')[0], today.toISOString().split('T')[0]);
+      const result = validateDateRange(thirtyOneDaysAgo.toISOString().split('T')[0], today.toISOString().split('T')[0]);
 
       expect(result.isValid).toBe(true);
-      expect(result.daysDifference).toBe(30);
+      expect(result.daysDifference).toBe(31);
     });
 
     it('should reject "last 60 days" range', () => {
@@ -224,10 +232,11 @@ describe('validateDateRange', () => {
     });
 
     it('should validate "this month" range (max 31 days)', () => {
-      const result = validateDateRange('2024-01-01', '2024-01-31');
+      // Jan 1 to Feb 1 is exactly 31 days
+      const result = validateDateRange('2024-01-01', '2024-02-01');
 
       expect(result.isValid).toBe(true);
-      expect(result.daysDifference).toBe(30);
+      expect(result.daysDifference).toBe(31);
     });
 
     it('should reject "last quarter" range (90 days)', () => {

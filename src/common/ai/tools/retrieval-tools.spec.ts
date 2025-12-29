@@ -95,20 +95,20 @@ describe('Data Retrieval Tools', () => {
       expect(mockPaystackService.get).not.toHaveBeenCalled();
     });
 
-    it('should validate date range (30-day limit)', async () => {
+    it('should validate date range (31-day limit)', async () => {
       const tool = createGetTransactionsTool(mockPaystackService, mockGetAuthenticatedUser);
       const result = await tool.execute?.(
         {
           perPage: 50,
           page: 1,
           from: '2024-01-01',
-          to: '2024-03-01', // More than 30 days
+          to: '2024-03-01', // More than 31 days
         },
         mockToolCallOptions,
       );
 
       expect(result).toMatchObject({
-        error: expect.stringContaining('30 days'),
+        error: expect.stringContaining('31 days'),
       });
       expect(mockPaystackService.get).not.toHaveBeenCalled();
     });
@@ -499,7 +499,7 @@ describe('Data Retrieval Tools', () => {
       );
 
       expect(result).toMatchObject({
-        error: expect.stringContaining('30 days'),
+        error: expect.stringContaining('31 days'),
       });
     });
 
@@ -649,7 +649,7 @@ describe('Data Retrieval Tools', () => {
       );
 
       expect(result).toMatchObject({
-        error: expect.stringContaining('30 days'),
+        error: expect.stringContaining('31 days'),
       });
     });
 
@@ -822,7 +822,7 @@ describe('Data Retrieval Tools', () => {
       );
 
       expect(result).toMatchObject({
-        error: expect.stringContaining('30 days'),
+        error: expect.stringContaining('31 days'),
       });
     });
 
