@@ -32,6 +32,18 @@ describe('Data Retrieval Tools', () => {
   });
 
   describe('createGetTransactionsTool', () => {
+    it('should refuse unsupported filters', async () => {
+      const tool = createGetTransactionsTool(mockPaystackService, mockGetAuthenticatedUser);
+
+      // @ts-expect-error intentional invalid filter to test guard
+      const result = await tool.execute?.({ foo: 'bar' }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        error: expect.stringContaining('foo'),
+      });
+      expect(mockPaystackService.get).not.toHaveBeenCalled();
+    });
+
     it('should fetch transactions successfully', async () => {
       const mockTransactions: PaystackTransaction[] = [
         {
@@ -259,6 +271,18 @@ describe('Data Retrieval Tools', () => {
   });
 
   describe('createGetCustomersTool', () => {
+    it('should refuse unsupported filters', async () => {
+      const tool = createGetCustomersTool(mockPaystackService, mockGetAuthenticatedUser);
+
+      // @ts-expect-error intentional invalid filter to test guard
+      const result = await tool.execute?.({ foo: 'bar' }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        error: expect.stringContaining('foo'),
+      });
+      expect(mockPaystackService.get).not.toHaveBeenCalled();
+    });
+
     it('should fetch customers successfully', async () => {
       const mockCustomers: PaystackCustomer[] = [
         {
@@ -416,6 +440,18 @@ describe('Data Retrieval Tools', () => {
   });
 
   describe('createGetRefundsTool', () => {
+    it('should refuse unsupported filters', async () => {
+      const tool = createGetRefundsTool(mockPaystackService, mockGetAuthenticatedUser);
+
+      // @ts-expect-error intentional invalid filter to test guard
+      const result = await tool.execute?.({ foo: 'bar' }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        error: expect.stringContaining('foo'),
+      });
+      expect(mockPaystackService.get).not.toHaveBeenCalled();
+    });
+
     it('should fetch refunds successfully', async () => {
       const mockRefunds: PaystackRefund[] = [
         {
@@ -442,7 +478,7 @@ describe('Data Retrieval Tools', () => {
 
       const tool = createGetRefundsTool(mockPaystackService, mockGetAuthenticatedUser);
       const result = await tool.execute?.(
-        { perPage: 50, page: 1, amount_operator: 'eq', status: RefundStatus.PROCESSED },
+        { perPage: 50, page: 1, amountOperator: 'eq', status: RefundStatus.PROCESSED },
         mockToolCallOptions,
       );
 
@@ -473,7 +509,7 @@ describe('Data Retrieval Tools', () => {
           perPage: 50,
           page: 1,
           amount: 100,
-          amount_operator: 'gt',
+          amountOperator: 'gt',
         },
         mockToolCallOptions,
       );
@@ -491,7 +527,7 @@ describe('Data Retrieval Tools', () => {
         {
           perPage: 50,
           page: 1,
-          amount_operator: 'eq',
+          amountOperator: 'eq',
           from: '2024-01-01',
           to: '2024-03-01',
         },
@@ -507,7 +543,7 @@ describe('Data Retrieval Tools', () => {
       mockGetAuthenticatedUser.mockReturnValueOnce({ userId: 'test-user-id', jwtToken: undefined });
 
       const tool = createGetRefundsTool(mockPaystackService, mockGetAuthenticatedUser);
-      const result = await tool.execute?.({ perPage: 50, page: 1, amount_operator: 'eq' }, mockToolCallOptions);
+      const result = await tool.execute?.({ perPage: 50, page: 1, amountOperator: 'eq' }, mockToolCallOptions);
 
       expect(result).toMatchObject({
         error: 'Authentication token not available. Please ensure you are logged in.',
@@ -549,7 +585,7 @@ describe('Data Retrieval Tools', () => {
       });
 
       const tool = createGetRefundsTool(mockPaystackService, mockGetAuthenticatedUser);
-      const result = await tool.execute?.({ perPage: 50, page: 1, amount_operator: 'eq' }, mockToolCallOptions);
+      const result = await tool.execute?.({ perPage: 50, page: 1, amountOperator: 'eq' }, mockToolCallOptions);
 
       // Should have standard-level fields
       expect((result as { refunds: PaystackRefund[] }).refunds?.[0]).toHaveProperty('id', 1);
@@ -578,6 +614,18 @@ describe('Data Retrieval Tools', () => {
   });
 
   describe('createGetPayoutsTool', () => {
+    it('should refuse unsupported filters', async () => {
+      const tool = createGetPayoutsTool(mockPaystackService, mockGetAuthenticatedUser);
+
+      // @ts-expect-error intentional invalid filter to test guard
+      const result = await tool.execute?.({ foo: 'bar' }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        error: expect.stringContaining('foo'),
+      });
+      expect(mockPaystackService.get).not.toHaveBeenCalled();
+    });
+
     it('should fetch payouts successfully', async () => {
       const mockPayouts: PaystackPayout[] = [
         {
@@ -730,6 +778,18 @@ describe('Data Retrieval Tools', () => {
   });
 
   describe('createGetDisputesTool', () => {
+    it('should refuse unsupported filters', async () => {
+      const tool = createGetDisputesTool(mockPaystackService, mockGetAuthenticatedUser);
+
+      // @ts-expect-error intentional invalid filter to test guard
+      const result = await tool.execute?.({ foo: 'bar' }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        error: expect.stringContaining('foo'),
+      });
+      expect(mockPaystackService.get).not.toHaveBeenCalled();
+    });
+
     it('should fetch disputes successfully', async () => {
       const mockDisputes: PaystackDispute[] = [
         {
@@ -791,7 +851,7 @@ describe('Data Retrieval Tools', () => {
       });
     });
 
-    it('should handle ignore_resolved parameter', async () => {
+    it('should handle ignoreResolved parameter', async () => {
       mockPaystackService.get.mockResolvedValueOnce({
         status: true,
         message: 'Disputes retrieved',
@@ -800,7 +860,7 @@ describe('Data Retrieval Tools', () => {
       });
 
       const tool = createGetDisputesTool(mockPaystackService, mockGetAuthenticatedUser);
-      await tool.execute?.({ perPage: 50, page: 1, ignore_resolved: 'yes' }, mockToolCallOptions);
+      await tool.execute?.({ perPage: 50, page: 1, ignoreResolved: 'yes' }, mockToolCallOptions);
 
       expect(mockPaystackService.get).toHaveBeenCalledWith('/dispute', 'test-token', {
         perPage: 50,

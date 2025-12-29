@@ -53,19 +53,20 @@ docs(readme): update installation instructions
 
 Unit test files follow the `*.spec.ts` naming convention:
 
-| Test File                            | Description                      |
-| ------------------------------------ | -------------------------------- |
-| `chat.controller.spec.ts`            | Chat controller tests            |
-| `chat.service.spec.ts`               | Chat service layer tests         |
-| `chat.service.summarization.spec.ts` | Conversation summarization tests |
-| `aggregation.spec.ts`                | Chart aggregation logic tests    |
-| `tools/export-tools.spec.ts`         | Export tools tests               |
-| `tools/retrieval-tools.spec.ts`      | Data retrieval tools tests       |
-| `tools/page-scoped-tools.spec.ts`    | Page-scoped tool filtering tests |
-| `utils.spec.ts`                      | AI utility function tests        |
-| `jwt-auth.guard.spec.ts`             | Authentication guard tests       |
-| `page-context.service.spec.ts`       | Page context enrichment tests    |
-| `app.service.spec.ts`                | Application service tests        |
+| Test File                                       | Description                       |
+| ----------------------------------------------- | --------------------------------- |
+| `chat.controller.spec.ts`                       | Chat controller tests             |
+| `chat.service.spec.ts`                          | Chat service layer tests          |
+| `chat.service.summarization.spec.ts`            | Conversation summarization tests  |
+| `aggregation.spec.ts`                           | Chart aggregation logic tests     |
+| `tools/export-tools.spec.ts`                    | Export tools tests                |
+| `tools/retrieval-tools.spec.ts`                 | Data retrieval tools tests        |
+| `tools/page-scoped-tools.spec.ts`               | Page-scoped tool filtering tests  |
+| `utils.spec.ts`                                 | AI utility function tests         |
+| `utilities/retreival-filter-validation.spec.ts` | Retrieval filter validation tests |
+| `jwt-auth.guard.spec.ts`                        | Authentication guard tests        |
+| `page-context.service.spec.ts`                  | Page context enrichment tests     |
+| `app.service.spec.ts`                           | Application service tests         |
 
 E2E tests are located in `test/e2e/` directory.
 
@@ -99,30 +100,45 @@ AI tools are organized by category in `src/common/ai/tools/`:
 
 1. Add tool factory function in the appropriate category file using Vercel AI SDK's `tool()` function
 2. Add Zod schema for input validation
-3. Implement execute function with JWT-authenticated Paystack API calls
-4. Export the factory function from the category file
-5. Import and add to `createTools()` in `tools/index.ts`
-6. Optionally add to `RESOURCE_TOOL_MAP` in `tools/index.ts` for page-scoped filtering
-7. Write comprehensive tests in the corresponding `*-tools.spec.ts` file
+3. Add filter validation constants (if creating a new retrieval tool)
+4. Implement execute function with JWT-authenticated Paystack API calls and filter validation
+5. Export the factory function from the category file
+6. Import and add to `createTools()` in `tools/index.ts`
+7. Optionally add to `RESOURCE_TOOL_MAP` in `tools/index.ts` for page-scoped filtering
+8. Write comprehensive tests in the corresponding `*-tools.spec.ts` file
 
 **Example** (adding a retrieval tool in `tools/retrieval.ts`):
 
 ```typescript
+import { findUnsupportedFilters, buildUnsupportedFilterError } from '../utilities/retreival-filter-validation';
+
+// Define allowed filters for this resource type
+export const MY_RESOURCE_ALLOWED_FILTERS = ['perPage', 'page', 'param1', 'param2'] as const;
+
 export function createMyNewTool(paystackService: PaystackApiService, getAuthenticatedUser: () => AuthenticatedUser) {
   return tool({
     description: 'Description of what this tool does',
-    inputSchema: z.object({
+    inputSchema: z.looseObject({
       perPage: z.number().optional().default(50),
       page: z.number().optional().default(1),
       param1: z.string().describe('Parameter description'),
       param2: z.number().optional().describe('Optional parameter'),
     }),
-    execute: async ({ perPage, page, param1, param2 }) => {
+    execute: async (input) => {
       const { jwtToken } = getAuthenticatedUser();
 
       if (!jwtToken) {
         return { error: 'Authentication token not available' };
       }
+
+      // Validate filters
+      const unsupportedFilters = findUnsupportedFilters(input, MY_RESOURCE_ALLOWED_FILTERS);
+
+      if (unsupportedFilters.length) {
+        return buildUnsupportedFilterError('my-resources', unsupportedFilters, MY_RESOURCE_ALLOWED_FILTERS);
+      }
+
+      const { perPage, page, param1, param2 } = input;
 
       try {
         const response = await paystackService.get('/endpoint', jwtToken, {
@@ -140,7 +156,11 @@ export function createMyNewTool(paystackService: PaystackApiService, getAuthenti
 }
 ```
 
-**Important**: For data retrieval tools that return arrays of resources, apply sanitization before returning:
+**Important Notes:**
+
+1. **Filter Validation**: Use `z.looseObject()` instead of `z.object()` for the input schema to allow extra fields for validation. Always validate filters before making API calls using `findUnsupportedFilters()` and `buildUnsupportedFilterError()`.
+
+2. **Sanitization**: For data retrieval tools that return arrays of resources, apply sanitization before returning:
 
 ```typescript
 import { sanitizeTransactions } from '../sanitization';
@@ -294,6 +314,117 @@ For a typical resource with 20+ fields returning 50 items:
 pnpm run test -- sanitizer.spec.ts
 
 # Run retrieval tool tests (includes sanitization verification)
+pnpm run test -- retrieval-tools.spec.ts
+```
+
+### Filter Validation for New Retrieval Tools
+
+When adding new data retrieval tools, implement filter validation to ensure only supported filters are passed to the Paystack API. This provides clear feedback to users and prevents API errors from unsupported parameters.
+
+**Steps to Add Filter Validation:**
+
+1. **Define Allowed Filters**: Create a constant array of allowed filter names in `src/common/ai/utilities/retreival-filter-validation.ts`
+
+```typescript
+export const MY_RESOURCE_ALLOWED_FILTERS = [
+  ...GENERIC_ALLOWED_FILTERS, // Includes 'perPage', 'page'
+  ...DATE_ALLOWED_FILTERS, // Optionally include 'from', 'to'
+  'status',
+  'customFilter1',
+  'customFilter2',
+] as const;
+```
+
+2. **Use Loose Object Schema**: In your tool's input schema, use `z.looseObject()` instead of `z.object()` to allow extra fields for validation
+
+```typescript
+inputSchema: z.looseObject({
+  perPage: z.number().optional().default(50),
+  page: z.number().optional().default(1),
+  status: z.enum(['active', 'inactive']).optional(),
+  customFilter1: z.string().optional(),
+  // ... other parameters
+});
+```
+
+3. **Validate Filters in Execute Function**: Add validation logic at the start of the execute function
+
+```typescript
+execute: async (input) => {
+  const { jwtToken } = getAuthenticatedUser();
+
+  if (!jwtToken) {
+    return { error: 'Authentication token not available' };
+  }
+
+  // Validate filters
+  const unsupportedFilters = findUnsupportedFilters(input, MY_RESOURCE_ALLOWED_FILTERS);
+
+  if (unsupportedFilters.length) {
+    return buildUnsupportedFilterError('my-resources', unsupportedFilters, MY_RESOURCE_ALLOWED_FILTERS);
+  }
+
+  // Continue with API call...
+};
+```
+
+4. **Export Filter Constants**: Export your filter constants from the validation module if they need to be referenced elsewhere
+
+```typescript
+export {
+  // ... existing exports
+  MY_RESOURCE_ALLOWED_FILTERS,
+} from './retreival-filter-validation';
+```
+
+5. **Write Tests**: Add comprehensive tests in `src/common/ai/utilities/retreival-filter-validation.spec.ts` and in your tool's test file
+
+```typescript
+describe('My Tool Filter Validation', () => {
+  it('should refuse unsupported filters', async () => {
+    const tool = createMyTool(mockPaystackService, mockGetAuthenticatedUser);
+
+    // @ts-expect-error intentional invalid filter to test guard
+    const result = await tool.execute?.({ invalidFilter: 'value' }, mockToolCallOptions);
+
+    expect(result).toMatchObject({
+      error: expect.stringContaining('invalidFilter'),
+    });
+    expect(mockPaystackService.get).not.toHaveBeenCalled();
+  });
+
+  it('should accept valid filters', async () => {
+    const tool = createMyTool(mockPaystackService, mockGetAuthenticatedUser);
+
+    const result = await tool.execute?.({ perPage: 50, status: 'active' }, mockToolCallOptions);
+
+    expect(result).toHaveProperty('success', true);
+    expect(mockPaystackService.get).toHaveBeenCalled();
+  });
+});
+```
+
+**Filter Naming Conventions:**
+
+- `GENERIC_ALLOWED_FILTERS`: `['perPage', 'page']` - Pagination filters common to all tools
+- `DATE_ALLOWED_FILTERS`: `['from', 'to']` - Date range filters for time-based queries
+- Resource-specific filters: Add filters specific to your resource type
+
+**Benefits:**
+
+- **Early Error Detection**: Catches invalid filters before making API calls
+- **User-Friendly Errors**: Provides clear, actionable error messages
+- **API Protection**: Prevents unnecessary API calls with invalid parameters
+- **Consistency**: Maintains consistent validation patterns across all tools
+- **Type Safety**: Constants provide autocomplete and type checking in development
+
+**Testing Filter Validation:**
+
+```bash
+# Run filter validation tests
+pnpm run test -- retreival-filter-validation.spec.ts
+
+# Run tool tests (includes filter validation)
 pnpm run test -- retrieval-tools.spec.ts
 ```
 
