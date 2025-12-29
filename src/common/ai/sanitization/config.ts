@@ -1,5 +1,6 @@
 import type { ResourceFieldConfigs } from './types';
-import { SanitizationLevel, ResourceType } from './types';
+import { SanitizationLevel } from './types';
+import { ResourceType } from '../types';
 import type { PaystackTransaction, PaystackCustomer, PaystackRefund, PaystackPayout, PaystackDispute } from '../types';
 
 /**

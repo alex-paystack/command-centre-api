@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, MongoRepository } from 'typeorm';
 import { Conversation } from '../entities/conversation.entity';
-import { ChatMode, PageContextType } from 'src/common';
+import { ChatMode, ResourceType } from 'src/common';
 
 @Injectable()
 export class ConversationRepository extends MongoRepository<Conversation> {
@@ -37,7 +37,7 @@ export class ConversationRepository extends MongoRepository<Conversation> {
     });
   }
 
-  async findByUserIdAndContextType(userId: string, contextType: PageContextType) {
+  async findByUserIdAndContextType(userId: string, contextType: ResourceType) {
     // Use dot-notation so Mongo matches embedded objects that include other keys (e.g. resourceId)
     return this.find({
       where: { userId, 'pageContext.type': contextType },
@@ -45,7 +45,7 @@ export class ConversationRepository extends MongoRepository<Conversation> {
     });
   }
 
-  async findByUserIdAndModeAndContextType(userId: string, mode: ChatMode, contextType: PageContextType) {
+  async findByUserIdAndModeAndContextType(userId: string, mode: ChatMode, contextType: ResourceType) {
     return this.find({
       where: { userId, mode, 'pageContext.type': contextType },
       order: { createdAt: 'desc' },

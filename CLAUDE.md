@@ -185,7 +185,7 @@ export function createMyTool(paystackService: PaystackApiService, getAuthenticat
 
 ### Adding a Page Context Resource Type
 
-1. Add to `PageContextType` enum in `types/index.ts`
+1. Add to `ResourceType` enum in `types/index.ts`
 2. Implement fetching in `PageContextService.fetchResourceData()`
 3. Add formatting in `PageContextService.formatResourceData()`
 4. Update `RESOURCE_TOOL_MAP` in `tools/index.ts`

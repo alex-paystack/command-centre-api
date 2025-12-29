@@ -59,7 +59,11 @@ export type ClassificationUIMessage = UIMessage<
   }
 >;
 
-export enum PageContextType {
+/**
+ * Unified resource type enum used across the application
+ * Used in page context, sanitization, charts, and other features
+ */
+export enum ResourceType {
   TRANSACTION = 'transaction',
   CUSTOMER = 'customer',
   REFUND = 'refund',
@@ -68,7 +72,7 @@ export enum PageContextType {
 }
 
 export interface PageContext {
-  type: PageContextType;
+  type: ResourceType;
   resourceId: string; // ID or reference
 }
 

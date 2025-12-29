@@ -299,7 +299,7 @@ pnpm run test -- retrieval-tools.spec.ts
 
 ### Adding Resource Types
 
-1. Add new type to `PageContextType` enum in `src/common/ai/types/index.ts`
+1. Add new type to `ResourceType` enum in `src/common/ai/types/index.ts`
 2. Implement fetching logic in `PageContextService.fetchResourceData()`
 3. Add formatting logic in `PageContextService.formatResourceData()`
 4. Update `RESOURCE_TOOL_MAP` in `src/common/ai/tools/index.ts` with relevant tools

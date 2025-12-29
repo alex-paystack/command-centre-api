@@ -66,6 +66,7 @@ enum RefundStatus {
   FAILED = 'failed',
   PROCESSED = 'processed',
   PROCESSING = 'processing',
+  RETRIABLE = 'retriable',
 }
 
 enum RefundType {

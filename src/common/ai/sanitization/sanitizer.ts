@@ -1,7 +1,8 @@
 import type { SanitizationOptions, FieldConfig, NestedFieldConfig, PaystackResource } from './types';
-import { SanitizationLevel, ResourceType } from './types';
+import { SanitizationLevel } from './types';
 import { RESOURCE_CONFIGS } from './config';
 import type { PaystackTransaction, PaystackCustomer, PaystackRefund, PaystackPayout, PaystackDispute } from '../types';
+import { ResourceType } from '../types';
 
 export class ResourceSanitizer {
   /**

@@ -22,7 +22,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
-import { ChatMode, PageContextType, PaystackResponse } from '~/common';
+import { ChatMode, ResourceType, PaystackResponse } from '~/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { createUIMessageStreamResponse } from 'ai';
 
@@ -80,7 +80,7 @@ export class ChatController {
   @ApiResponse({ status: 200, description: 'List of conversations', type: [ConversationResponseDto] })
   async getConversationsByUserId(
     @CurrentUser() userId: string,
-    @Query('contextType') contextType?: PageContextType,
+    @Query('contextType') contextType?: ResourceType,
     @Query('mode') mode?: ChatMode,
   ) {
     const conversations = await this.chatService.getConversationsByUserId(userId, contextType, mode);

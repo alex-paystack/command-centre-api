@@ -6,8 +6,9 @@ import {
   sanitizePayouts,
   sanitizeDisputes,
 } from './sanitizer';
-import { SanitizationLevel, ResourceType } from './types';
+import { SanitizationLevel } from './types';
 import type { PaystackTransaction, PaystackCustomer, PaystackRefund, PaystackPayout, PaystackDispute } from '../types';
+import { ResourceType } from '../types';
 
 describe('ResourceSanitizer', () => {
   describe('Transaction Sanitization', () => {

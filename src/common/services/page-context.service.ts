@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PaystackApiService } from './paystack-api.service';
-import { PageContextType } from '../ai/types';
+import { ResourceType } from '../ai/types';
 import type {
   PageContext,
   EnrichedPageContext,
@@ -37,10 +37,10 @@ export class PageContextService {
   /**
    * Fetch resource data from Paystack API
    */
-  private async fetchResourceData(resourceType: PageContextType, resourceId: string, jwtToken: string) {
+  private async fetchResourceData(resourceType: ResourceType, resourceId: string, jwtToken: string) {
     try {
       switch (resourceType) {
-        case PageContextType.TRANSACTION: {
+        case ResourceType.TRANSACTION: {
           const response = await this.paystackApiService.get<PaystackTransaction>(
             `/transaction/${resourceId}`,
             jwtToken,
@@ -49,23 +49,23 @@ export class PageContextService {
           return response.data;
         }
 
-        case PageContextType.CUSTOMER: {
+        case ResourceType.CUSTOMER: {
           const response = await this.paystackApiService.get<PaystackCustomer>(`/customer/${resourceId}`, jwtToken, {});
           return response.data;
         }
 
-        case PageContextType.REFUND: {
+        case ResourceType.REFUND: {
           const response = await this.paystackApiService.get<PaystackRefund>(`/refund/${resourceId}`, jwtToken, {});
           return response.data;
         }
 
-        case PageContextType.PAYOUT: {
+        case ResourceType.PAYOUT: {
           const params = { id: resourceId };
           const response = await this.paystackApiService.get<PaystackPayout>('/settlement', jwtToken, params);
           return response.data;
         }
 
-        case PageContextType.DISPUTE: {
+        case ResourceType.DISPUTE: {
           const response = await this.paystackApiService.get<PaystackDispute>(`/dispute/${resourceId}`, jwtToken, {});
           return response.data;
         }
@@ -88,19 +88,19 @@ export class PageContextService {
   /**
    * Format resource data for prompt injection
    */
-  private formatResourceData(resourceType: PageContextType, resourceData: unknown) {
+  private formatResourceData(resourceType: ResourceType, resourceData: unknown) {
     const data = resourceData as Record<string, unknown>;
 
     switch (resourceType) {
-      case PageContextType.TRANSACTION:
+      case ResourceType.TRANSACTION:
         return this.formatTransaction(data as unknown as PaystackTransaction);
-      case PageContextType.CUSTOMER:
+      case ResourceType.CUSTOMER:
         return this.formatCustomer(data as unknown as PaystackCustomer);
-      case PageContextType.REFUND:
+      case ResourceType.REFUND:
         return this.formatRefund(data as unknown as PaystackRefund);
-      case PageContextType.PAYOUT:
+      case ResourceType.PAYOUT:
         return this.formatPayout(data as unknown as PaystackPayout);
-      case PageContextType.DISPUTE:
+      case ResourceType.DISPUTE:
         return this.formatDispute(data as unknown as PaystackDispute);
       default:
         return JSON.stringify(data, null, 2);

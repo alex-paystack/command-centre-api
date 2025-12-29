@@ -28,7 +28,6 @@ export {
 
 export {
   SanitizationLevel,
-  ResourceType,
   type SanitizationOptions,
   type FieldConfig,
   type NestedFieldConfig,
