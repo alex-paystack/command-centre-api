@@ -32,6 +32,7 @@ services:
       - OTEL_LOG_LEVEL=INFO
     depends_on:
       - mongodb
+      - redis
     develop:
       watch:
         - path: .
@@ -63,6 +64,20 @@ services:
     networks:
       - paystack-net
     restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '${HOST_REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis_data:/data
+    networks:
+      - paystack-net
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
   grafana-otel:
     image: grafana/otel-lgtm
     container_name: grafana-otel
@@ -75,6 +90,7 @@ services:
 
 volumes:
   mongodb_data:
+  redis_data:
 
 networks:
   # @TODO: create a network for the project as part of the init script

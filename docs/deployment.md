@@ -9,7 +9,7 @@ This document covers Docker setup, CI/CD pipelines, and production deployment.
 Start supporting services and run the application locally:
 
 ```bash
-# Start supporting services (MongoDB, Grafana OTEL)
+# Start supporting services (MongoDB, Redis, Grafana OTEL)
 docker-compose up -d
 
 # Run the application locally with hot reload
@@ -24,7 +24,16 @@ The `docker-compose.yml` includes:
 | -------------- | ---------------- | ---------------------------------------- |
 | `app`          | 3000             | Main application (development mode)      |
 | `mongodb`      | 27017            | MongoDB database                         |
+| `redis`        | 6379             | Redis cache for chart data               |
 | `grafana-otel` | 3001, 4317, 4318 | Grafana OTEL collector for observability |
+
+**Redis Service Details:**
+
+- **Image**: redis:7-alpine
+- **Purpose**: Caches processed chart data for 3 hours
+- **Health Check**: Automatic health monitoring via `redis-cli ping`
+- **Volume**: `redis_data` for data persistence
+- **Graceful Degradation**: Application continues working if Redis is unavailable
 
 ### Production Build
 
@@ -109,6 +118,11 @@ Before deploying to production, ensure:
 
 - [ ] Set `NODE_ENV=production`
 - [ ] Configure production MongoDB connection
+- [ ] Configure production Redis connection (managed service recommended)
+  - [ ] Set `REDIS_READ_URL` with TLS (rediss://)
+  - [ ] Set `REDIS_WRITE_URL` with TLS (rediss://)
+  - [ ] Set secure `REDIS_USERNAME` and `REDIS_PASSWORD`
+  - [ ] Configure appropriate `CACHE_TTL` (default: 3 hours)
 - [ ] Set secure `JWT_SECRET` (use crypto-generated value)
 - [ ] Set secure `OPENAI_API_KEY`
 - [ ] Configure `PAYSTACK_API_BASE_URL` for production
@@ -134,6 +148,16 @@ Before deploying to production, ensure:
 - [ ] Configure backup strategies
 - [ ] Set up database monitoring
 - [ ] Run pending migrations
+
+### Cache (Redis)
+
+- [ ] Use managed Redis service (AWS ElastiCache, Redis Cloud, Azure Cache)
+- [ ] Configure Redis master-replica setup for high availability
+- [ ] Set appropriate memory limits and eviction policy (LRU recommended)
+- [ ] Enable Redis persistence (RDB or AOF)
+- [ ] Set up Redis monitoring and alerting
+- [ ] Configure Redis connection pooling
+- [ ] Test graceful degradation (app continues working if Redis fails)
 
 ### Infrastructure
 
@@ -195,13 +219,51 @@ pnpm run migration:show     # Show migration status
 curl http://localhost:3000/health
 ```
 
-Expected response:
+Expected response when all services are healthy:
 
 ```json
 {
-  "status": "ok",
-  "info": {
-    "database": { "status": "up" }
+  "success": true,
+  "message": "Service is healthy",
+  "data": {
+    "application": {
+      "status": "up",
+      "message": "Application is healthy - timestamp: 2024-12-29T20:00:00.000Z"
+    },
+    "mongodb": {
+      "status": "up",
+      "message": "Mongodb connectivity is working as expected"
+    },
+    "redis": {
+      "status": "up",
+      "message": "Redis connectivity is working as expected"
+    }
+  }
+}
+```
+
+**Health Check Details:**
+
+- **MongoDB**: Verifies database connectivity with 3-second timeout
+- **Redis**: Pings Redis server to verify cache availability
+- **Status Code**: Returns 200 (healthy) or 503 (unhealthy)
+- **Graceful Degradation**: If Redis is down, health check fails but chart generation continues working
+
+**Unhealthy Response Example** (Redis down):
+
+```json
+{
+  "status": false,
+  "type": "api_error",
+  "code": "HEALTH_CHECK_FAILED",
+  "message": "Redis is unavailable",
+  "data": {
+    "application": { "status": "up" },
+    "mongodb": { "status": "up" },
+    "redis": {
+      "status": "down",
+      "message": "Connection refused"
+    }
   }
 }
 ```

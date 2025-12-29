@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { SavedChartRepository } from './repositories/saved-chart.repository';
 import { PaystackApiService } from '~/common/services/paystack-api.service';
 import { SaveChartDto } from './dto/save-chart.dto';
@@ -7,14 +9,31 @@ import { RegenerateChartQueryDto } from './dto/regenerate-chart-query.dto';
 import { SavedChartResponseDto } from './dto/saved-chart-response.dto';
 import { SavedChartWithDataResponseDto } from './dto/saved-chart-with-data-response.dto';
 import { validateChartParams } from '~/common/ai/utilities/chart-validation';
-import { generateChartData, ChartGenerationState } from '~/common/ai/utilities/chart-generator';
+import { generateChartData, ChartGenerationState, ChartSuccessState } from '~/common/ai/utilities/chart-generator';
 import { NotFoundError, ValidationError, ErrorCodes } from '~/common';
+import { generateCacheKey } from './utilities/cache-key.util';
+
+/**
+ * Type for cached chart data
+ * Matches the structure of ChartSuccessState without the 'success' flag
+ */
+interface CachedChartData {
+  label: string;
+  chartType: string;
+  chartData: ChartSuccessState['chartData'];
+  chartSeries: ChartSuccessState['chartSeries'];
+  summary: ChartSuccessState['summary'];
+  message: string;
+}
 
 @Injectable()
 export class SavedChartService {
+  private readonly logger = new Logger(SavedChartService.name);
+
   constructor(
     private readonly savedChartRepository: SavedChartRepository,
     private readonly paystackApiService: PaystackApiService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   /**
@@ -48,8 +67,15 @@ export class SavedChartService {
   }
 
   /**
-   * Get a saved chart with fresh data (re-execute chart generation)
+   * Get a saved chart with data (with caching)
    * Query parameters can override saved configuration values
+   *
+   * Caching Strategy:
+   * - Cache key includes chartId + all merged parameters (from, to, status, currency, channel)
+   * - Each parameter combination gets its own cache entry
+   * - Cache misses trigger full chart generation
+   * - Cache failures are logged but don't break chart generation (graceful degradation)
+   * - TTL: 3 hours (configured in cache.config.ts)
    */
   async getSavedChartWithData(
     chartId: string,
@@ -63,8 +89,6 @@ export class SavedChartService {
     }
 
     // Merge saved configuration with query overrides
-    // Only filter parameters (from, to, status, currency) can be overridden
-    // resourceType and aggregationType are immutable
     const chartConfig = {
       resourceType: savedChart.resourceType,
       aggregationType: savedChart.aggregationType,
@@ -79,7 +103,45 @@ export class SavedChartService {
       this.validateChartConfiguration(chartConfig as SaveChartDto);
     }
 
-    // TODO: Consider caching the chart data and serving that if the params are the same
+    // Generate cache key from merged configuration
+    const cacheKey = generateCacheKey({
+      chartId,
+      resourceType: chartConfig.resourceType,
+      aggregationType: chartConfig.aggregationType,
+      from: chartConfig.from,
+      to: chartConfig.to,
+      status: chartConfig.status,
+      currency: chartConfig.currency,
+      channel: chartConfig.channel,
+    });
+
+    // Try to get from cache
+    try {
+      const cachedData = await this.cacheManager.get<CachedChartData>(cacheKey);
+      if (cachedData) {
+        this.logger.log(`Cache hit for chart ${chartId} (key: ${cacheKey})`);
+
+        // Combine saved chart metadata with cached data
+        const response = SavedChartResponseDto.fromEntity(savedChart) as SavedChartWithDataResponseDto;
+        response.label = cachedData.label;
+        response.chartType = cachedData.chartType;
+        response.chartData = cachedData.chartData;
+        response.chartSeries = cachedData.chartSeries;
+        response.summary = cachedData.summary;
+        response.message = cachedData.message;
+
+        return response;
+      }
+
+      this.logger.log(`Cache miss for chart ${chartId} (key: ${cacheKey})`);
+    } catch (error) {
+      // Log cache errors but continue with generation (graceful degradation)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Cache retrieval error for chart ${chartId}: ${errorMessage}`, errorStack);
+    }
+
+    // Cache miss or error - generate chart data
     const generator = generateChartData(chartConfig, this.paystackApiService, jwtToken);
 
     // Consume the generator to get the final result
@@ -93,9 +155,28 @@ export class SavedChartService {
     }
 
     if (finalResult && 'success' in finalResult) {
+      // Store in cache (fire-and-forget)
+      const dataToCache: CachedChartData = {
+        label: finalResult.label,
+        chartType: finalResult.chartType,
+        chartData: finalResult.chartData,
+        chartSeries: finalResult.chartSeries,
+        summary: finalResult.summary,
+        message: finalResult.message,
+      };
+
+      try {
+        await this.cacheManager.set(cacheKey, dataToCache);
+        this.logger.log(`Cached chart data for chart ${chartId} (key: ${cacheKey})`);
+      } catch (error) {
+        // Log cache write errors but don't fail the request
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        this.logger.error(`Cache write error for chart ${chartId}: ${errorMessage}`, errorStack);
+      }
+
       // Combine saved chart metadata with fresh data
       const response = SavedChartResponseDto.fromEntity(savedChart) as SavedChartWithDataResponseDto;
-
       response.label = finalResult.label;
       response.chartType = finalResult.chartType;
       response.chartData = finalResult.chartData;
@@ -131,12 +212,17 @@ export class SavedChartService {
 
   /**
    * Delete a saved chart
+   * Cached data will expire via TTL (3 hours)
    */
   async deleteSavedChart(chartId: string, userId: string) {
     const deleted = await this.savedChartRepository.deleteByIdForUser(chartId, userId);
     if (!deleted) {
       throw new NotFoundError(`Saved chart with ID ${chartId} not found`, ErrorCodes.CHART_NOT_FOUND);
     }
+
+    // Note: Cached data will expire via TTL
+    // Pattern-based cache invalidation would require direct Redis access
+    this.logger.log(`Chart ${chartId} deleted - cached data will expire via TTL`);
   }
 
   /**

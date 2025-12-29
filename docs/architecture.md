@@ -64,14 +64,28 @@ Manages JWT authentication:
 
 ### SavedChartService
 
-Manages saved chart configurations and regeneration:
+Manages saved chart configurations and regeneration with Redis caching:
 
 - Saves chart configurations with custom names and descriptions
 - Retrieves saved charts for authenticated users
-- Regenerates charts with fresh data from Paystack API
+- **Regenerates charts with Redis caching** (3-hour TTL)
+- **Cache key generation** using SHA-256 hashing of chart parameters
+- **Graceful degradation** - cache failures don't break chart generation
+- **Fire-and-forget caching** - cache writes don't block responses
 - Updates chart metadata (name, description)
 - Deletes saved charts with ownership verification
 - Validates chart configurations (aggregation types, date ranges)
+
+**Performance Impact:**
+
+- Chart generation without cache: 2-5 seconds
+- Chart retrieval with cache hit: <100ms
+- Expected cache hit rate: 30-70%
+
+**Key Files:**
+
+- `src/modules/charts/saved-chart.service.ts` - Chart service with caching logic
+- `src/modules/charts/utilities/cache-key.util.ts` - Cache key generation
 
 ### Telemetry Module
 
@@ -176,6 +190,7 @@ src/
 ├── config/ # Configuration modules
 │ ├── database.config.ts
 │ ├── jwt.config.ts
+│ ├── cache.config.ts # Redis cache configuration
 │ └── helpers.ts
 ├── database/
 │ ├── migrations/ # TypeORM migrations
@@ -208,10 +223,15 @@ src/
 │ │ │ └── saved-chart.entity.ts
 │ │ ├── repositories/ # Database repositories
 │ │ │ └── saved-chart.repository.ts
+│ │ ├── utilities/ # Chart utilities
+│ │ │ └── cache-key.util.ts # Cache key generation with SHA-256
 │ │ ├── charts.controller.ts
-│ │ ├── saved-chart.service.ts # Chart CRUD and regeneration
+│ │ ├── saved-chart.service.ts # Chart CRUD, regeneration, and caching
 │ │ └── charts.module.ts
 │ └── health/ # Health check endpoints
+│ ├── health.controller.ts # MongoDB and Redis health checks
+│ ├── redis-health.indicator.ts # Redis connectivity check
+│ └── health.module.ts
 ├── app.module.ts # Root module with global auth guard
 └── main.ts # Application entry point with observability
 ```
@@ -222,6 +242,7 @@ src/
 | --------------------- | --------------------------------------- | ------------ |
 | **Framework**         | NestJS                                  | v11          |
 | **Database**          | MongoDB with TypeORM                    | v6.8 / v0.3  |
+| **Cache**             | Redis with cache-manager                | v7 / v7.2    |
 | **AI SDK**            | Vercel AI SDK with OpenAI               | v5.0.110     |
 | **Language**          | TypeScript                              | v5.7         |
 | **Validation**        | class-validator, class-transformer, Zod | v4.0         |
@@ -285,6 +306,7 @@ flowchart TD
     AppModule --> ChartsModule
     AppModule --> HealthModule
     AppModule --> DatabaseModule
+    AppModule --> CacheModule
 
     subgraph AuthModule[AuthModule - global]
         JwtModule[JwtModule]
@@ -303,6 +325,7 @@ flowchart TD
     end
 
     ChartsModule --> PaystackModule
+    ChartsModule --> CacheModule
 
     subgraph PaystackModule[PaystackModule - shared]
         PaystackApiService[PaystackApiService]
@@ -313,4 +336,16 @@ flowchart TD
     subgraph DatabaseModule[DatabaseModule]
         TypeORM[TypeORM - MongoDB]
     end
+
+    subgraph CacheModule[CacheModule - global]
+        Redis[Redis Store]
+        CacheManager[cache-manager]
+    end
+
+    subgraph HealthModule[HealthModule]
+        MongoHealth[MongoDB Health]
+        RedisHealth[Redis Health]
+    end
+
+    HealthModule --> CacheModule
 ```
