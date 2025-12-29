@@ -478,7 +478,7 @@ describe('Data Retrieval Tools', () => {
 
       const tool = createGetRefundsTool(mockPaystackService, mockGetAuthenticatedUser);
       const result = await tool.execute?.(
-        { perPage: 50, page: 1, amount_operator: 'eq', status: RefundStatus.PROCESSED },
+        { perPage: 50, page: 1, amountOperator: 'eq', status: RefundStatus.PROCESSED },
         mockToolCallOptions,
       );
 
@@ -509,7 +509,7 @@ describe('Data Retrieval Tools', () => {
           perPage: 50,
           page: 1,
           amount: 100,
-          amount_operator: 'gt',
+          amountOperator: 'gt',
         },
         mockToolCallOptions,
       );
@@ -527,7 +527,7 @@ describe('Data Retrieval Tools', () => {
         {
           perPage: 50,
           page: 1,
-          amount_operator: 'eq',
+          amountOperator: 'eq',
           from: '2024-01-01',
           to: '2024-03-01',
         },
@@ -543,7 +543,7 @@ describe('Data Retrieval Tools', () => {
       mockGetAuthenticatedUser.mockReturnValueOnce({ userId: 'test-user-id', jwtToken: undefined });
 
       const tool = createGetRefundsTool(mockPaystackService, mockGetAuthenticatedUser);
-      const result = await tool.execute?.({ perPage: 50, page: 1, amount_operator: 'eq' }, mockToolCallOptions);
+      const result = await tool.execute?.({ perPage: 50, page: 1, amountOperator: 'eq' }, mockToolCallOptions);
 
       expect(result).toMatchObject({
         error: 'Authentication token not available. Please ensure you are logged in.',
@@ -585,7 +585,7 @@ describe('Data Retrieval Tools', () => {
       });
 
       const tool = createGetRefundsTool(mockPaystackService, mockGetAuthenticatedUser);
-      const result = await tool.execute?.({ perPage: 50, page: 1, amount_operator: 'eq' }, mockToolCallOptions);
+      const result = await tool.execute?.({ perPage: 50, page: 1, amountOperator: 'eq' }, mockToolCallOptions);
 
       // Should have standard-level fields
       expect((result as { refunds: PaystackRefund[] }).refunds?.[0]).toHaveProperty('id', 1);
@@ -851,7 +851,7 @@ describe('Data Retrieval Tools', () => {
       });
     });
 
-    it('should handle ignore_resolved parameter', async () => {
+    it('should handle ignoreResolved parameter', async () => {
       mockPaystackService.get.mockResolvedValueOnce({
         status: true,
         message: 'Disputes retrieved',
@@ -860,7 +860,7 @@ describe('Data Retrieval Tools', () => {
       });
 
       const tool = createGetDisputesTool(mockPaystackService, mockGetAuthenticatedUser);
-      await tool.execute?.({ perPage: 50, page: 1, ignore_resolved: 'yes' }, mockToolCallOptions);
+      await tool.execute?.({ perPage: 50, page: 1, ignoreResolved: 'yes' }, mockToolCallOptions);
 
       expect(mockPaystackService.get).toHaveBeenCalledWith('/dispute', 'test-token', {
         perPage: 50,

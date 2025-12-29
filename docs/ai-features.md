@@ -63,7 +63,7 @@ The assistant can only operate on merchant data exposed by these tools (all requ
 | Tool                | Description                    | Key Filters                                       |
 | ------------------- | ------------------------------ | ------------------------------------------------- |
 | `getTransactions`   | Fetch payment transactions     | status, channel, customer, date, amount, currency |
-| `getCustomers`      | List/search customers          | email, account_number, pagination                 |
+| `getCustomers`      | List/search customers          | email, accountNumber, pagination                  |
 | `getRefunds`        | Fetch refund data              | status, date, amount (with operators: gt, lt, eq) |
 | `getPayouts`        | Fetch payout/settlement data   | status, date, subaccount                          |
 | `getDisputes`       | Fetch dispute data             | status, date, transaction, category               |
@@ -104,10 +104,10 @@ The filter validation system uses a centralized approach with:
 | Resource Type   | Supported Filters                                                                    |
 | --------------- | ------------------------------------------------------------------------------------ |
 | **Transaction** | perPage, page, from, to, status, channel, customer, amount, currency, subaccountCode |
-| **Customer**    | perPage, page, email, account_number                                                 |
-| **Refund**      | perPage, page, from, to, status, amount, amount_operator, transaction, search        |
-| **Payout**      | perPage, page, from, to, status, subaccount, id                                      |
-| **Dispute**     | perPage, page, from, to, status, ignore_resolved, transaction, category, resolution  |
+| **Customer**    | perPage, page, email, accountNumber                                                  |
+| **Refund**      | perPage, page, from, to, status, amount, amountOperator, transaction, search         |
+| **Payout**      | perPage, page, from, to, status, subaccount, payoutId                                |
+| **Dispute**     | perPage, page, from, to, status, ignoreResolved, transaction, category, resolution   |
 
 **Example Error Response:**
 
@@ -123,7 +123,7 @@ For multiple unsupported filters:
 
 ```json
 {
-  "error": "The filter options foo, bar are not available for customers. Supported filters: perPage, page, email, account_number."
+  "error": "The filter options foo, bar are not available for customers. Supported filters: perPage, page, email, accountNumber."
 }
 ```
 

@@ -87,7 +87,7 @@ describe('Retrieval Filter Validation', () => {
           perPage: 50,
           page: 1,
           email: 'test@example.com',
-          account_number: '0123456789',
+          accountNumber: '0123456789',
         };
 
         const unsupported = findUnsupportedFilters(input, CUSTOMER_ALLOWED_FILTERS);
@@ -118,7 +118,7 @@ describe('Retrieval Filter Validation', () => {
           to: '2024-01-31',
           status: 'processed',
           amount: 5000,
-          amount_operator: 'gte',
+          amountOperator: 'gte',
           transaction: 'TRX_123',
           search: 'query',
         };
@@ -149,7 +149,7 @@ describe('Retrieval Filter Validation', () => {
           to: '2024-01-31',
           status: 'success',
           subaccount: 'SUBACC_123',
-          id: 'PAYOUT_123',
+          payoutId: 'PAYOUT_123',
         };
 
         const unsupported = findUnsupportedFilters(input, PAYOUT_ALLOWED_FILTERS);
@@ -166,7 +166,7 @@ describe('Retrieval Filter Validation', () => {
           from: '2024-01-01',
           to: '2024-01-31',
           status: 'awaiting-merchant-feedback',
-          ignore_resolved: true,
+          ignoreResolved: true,
           transaction: 'TRX_123',
           category: 'chargeback',
           resolution: 'merchant-accepted',

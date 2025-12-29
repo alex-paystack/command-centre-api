@@ -141,7 +141,7 @@ export function createGetCustomersTool(
       perPage: z.number().optional().default(50).describe('Number of customers per page (default: 50, max: 100)'),
       page: z.number().optional().default(1).describe('Page number for pagination (default: 1)'),
       email: z.string().optional().describe('Filter by email'),
-      account_number: z.string().optional().describe('Filter by account number'),
+      accountNumber: z.string().optional().describe('Filter by account number'),
     }),
     execute: async (input) => {
       const { jwtToken } = getAuthenticatedUser();
@@ -158,14 +158,14 @@ export function createGetCustomersTool(
         return buildUnsupportedFilterError('customers', unsupportedFilters, CUSTOMER_ALLOWED_FILTERS);
       }
 
-      const { perPage, page, email, account_number } = input;
+      const { perPage, page, email, accountNumber } = input;
 
       try {
         const params: Record<string, unknown> = {
           perPage,
           page,
           ...(email && { email }),
-          ...(account_number && { account_number }),
+          ...(accountNumber && { account_number: accountNumber }),
         };
 
         const response = await paystackService.get<PaystackCustomer[]>('/customer', jwtToken, params);
@@ -204,7 +204,7 @@ export function createGetRefundsTool(
       from: z.string().optional().describe('Start date for filtering refunds (ISO 8601 format, e.g., 2024-01-01)'),
       to: z.string().optional().describe('End date for filtering refunds (ISO 8601 format, e.g., 2024-12-31)'),
       amount: z.number().optional().describe('Filter by amount'),
-      amount_operator: z.enum(['gt', 'lt', 'eq']).optional().describe('Filter by amount operator').default('eq'),
+      amountOperator: z.enum(['gt', 'lt', 'eq']).optional().describe('Filter by amount operator').default('eq'),
       transaction: z.number().optional().describe('Filter by transaction id'),
       search: z.string().optional().describe('Filter by bank reference or refund id'),
     }),
@@ -223,7 +223,7 @@ export function createGetRefundsTool(
         return buildUnsupportedFilterError('refunds', unsupportedFilters, REFUND_ALLOWED_FILTERS);
       }
 
-      const { status, perPage, page, from, to, amount, amount_operator = 'eq', transaction, search } = input;
+      const { status, perPage, page, from, to, amount, amountOperator = 'eq', transaction, search } = input;
 
       // Validate date range does not exceed 30 days
       const dateValidation = validateDateRange(from, to);
@@ -237,9 +237,9 @@ export function createGetRefundsTool(
       try {
         const amountFilter =
           amount != undefined
-            ? amount_operator === 'eq'
+            ? amountOperator === 'eq'
               ? { amount: amountInBaseUnitToSubUnit(amount) }
-              : { amount: JSON.stringify({ [amount_operator]: amountInBaseUnitToSubUnit(amount) }) }
+              : { amount: JSON.stringify({ [amountOperator]: amountInBaseUnitToSubUnit(amount) }) }
             : {};
 
         const params: Record<string, unknown> = {
@@ -289,7 +289,7 @@ export function createGetPayoutsTool(
       to: z.string().optional().describe('End date for filtering payouts (ISO 8601 format, e.g., 2024-12-31)'),
       status: z.enum(Object.values(PayoutStatus)).optional().describe('Filter by payout status'),
       subaccount: z.string().optional().describe('Filter by subaccount'),
-      id: z.string().optional().describe('Filter by payout id'),
+      payoutId: z.string().optional().describe('Filter by payout id'),
     }),
     execute: async (input) => {
       const { jwtToken } = getAuthenticatedUser();
@@ -306,7 +306,7 @@ export function createGetPayoutsTool(
         return buildUnsupportedFilterError('payouts', unsupportedFilters, PAYOUT_ALLOWED_FILTERS);
       }
 
-      const { perPage, page, from, to, status, subaccount, id } = input;
+      const { perPage, page, from, to, status, subaccount, payoutId } = input;
 
       // Validate date range does not exceed 30 days
       const dateValidation = validateDateRange(from, to);
@@ -325,7 +325,7 @@ export function createGetPayoutsTool(
           ...(to && { to }),
           ...(status && { status }),
           ...(subaccount && { subaccount }),
-          ...(id && { id }),
+          ...(payoutId && { id: payoutId }),
         };
 
         const response = await paystackService.get<PaystackPayout[]>('/settlement', jwtToken, params);
@@ -363,7 +363,7 @@ export function createGetDisputesTool(
       from: z.string().optional().describe('Start date for filtering disputes (ISO 8601 format, e.g., 2024-01-01)'),
       to: z.string().optional().describe('End date for filtering disputes (ISO 8601 format, e.g., 2024-12-31)'),
       status: z.enum(Object.values(DisputeStatusSlug)).optional().describe('Filter by dispute status'),
-      ignore_resolved: z.enum(['yes', 'no']).optional().describe('Ignore resolved disputes'),
+      ignoreResolved: z.enum(['yes', 'no']).optional().describe('Ignore resolved disputes'),
       transaction: z.number().optional().describe('Filter by transaction id'),
       category: z.enum(Object.values(DisputeCategory)).optional().describe('Filter by dispute category'),
       resolution: z.enum(Object.values(DisputeResolutionSlug)).optional().describe('Filter by dispute resolution'),
@@ -383,7 +383,7 @@ export function createGetDisputesTool(
         return buildUnsupportedFilterError('disputes', unsupportedFilters, DISPUTE_ALLOWED_FILTERS);
       }
 
-      const { perPage, page, from, to, status, ignore_resolved, transaction, category, resolution } = input;
+      const { perPage, page, from, to, status, ignoreResolved, transaction, category, resolution } = input;
 
       // Validate date range does not exceed 30 days
       const dateValidation = validateDateRange(from, to);
@@ -401,7 +401,7 @@ export function createGetDisputesTool(
           ...(from && { from }),
           ...(to && { to }),
           ...(status && { status }),
-          ...(ignore_resolved && { ignore_resolved }),
+          ...(ignoreResolved && { ignore_resolved: ignoreResolved }),
           ...(transaction && { transaction }),
           ...(category && { category }),
           ...(resolution && { resolution }),

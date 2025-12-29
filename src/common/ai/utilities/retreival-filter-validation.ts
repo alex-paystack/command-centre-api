@@ -13,14 +13,14 @@ export const TRANSACTION_ALLOWED_FILTERS = [
   'subaccountCode',
 ] as const;
 
-export const CUSTOMER_ALLOWED_FILTERS = [...GENERIC_ALLOWED_FILTERS, 'email', 'account_number'] as const;
+export const CUSTOMER_ALLOWED_FILTERS = [...GENERIC_ALLOWED_FILTERS, 'email', 'accountNumber'] as const;
 
 export const REFUND_ALLOWED_FILTERS = [
   ...GENERIC_ALLOWED_FILTERS,
   ...DATE_ALLOWED_FILTERS,
   'status',
   'amount',
-  'amount_operator',
+  'amountOperator',
   'transaction',
   'search',
 ] as const;
@@ -30,14 +30,14 @@ export const PAYOUT_ALLOWED_FILTERS = [
   ...DATE_ALLOWED_FILTERS,
   'status',
   'subaccount',
-  'id',
+  'payoutId',
 ] as const;
 
 export const DISPUTE_ALLOWED_FILTERS = [
   ...GENERIC_ALLOWED_FILTERS,
   ...DATE_ALLOWED_FILTERS,
   'status',
-  'ignore_resolved',
+  'ignoreResolved',
   'transaction',
   'category',
   'resolution',
