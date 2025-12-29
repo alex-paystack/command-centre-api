@@ -1,6 +1,6 @@
 import { Tool } from 'ai';
 import type { PaystackApiService } from '~/common/services/paystack-api.service';
-import type { AuthenticatedUser, PageContextType } from '../types';
+import type { AuthenticatedUser, ResourceType } from '../types';
 import { createGetTransactionsTool } from './retrieval';
 import { createGetCustomersTool } from './retrieval';
 import { createGetRefundsTool } from './retrieval';
@@ -39,7 +39,7 @@ export function createTools(
  * Resource-specific tool mapping for page-scoped chat
  * Maps each resource type to the relevant tools for that context
  */
-const RESOURCE_TOOL_MAP: Record<PageContextType, string[]> = {
+const RESOURCE_TOOL_MAP: Record<ResourceType, string[]> = {
   transaction: ['getCustomers', 'getRefunds', 'getDisputes'],
   customer: ['getTransactions', 'getRefunds', 'exportTransactions'],
   refund: ['getTransactions', 'getCustomers'],
@@ -57,7 +57,7 @@ const RESOURCE_TOOL_MAP: Record<PageContextType, string[]> = {
 export function createPageScopedTools(
   paystackService: PaystackApiService,
   getAuthenticatedUser: () => AuthenticatedUser,
-  contextType: PageContextType,
+  contextType: ResourceType,
 ): Record<string, Tool<unknown, unknown>> {
   const allTools = createTools(paystackService, getAuthenticatedUser);
   const allowedTools = RESOURCE_TOOL_MAP[contextType];

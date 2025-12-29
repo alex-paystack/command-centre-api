@@ -1,4 +1,5 @@
 import type { PaystackTransaction, PaystackCustomer, PaystackRefund, PaystackPayout, PaystackDispute } from '../types';
+import { ResourceType } from '../types';
 
 /**
  * Sanitization levels control how much data to retain
@@ -22,17 +23,6 @@ export enum SanitizationLevel {
    * Conservative token reduction (~60-65%)
    */
   DETAILED = 'detailed',
-}
-
-/**
- * Resource types for sanitization
- */
-export enum ResourceType {
-  TRANSACTION = 'transaction',
-  CUSTOMER = 'customer',
-  REFUND = 'refund',
-  PAYOUT = 'payout',
-  DISPUTE = 'dispute',
 }
 
 /**

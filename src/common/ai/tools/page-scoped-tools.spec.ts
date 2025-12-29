@@ -1,5 +1,5 @@
 import { createPageScopedTools } from '.';
-import { PageContextType } from '../types';
+import { ResourceType } from '../types';
 import { PaystackApiService } from '../../services/paystack-api.service';
 
 describe('createPageScopedTools', () => {
@@ -15,7 +15,7 @@ describe('createPageScopedTools', () => {
   });
 
   it('should return only customer, dispute and refund tools for transaction context', () => {
-    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, PageContextType.TRANSACTION);
+    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, ResourceType.TRANSACTION);
 
     const toolNames = Object.keys(tools);
     expect(toolNames).toContain('getCustomers');
@@ -27,7 +27,7 @@ describe('createPageScopedTools', () => {
   });
 
   it('should return transaction, refund, and export transaction tools for customer context', () => {
-    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, PageContextType.CUSTOMER);
+    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, ResourceType.CUSTOMER);
 
     const toolNames = Object.keys(tools);
     expect(toolNames).toContain('getTransactions');
@@ -40,7 +40,7 @@ describe('createPageScopedTools', () => {
   });
 
   it('should return transaction and customer tools for refund context', () => {
-    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, PageContextType.REFUND);
+    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, ResourceType.REFUND);
 
     const toolNames = Object.keys(tools);
     expect(toolNames).toContain('getTransactions');
@@ -52,7 +52,7 @@ describe('createPageScopedTools', () => {
   });
 
   it('should return only transaction tools for payout context', () => {
-    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, PageContextType.PAYOUT);
+    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, ResourceType.PAYOUT);
 
     const toolNames = Object.keys(tools);
     expect(toolNames).toContain('getTransactions');
@@ -64,7 +64,7 @@ describe('createPageScopedTools', () => {
   });
 
   it('should return transaction, customer, and refund tools for dispute context', () => {
-    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, PageContextType.DISPUTE);
+    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, ResourceType.DISPUTE);
 
     const toolNames = Object.keys(tools);
     expect(toolNames).toContain('getTransactions');
@@ -76,7 +76,7 @@ describe('createPageScopedTools', () => {
   });
 
   it('should return valid tool objects with correct structure', () => {
-    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, PageContextType.TRANSACTION);
+    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, ResourceType.TRANSACTION);
 
     expect(tools.getCustomers).toBeDefined();
     expect(typeof tools.getCustomers).toBe('object');

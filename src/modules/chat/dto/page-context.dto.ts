@@ -1,16 +1,16 @@
 import { IsEnum, IsNotEmpty, IsString, IsOptional, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PageContextType } from '~/common/ai/types';
+import { ResourceType } from '~/common/ai/types';
 
 export class PageContextDto {
   @ApiProperty({
     description: 'Type of resource for page-scoped chat',
-    enum: PageContextType,
-    example: PageContextType.TRANSACTION,
+    enum: ResourceType,
+    example: ResourceType.TRANSACTION,
   })
-  @IsEnum(PageContextType)
+  @IsEnum(ResourceType)
   @IsNotEmpty()
-  type: PageContextType;
+  type: ResourceType;
 
   @ApiProperty({
     description: 'Resource ID or reference (e.g., transaction reference, customer code)',

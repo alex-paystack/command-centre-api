@@ -16,6 +16,7 @@ import {
   PayoutStatus,
   DisputeStatusSlug,
   DisputeCategory,
+  DisputeResolutionSlug,
 } from '../types/data';
 import { amountInBaseUnitToSubUnit, validateDateRange } from '../utilities/utils';
 import {
@@ -55,8 +56,9 @@ export function createGetTransactionsTool(
         .describe('Filter by the `id` field of the customer object, not the customer code'),
       amount: z.number().optional().describe('Filter by amount'),
       currency: z.string().optional().describe('Filter by currency'),
+      subaccountCode: z.string().optional().describe('Filter by subaccount code'),
     }),
-    execute: async ({ perPage, page, from, to, status, channel, customer, amount, currency }) => {
+    execute: async ({ perPage, page, from, to, status, channel, customer, amount, currency, subaccountCode }) => {
       const { jwtToken } = getAuthenticatedUser();
 
       if (!jwtToken) {
@@ -86,6 +88,7 @@ export function createGetTransactionsTool(
           ...(to && { to }),
           ...(amount && { amount: amountInBaseUnitToSubUnit(amount) }),
           ...(currency && { currency }),
+          ...(subaccountCode && { subaccount_code: subaccountCode }),
         };
 
         const response = await paystackService.get<PaystackTransaction[]>('/transaction', jwtToken, params);
@@ -177,10 +180,10 @@ export function createGetRefundsTool(
       to: z.string().optional().describe('End date for filtering refunds (ISO 8601 format, e.g., 2024-12-31)'),
       amount: z.number().optional().describe('Filter by amount'),
       amount_operator: z.enum(['gt', 'lt', 'eq']).optional().describe('Filter by amount operator').default('eq'),
-      active: z.boolean().optional().describe('Filter by active status'),
-      search: z.string().optional().describe('Filter by transaction search query'),
+      transaction: z.number().optional().describe('Filter by transaction id'),
+      search: z.string().optional().describe('Filter by bank reference or refund id'),
     }),
-    execute: async ({ status, perPage, page, from, to, amount, amount_operator = 'eq', active, search }) => {
+    execute: async ({ status, perPage, page, from, to, amount, amount_operator = 'eq', transaction, search }) => {
       const { jwtToken } = getAuthenticatedUser();
 
       if (!jwtToken) {
@@ -213,7 +216,7 @@ export function createGetRefundsTool(
           ...(from && { from }),
           ...(to && { to }),
           ...amountFilter,
-          ...(active && { active }),
+          ...(transaction && { transaction }),
           ...(search && { search }),
         };
 
@@ -322,8 +325,9 @@ export function createGetDisputesTool(
       ignore_resolved: z.enum(['yes', 'no']).optional().describe('Ignore resolved disputes'),
       transaction: z.number().optional().describe('Filter by transaction id'),
       category: z.enum(Object.values(DisputeCategory)).optional().describe('Filter by dispute category'),
+      resolution: z.enum(Object.values(DisputeResolutionSlug)).optional().describe('Filter by dispute resolution'),
     }),
-    execute: async ({ perPage, page, from, to, status, ignore_resolved, transaction, category }) => {
+    execute: async ({ perPage, page, from, to, status, ignore_resolved, transaction, category, resolution }) => {
       const { jwtToken } = getAuthenticatedUser();
 
       if (!jwtToken) {
@@ -351,6 +355,7 @@ export function createGetDisputesTool(
           ...(ignore_resolved && { ignore_resolved }),
           ...(transaction && { transaction }),
           ...(category && { category }),
+          ...(resolution && { resolution }),
         };
 
         const response = await paystackService.get<PaystackDispute[]>('/dispute', jwtToken, params);

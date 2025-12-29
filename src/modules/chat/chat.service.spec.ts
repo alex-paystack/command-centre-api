@@ -14,7 +14,7 @@ import { PageContextService } from '~/common/services/page-context.service';
 import {
   MessageClassificationIntent,
   ChatResponseType,
-  PageContextType,
+  ResourceType,
   ClassificationUIMessage,
 } from '~/common/ai/types';
 import { NotFoundError } from '~/common';
@@ -37,7 +37,7 @@ describe('ChatService', () => {
     id: '123e4567-e89b-12d3-a456-426614174000',
     title: 'Test Conversation',
     userId: 'user_123',
-    pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_abc123' },
+    pageContext: { type: ResourceType.TRANSACTION, resourceId: 'ref_abc123' },
     createdAt: new Date('2024-01-01'),
     lastActivityAt: new Date('2024-01-01'),
     expiresAt: new Date('2024-01-04'),
@@ -198,14 +198,14 @@ describe('ChatService', () => {
     it('should filter conversations by context type when provided', async () => {
       jest.spyOn(conversationRepository, 'findByUserIdAndContextType').mockResolvedValue([mockConversation]);
 
-      const result = await service.getConversationsByUserId('user_123', PageContextType.TRANSACTION);
+      const result = await service.getConversationsByUserId('user_123', ResourceType.TRANSACTION);
 
       expect(conversationRepository.findByUserIdAndContextType).toHaveBeenCalledWith(
         'user_123',
-        PageContextType.TRANSACTION,
+        ResourceType.TRANSACTION,
       );
       expect(result).toHaveLength(1);
-      expect(result[0].pageContext?.type).toBe(PageContextType.TRANSACTION);
+      expect(result[0].pageContext?.type).toBe(ResourceType.TRANSACTION);
       expect(result[0].pageContext?.resourceId).toBe('ref_abc123');
     });
 
@@ -222,15 +222,15 @@ describe('ChatService', () => {
     it('should filter conversations by context type and mode when provided', async () => {
       jest.spyOn(conversationRepository, 'findByUserIdAndModeAndContextType').mockResolvedValue([mockConversation]);
 
-      const result = await service.getConversationsByUserId('user_123', PageContextType.TRANSACTION, ChatMode.PAGE);
+      const result = await service.getConversationsByUserId('user_123', ResourceType.TRANSACTION, ChatMode.PAGE);
 
       expect(conversationRepository.findByUserIdAndModeAndContextType).toHaveBeenCalledWith(
         'user_123',
         ChatMode.PAGE,
-        PageContextType.TRANSACTION,
+        ResourceType.TRANSACTION,
       );
       expect(result).toHaveLength(1);
-      expect(result[0].pageContext?.type).toBe(PageContextType.TRANSACTION);
+      expect(result[0].pageContext?.type).toBe(ResourceType.TRANSACTION);
       expect(result[0].pageContext?.resourceId).toBe('ref_abc123');
       expect(result[0].mode).toBe(ChatMode.PAGE);
     });
@@ -545,7 +545,7 @@ describe('ChatService', () => {
       };
       const mockHistory = [mockUIMessage];
       const mockPageContext = {
-        type: PageContextType.TRANSACTION,
+        type: ResourceType.TRANSACTION,
         resourceId: 'ref_123',
       };
 
@@ -630,7 +630,7 @@ describe('ChatService', () => {
 
     it('should allow message when OUT_OF_PAGE_SCOPE but low confidence', async () => {
       const mockPageContext = {
-        type: PageContextType.TRANSACTION,
+        type: ResourceType.TRANSACTION,
         resourceId: 'ref_123',
       };
 
@@ -676,7 +676,7 @@ describe('ChatService', () => {
     it('should throw ValidationError when page-scoped conversation is used without PAGE mode', () => {
       const pageConversation = {
         ...mockConversation,
-        pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_123' },
+        pageContext: { type: ResourceType.TRANSACTION, resourceId: 'ref_123' },
       };
 
       expect(() => {
@@ -687,7 +687,7 @@ describe('ChatService', () => {
     it('should throw ValidationError when page-scoped mode is used but pageContext is missing', () => {
       const pageConversation = {
         ...mockConversation,
-        pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_123' },
+        pageContext: { type: ResourceType.TRANSACTION, resourceId: 'ref_123' },
       };
 
       expect(() => {
@@ -698,12 +698,12 @@ describe('ChatService', () => {
     it('should throw ValidationError when pageContext type differs from saved context', () => {
       const pageConversation = {
         ...mockConversation,
-        pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_123' },
+        pageContext: { type: ResourceType.TRANSACTION, resourceId: 'ref_123' },
       };
 
       expect(() => {
         service.validateChatMode(pageConversation, ChatMode.PAGE, {
-          type: PageContextType.CUSTOMER,
+          type: ResourceType.CUSTOMER,
           resourceId: 'CUS_123',
         });
       }).toThrow('Conversation is locked to a different page context');
@@ -712,12 +712,12 @@ describe('ChatService', () => {
     it('should throw ValidationError when pageContext resourceId differs from saved context', () => {
       const pageConversation = {
         ...mockConversation,
-        pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_123' },
+        pageContext: { type: ResourceType.TRANSACTION, resourceId: 'ref_123' },
       };
 
       expect(() => {
         service.validateChatMode(pageConversation, ChatMode.PAGE, {
-          type: PageContextType.TRANSACTION,
+          type: ResourceType.TRANSACTION,
           resourceId: 'ref_456',
         });
       }).toThrow('Conversation is locked to a different page context');
@@ -726,12 +726,12 @@ describe('ChatService', () => {
     it('should not throw when page context matches', () => {
       const pageConversation = {
         ...mockConversation,
-        pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_123' },
+        pageContext: { type: ResourceType.TRANSACTION, resourceId: 'ref_123' },
       };
 
       expect(() => {
         service.validateChatMode(pageConversation, ChatMode.PAGE, {
-          type: PageContextType.TRANSACTION,
+          type: ResourceType.TRANSACTION,
           resourceId: 'ref_123',
         });
       }).not.toThrow();
@@ -774,7 +774,7 @@ describe('ChatService', () => {
   describe('buildPageScopedPrompt', () => {
     it('should build prompt with transaction context', () => {
       const enrichedContext = {
-        type: PageContextType.TRANSACTION,
+        type: ResourceType.TRANSACTION,
         resourceId: 'ref_123',
         resourceData: { id: 123, reference: 'ref_123' },
         formattedData: 'Transaction Details:\n- Reference: ref_123\n- Amount: NGN 1000.00',
@@ -789,7 +789,7 @@ describe('ChatService', () => {
 
     it('should build prompt with customer context', () => {
       const enrichedContext = {
-        type: PageContextType.CUSTOMER,
+        type: ResourceType.CUSTOMER,
         resourceId: 'CUS_123',
         resourceData: { customer_code: 'CUS_123', email: 'test@example.com' },
         formattedData: 'Customer Details:\n- Customer Code: CUS_123\n- Email: test@example.com',
@@ -804,7 +804,7 @@ describe('ChatService', () => {
 
     it('should include current date in prompt', () => {
       const enrichedContext = {
-        type: PageContextType.TRANSACTION,
+        type: ResourceType.TRANSACTION,
         resourceId: 'ref_123',
         resourceData: {},
         formattedData: 'Transaction Details',
@@ -843,9 +843,9 @@ describe('ChatService', () => {
     });
 
     it('should return page-scoped system prompt and tools when mode is PAGE with valid context', async () => {
-      const pageContext = { type: PageContextType.TRANSACTION, resourceId: 'ref_123' };
+      const pageContext = { type: ResourceType.TRANSACTION, resourceId: 'ref_123' };
       const enrichedContext = {
-        type: PageContextType.TRANSACTION,
+        type: ResourceType.TRANSACTION,
         resourceId: 'ref_123',
         resourceData: { id: 123, reference: 'ref_123' },
         formattedData: 'Transaction Details:\n- Reference: ref_123',
@@ -872,9 +872,9 @@ describe('ChatService', () => {
       expect(globalResult.systemPrompt).toContain(currentDate);
 
       // Test page-scoped mode
-      const pageContext = { type: PageContextType.TRANSACTION, resourceId: 'ref_123' };
+      const pageContext = { type: ResourceType.TRANSACTION, resourceId: 'ref_123' };
       const enrichedContext = {
-        type: PageContextType.TRANSACTION,
+        type: ResourceType.TRANSACTION,
         resourceId: 'ref_123',
         resourceData: {},
         formattedData: 'Transaction Details',

@@ -1,6 +1,6 @@
 import { IsString, IsNotEmpty, IsUUID, IsOptional, IsEnum, ValidateNested, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ChatMode, PageContextType } from '~/common/ai/types';
+import { ChatMode, ResourceType } from '~/common/ai/types';
 import { Type } from 'class-transformer';
 import { PageContextDto } from './page-context.dto';
 
@@ -24,7 +24,7 @@ export class CreateConversationDto {
   @ApiPropertyOptional({
     description: 'Page context for resource-scoped chat. Required when mode is "page".',
     example: {
-      type: PageContextType.TRANSACTION,
+      type: ResourceType.TRANSACTION,
       resourceId: '123456',
     },
   })

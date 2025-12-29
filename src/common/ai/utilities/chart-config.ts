@@ -15,6 +15,8 @@ import { APIError } from '../../exceptions/api.exception';
 
 /**
  * Supported resource types for chart generation
+ * This is a subset of ResourceType (excludes CUSTOMER since customer charts are not supported)
+ * Values must match ResourceType enum values
  */
 export enum ChartResourceType {
   TRANSACTION = 'transaction',

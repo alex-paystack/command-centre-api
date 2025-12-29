@@ -21,7 +21,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
-import { AuthenticatedUser, ChatMode, PageContext, PageContextType } from '~/common/ai/types';
+import { AuthenticatedUser, ChatMode, PageContext, ResourceType } from '~/common/ai/types';
 import { MessageRole } from './entities/message.entity';
 import {
   generateConversationTitle,
@@ -122,10 +122,9 @@ export class ChatService {
     return ConversationResponseDto.fromEntity(conversation);
   }
 
-  async getConversationsByUserId(userId: string, contextType?: PageContextType, mode?: ChatMode) {
+  async getConversationsByUserId(userId: string, contextType?: ResourceType, mode?: ChatMode) {
     const resolvedMode = mode && Object.values(ChatMode).includes(mode) ? mode : undefined;
-    const resolvedContext =
-      contextType && Object.values(PageContextType).includes(contextType) ? contextType : undefined;
+    const resolvedContext = contextType && Object.values(ResourceType).includes(contextType) ? contextType : undefined;
 
     let conversations: Conversation[];
 

@@ -1,7 +1,7 @@
 import { Exclude, Expose } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { Conversation } from '../entities/conversation.entity';
-import { ChatMode, PageContextType, PageContext } from '~/common/ai/types';
+import { ChatMode, ResourceType, PageContext } from '~/common/ai/types';
 
 @Exclude()
 export class ConversationResponseDto {
@@ -29,7 +29,7 @@ export class ConversationResponseDto {
   @ApiProperty({
     description: 'Page key where the conversation is scoped',
     example: {
-      type: PageContextType.TRANSACTION,
+      type: ResourceType.TRANSACTION,
       resourceId: 'ref_abc123',
     },
   })

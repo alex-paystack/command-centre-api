@@ -2,7 +2,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PageContextService } from './page-context.service';
 import { PaystackApiService } from './paystack-api.service';
-import { PageContextType } from '../ai/types';
+import { ResourceType } from '../ai/types';
 
 describe('PageContextService', () => {
   let service: PageContextService;
@@ -32,7 +32,7 @@ describe('PageContextService', () => {
 
     it('should fetch transaction data for transaction context', async () => {
       const pageContext = {
-        type: PageContextType.TRANSACTION,
+        type: ResourceType.TRANSACTION,
         resourceId: 'ref_123',
       };
 
@@ -65,7 +65,7 @@ describe('PageContextService', () => {
 
     it('should fetch customer data for customer context', async () => {
       const pageContext = {
-        type: PageContextType.CUSTOMER,
+        type: ResourceType.CUSTOMER,
         resourceId: 'CUS_123',
       };
 
@@ -94,7 +94,7 @@ describe('PageContextService', () => {
 
     it('should format refund data correctly', async () => {
       const pageContext = {
-        type: PageContextType.REFUND,
+        type: ResourceType.REFUND,
         resourceId: '123',
       };
 
@@ -126,7 +126,7 @@ describe('PageContextService', () => {
 
     it('should format payout data correctly', async () => {
       const pageContext = {
-        type: PageContextType.PAYOUT,
+        type: ResourceType.PAYOUT,
         resourceId: '123',
       };
 
@@ -159,7 +159,7 @@ describe('PageContextService', () => {
 
     it('should format dispute data correctly', async () => {
       const pageContext = {
-        type: PageContextType.DISPUTE,
+        type: ResourceType.DISPUTE,
         resourceId: '123',
       };
 

@@ -5,7 +5,7 @@ import { NotFoundError, ValidationError } from '~/common';
 import { ChatService } from './chat.service';
 import { ConversationRepository } from './repositories/conversation.repository';
 import { MessageRepository } from './repositories/message.repository';
-import { ChatMode, PageContextType } from '~/common/ai/types';
+import { ChatMode, ResourceType } from '~/common/ai/types';
 import { Conversation } from './entities/conversation.entity';
 import { PaystackApiService } from '~/common/services/paystack-api.service';
 import { PageContextService } from '~/common/services/page-context.service';
@@ -227,13 +227,13 @@ describe('ChatService - Summarization', () => {
       const pageContextConversation = {
         ...mockClosedConversation,
         mode: ChatMode.PAGE,
-        pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_123' },
+        pageContext: { type: ResourceType.TRANSACTION, resourceId: 'ref_123' },
       };
 
       const dto: CreateConversationFromSummaryDto = {
         previousConversationId: 'closed-conversation-id',
         mode: ChatMode.PAGE,
-        pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_456' },
+        pageContext: { type: ResourceType.TRANSACTION, resourceId: 'ref_456' },
       };
 
       const newConversation = {

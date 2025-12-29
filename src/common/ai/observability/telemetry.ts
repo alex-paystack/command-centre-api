@@ -150,7 +150,7 @@ function buildMetadata(context: TelemetryContext): Record<string, string | boole
  *     conversationId: 'abc-123',
  *     userId: 'user-456',
  *     mode: ChatMode.PAGE,
- *     pageContext: { type: PageContextType.TRANSACTION, resourceId: 'txn-789' },
+ *     pageContext: { type: ResourceType.TRANSACTION, resourceId: 'txn-789' },
  *     operationType: LLMOperationType.CHAT_RESPONSE,
  *   }),
  * });

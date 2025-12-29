@@ -10,7 +10,7 @@ import { ConversationResponseDto } from './dto/conversation-response.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
 import { MessageRole } from './entities/message.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ChatMode, PageContextType } from '~/common/ai/types';
+import { ChatMode, ResourceType } from '~/common/ai/types';
 
 describe('ChatController', () => {
   let controller: ChatController;
@@ -22,7 +22,7 @@ describe('ChatController', () => {
     id: '123e4567-e89b-12d3-a456-426614174000',
     title: 'Test Conversation',
     userId: mockUserId,
-    pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_abc123' },
+    pageContext: { type: ResourceType.TRANSACTION, resourceId: 'ref_abc123' },
     mode: ChatMode.PAGE,
     createdAt: new Date('2024-01-01'),
     summaryCount: 0,
@@ -126,9 +126,9 @@ describe('ChatController', () => {
     it('should filter conversations by context type when provided', async () => {
       jest.spyOn(service, 'getConversationsByUserId').mockResolvedValue([mockConversationResponse]);
 
-      const result = await controller.getConversationsByUserId(mockUserId, PageContextType.TRANSACTION);
+      const result = await controller.getConversationsByUserId(mockUserId, ResourceType.TRANSACTION);
 
-      expect(service.getConversationsByUserId).toHaveBeenCalledWith(mockUserId, PageContextType.TRANSACTION, undefined);
+      expect(service.getConversationsByUserId).toHaveBeenCalledWith(mockUserId, ResourceType.TRANSACTION, undefined);
       expect(result.data).toEqual([mockConversationResponse]);
     });
 
@@ -144,11 +144,11 @@ describe('ChatController', () => {
     it('should filter conversations by context type and mode when provided', async () => {
       jest.spyOn(service, 'getConversationsByUserId').mockResolvedValue([mockConversationResponse]);
 
-      const result = await controller.getConversationsByUserId(mockUserId, PageContextType.TRANSACTION, ChatMode.PAGE);
+      const result = await controller.getConversationsByUserId(mockUserId, ResourceType.TRANSACTION, ChatMode.PAGE);
 
       expect(service.getConversationsByUserId).toHaveBeenCalledWith(
         mockUserId,
-        PageContextType.TRANSACTION,
+        ResourceType.TRANSACTION,
         ChatMode.PAGE,
       );
       expect(result.data).toEqual([mockConversationResponse]);
@@ -257,7 +257,7 @@ describe('ChatController', () => {
       const dto: CreateConversationFromSummaryDto = {
         previousConversationId: 'closed-conversation-id',
         mode: ChatMode.PAGE,
-        pageContext: { type: PageContextType.TRANSACTION, resourceId: 'ref_123' },
+        pageContext: { type: ResourceType.TRANSACTION, resourceId: 'ref_123' },
       };
 
       const newConversationResponse: ConversationResponseDto = {
