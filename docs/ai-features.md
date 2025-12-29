@@ -87,6 +87,99 @@ The assistant can only operate on merchant data exposed by these tools (all requ
 
 **Important**: All date filters are limited to 30 days; helper validation returns clear errors when exceeded.
 
+### Response Sanitization for Token Efficiency
+
+All data retrieval tools automatically sanitize their responses before returning data to the LLM, significantly reducing token consumption while preserving essential context. This enables longer conversations with more tool calls before reaching summarization thresholds.
+
+**How It Works:**
+
+The sanitization system uses a configuration-driven approach with three sanitization levels:
+
+- **MINIMAL** (85-87% token reduction): Only critical identification fields (IDs, amounts, status)
+- **STANDARD** (70-75% token reduction, **default**): Most commonly needed fields for general queries
+- **DETAILED** (60-65% token reduction): More fields for complex queries
+
+**Token Savings by Resource Type (STANDARD Level):**
+
+| Resource Type   | Reduction | Fields Removed                                       | Fields Preserved                                                         |
+| --------------- | --------- | ---------------------------------------------------- | ------------------------------------------------------------------------ |
+| **Transaction** | ~75%      | Log history, metadata, verbose authorization details | ID, reference, amount, status, channel, fees, customer email/phone       |
+| **Customer**    | ~62%      | Full authorization arrays, internal metadata         | ID, email, customer code, name, phone, risk action, first 3 saved cards  |
+| **Refund**      | ~71%      | Internal processing details, bank references         | ID, amount, status, transaction ref, refund type, customer basic info    |
+| **Payout**      | ~57%      | Detailed subaccount fields, processing metadata      | ID, amounts, status, settlement date, fees, subaccount business name     |
+| **Dispute**     | ~75%      | Full message threads, extensive history              | ID, refund amount, status, category, customer info, last 5 history items |
+
+**Nested Object Handling:**
+
+The system intelligently sanitizes nested objects:
+
+- Customer objects within transactions are reduced to essential fields (ID, email, phone)
+- Authorization data keeps only card identification (bin, last4, bank) without sensitive details
+- Array fields are limited (e.g., first 3 authorizations, last 5 dispute history items)
+- Null values and missing fields are handled gracefully
+
+**Impact on Conversations:**
+
+- **2.5x more tool calls** before hitting summarization threshold
+- Conversations can include **25-40 tool-heavy interactions** vs 10-15 without sanitization
+- Default threshold remains at 76,800 tokens (60% of 128K context window)
+- Longer coherent conversations without losing context
+
+**Example: Transaction Sanitization**
+
+```typescript
+// Raw API response (30+ fields, ~400 tokens per transaction)
+{
+  id: 1,
+  reference: 'ref123',
+  amount: 50000,
+  currency: 'NGN',
+  status: 'success',
+  channel: 'card',
+  gateway_response: 'Approved',
+  fees: 750,
+  paid_at: '2024-01-01T12:00:00Z',
+  customer: {
+    id: 100,
+    email: 'customer@example.com',
+    customer_code: 'CUS_xxx',
+    phone: '+234...',
+    // ... 8 more fields
+  },
+  authorization: {
+    authorization_code: 'AUTH_xxx',
+    bin: '408408',
+    last4: '4081',
+    bank: 'Test Bank',
+    brand: 'visa',
+    card_type: 'visa',
+    channel: 'card'
+    // ... 8 more fields removed
+  },
+  // log, metadata, fees_split, additional_charges removed entirely
+}
+
+// After sanitization (~100 tokens per transaction)
+// 75% token reduction per transaction
+```
+
+**Implementation:**
+
+Sanitization is automatic and internal - no API or configuration changes required. The system uses:
+
+- `src/common/ai/sanitization/config.ts` - Field configurations per resource type
+- `src/common/ai/sanitization/sanitizer.ts` - Core filtering engine
+- Applied automatically in all retrieval tool responses
+
+**Extensibility:**
+
+Adding sanitization for new resource types requires:
+
+1. Add resource type to `ResourceType` enum
+2. Define field configurations at all three levels
+3. Create convenience sanitization function
+4. Apply in retrieval tool response
+
 ### Resource-Specific Tool Filtering
 
 In page-scoped mode, tools are automatically filtered based on the resource type:

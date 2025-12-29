@@ -18,6 +18,13 @@ import {
   DisputeCategory,
 } from '../types/data';
 import { amountInBaseUnitToSubUnit, validateDateRange } from '../utilities/utils';
+import {
+  sanitizeTransactions,
+  sanitizeCustomers,
+  sanitizeRefunds,
+  sanitizePayouts,
+  sanitizeDisputes,
+} from '../sanitization';
 
 /**
  * Create the getTransactions tool
@@ -83,9 +90,11 @@ export function createGetTransactionsTool(
 
         const response = await paystackService.get<PaystackTransaction[]>('/transaction', jwtToken, params);
 
+        const sanitizedTransactions = sanitizeTransactions(response.data);
+
         return {
           success: true,
-          transactions: response.data,
+          transactions: sanitizedTransactions,
           meta: response.meta,
           message: `Retrieved ${response.data.length} transaction(s)`,
         };
@@ -133,9 +142,11 @@ export function createGetCustomersTool(
 
         const response = await paystackService.get<PaystackCustomer[]>('/customer', jwtToken, params);
 
+        const sanitizedCustomers = sanitizeCustomers(response.data);
+
         return {
           success: true,
-          customers: response.data,
+          customers: sanitizedCustomers,
           meta: response.meta,
           message: `Retrieved ${response.data.length} customer(s)`,
         };
@@ -208,9 +219,11 @@ export function createGetRefundsTool(
 
         const response = await paystackService.get<PaystackRefund[]>('/refund', jwtToken, params);
 
+        const sanitizedRefunds = sanitizeRefunds(response.data);
+
         return {
           success: true,
-          refunds: response.data,
+          refunds: sanitizedRefunds,
           meta: response.meta,
           message: `Retrieved ${response.data.length} refund(s)`,
         };
@@ -273,9 +286,11 @@ export function createGetPayoutsTool(
 
         const response = await paystackService.get<PaystackPayout[]>('/settlement', jwtToken, params);
 
+        const sanitizedPayouts = sanitizePayouts(response.data);
+
         return {
           success: true,
-          payouts: response.data,
+          payouts: sanitizedPayouts,
           meta: response.meta,
           message: `Retrieved ${response.data.length} payout(s)`,
         };
@@ -340,9 +355,11 @@ export function createGetDisputesTool(
 
         const response = await paystackService.get<PaystackDispute[]>('/dispute', jwtToken, params);
 
+        const sanitizedDisputes = sanitizeDisputes(response.data);
+
         return {
           success: true,
-          disputes: response.data,
+          disputes: sanitizedDisputes,
           meta: response.meta,
           message: `Retrieved ${response.data.length} dispute(s)`,
         };
