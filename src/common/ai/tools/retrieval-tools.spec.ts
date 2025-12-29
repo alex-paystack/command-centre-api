@@ -32,6 +32,18 @@ describe('Data Retrieval Tools', () => {
   });
 
   describe('createGetTransactionsTool', () => {
+    it('should refuse unsupported filters', async () => {
+      const tool = createGetTransactionsTool(mockPaystackService, mockGetAuthenticatedUser);
+
+      // @ts-expect-error intentional invalid filter to test guard
+      const result = await tool.execute?.({ foo: 'bar' }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        error: expect.stringContaining('foo'),
+      });
+      expect(mockPaystackService.get).not.toHaveBeenCalled();
+    });
+
     it('should fetch transactions successfully', async () => {
       const mockTransactions: PaystackTransaction[] = [
         {
@@ -259,6 +271,18 @@ describe('Data Retrieval Tools', () => {
   });
 
   describe('createGetCustomersTool', () => {
+    it('should refuse unsupported filters', async () => {
+      const tool = createGetCustomersTool(mockPaystackService, mockGetAuthenticatedUser);
+
+      // @ts-expect-error intentional invalid filter to test guard
+      const result = await tool.execute?.({ foo: 'bar' }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        error: expect.stringContaining('foo'),
+      });
+      expect(mockPaystackService.get).not.toHaveBeenCalled();
+    });
+
     it('should fetch customers successfully', async () => {
       const mockCustomers: PaystackCustomer[] = [
         {
@@ -416,6 +440,18 @@ describe('Data Retrieval Tools', () => {
   });
 
   describe('createGetRefundsTool', () => {
+    it('should refuse unsupported filters', async () => {
+      const tool = createGetRefundsTool(mockPaystackService, mockGetAuthenticatedUser);
+
+      // @ts-expect-error intentional invalid filter to test guard
+      const result = await tool.execute?.({ foo: 'bar' }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        error: expect.stringContaining('foo'),
+      });
+      expect(mockPaystackService.get).not.toHaveBeenCalled();
+    });
+
     it('should fetch refunds successfully', async () => {
       const mockRefunds: PaystackRefund[] = [
         {
@@ -578,6 +614,18 @@ describe('Data Retrieval Tools', () => {
   });
 
   describe('createGetPayoutsTool', () => {
+    it('should refuse unsupported filters', async () => {
+      const tool = createGetPayoutsTool(mockPaystackService, mockGetAuthenticatedUser);
+
+      // @ts-expect-error intentional invalid filter to test guard
+      const result = await tool.execute?.({ foo: 'bar' }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        error: expect.stringContaining('foo'),
+      });
+      expect(mockPaystackService.get).not.toHaveBeenCalled();
+    });
+
     it('should fetch payouts successfully', async () => {
       const mockPayouts: PaystackPayout[] = [
         {
@@ -730,6 +778,18 @@ describe('Data Retrieval Tools', () => {
   });
 
   describe('createGetDisputesTool', () => {
+    it('should refuse unsupported filters', async () => {
+      const tool = createGetDisputesTool(mockPaystackService, mockGetAuthenticatedUser);
+
+      // @ts-expect-error intentional invalid filter to test guard
+      const result = await tool.execute?.({ foo: 'bar' }, mockToolCallOptions);
+
+      expect(result).toMatchObject({
+        error: expect.stringContaining('foo'),
+      });
+      expect(mockPaystackService.get).not.toHaveBeenCalled();
+    });
+
     it('should fetch disputes successfully', async () => {
       const mockDisputes: PaystackDispute[] = [
         {

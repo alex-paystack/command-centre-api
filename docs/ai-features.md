@@ -87,6 +87,60 @@ The assistant can only operate on merchant data exposed by these tools (all requ
 
 **Important**: All date filters are limited to 30 days; helper validation returns clear errors when exceeded.
 
+### Filter Validation
+
+All data retrieval tools automatically validate filter parameters before making API calls, ensuring only supported filters are used for each resource type. This prevents errors and provides clear feedback when unsupported filters are attempted.
+
+**How It Works:**
+
+The filter validation system uses a centralized approach with:
+
+- **Allowed filter constants**: Predefined lists of supported filters per resource type (e.g., `TRANSACTION_ALLOWED_FILTERS`)
+- **Filter detection**: `findUnsupportedFilters()` identifies any filters not in the allowed list
+- **Error generation**: `buildUnsupportedFilterError()` creates user-friendly error messages
+
+**Supported Filters by Resource Type:**
+
+| Resource Type   | Supported Filters                                                                    |
+| --------------- | ------------------------------------------------------------------------------------ |
+| **Transaction** | perPage, page, from, to, status, channel, customer, amount, currency, subaccountCode |
+| **Customer**    | perPage, page, email, account_number                                                 |
+| **Refund**      | perPage, page, from, to, status, amount, amount_operator, transaction, search        |
+| **Payout**      | perPage, page, from, to, status, subaccount, id                                      |
+| **Dispute**     | perPage, page, from, to, status, ignore_resolved, transaction, category, resolution  |
+
+**Example Error Response:**
+
+When an unsupported filter is used, the tool returns a helpful error:
+
+```json
+{
+  "error": "The filter option foo is not available for transactions. Supported filters: perPage, page, from, to, status, channel, customer, amount, currency, subaccountCode."
+}
+```
+
+For multiple unsupported filters:
+
+```json
+{
+  "error": "The filter options foo, bar are not available for customers. Supported filters: perPage, page, email, account_number."
+}
+```
+
+**Benefits:**
+
+- **Clear feedback**: Users immediately know which filters are supported
+- **Prevents API errors**: Validation happens before making Paystack API calls
+- **Consistent experience**: All retrieval tools use the same validation pattern
+- **Developer-friendly**: Easy to add validation for new tools and resource types
+
+**Implementation:**
+
+Filter validation is automatic and internal - no API or configuration changes required. The system uses:
+
+- `src/common/ai/utilities/retreival-filter-validation.ts` - Filter constants and validation functions
+- Applied automatically in all retrieval tool execute functions
+
 ### Response Sanitization for Token Efficiency
 
 All data retrieval tools automatically sanitize their responses before returning data to the LLM, significantly reducing token consumption while preserving essential context. This enables longer conversations with more tool calls before reaching summarization thresholds.
