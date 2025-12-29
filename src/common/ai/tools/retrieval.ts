@@ -67,7 +67,7 @@ export function createGetTransactionsTool(
         };
       }
 
-      // Validate date range does not exceed 30 days
+      // Validate date range does not exceed 31 days
       const dateValidation = validateDateRange(from, to);
 
       if (!dateValidation.isValid) {
@@ -192,7 +192,7 @@ export function createGetRefundsTool(
         };
       }
 
-      // Validate date range does not exceed 30 days
+      // Validate date range does not exceed 31 days
       const dateValidation = validateDateRange(from, to);
 
       if (!dateValidation.isValid) {
@@ -267,7 +267,7 @@ export function createGetPayoutsTool(
         };
       }
 
-      // Validate date range does not exceed 30 days
+      // Validate date range does not exceed 31 days
       const dateValidation = validateDateRange(from, to);
 
       if (!dateValidation.isValid) {
@@ -336,7 +336,7 @@ export function createGetDisputesTool(
         };
       }
 
-      // Validate date range does not exceed 30 days
+      // Validate date range does not exceed 31 days
       const dateValidation = validateDateRange(from, to);
 
       if (!dateValidation.isValid) {

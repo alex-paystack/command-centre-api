@@ -85,7 +85,7 @@ The assistant can only operate on merchant data exposed by these tools (all requ
 - All export tools validate data exists before triggering export
 - Support similar filters as their corresponding GET tools
 
-**Important**: All date filters are limited to 30 days; helper validation returns clear errors when exceeded.
+**Important**: All date filters are limited to 31 days; helper validation returns clear errors when exceeded.
 
 ### Response Sanitization for Token Efficiency
 
@@ -267,7 +267,7 @@ The `generateChartData` tool provides powerful analytics capabilities across mul
 - Multi-currency support with per-currency series and breakdowns
 - Automatic chart type suggestion based on aggregation
 - Comprehensive summary statistics with per-currency breakdown
-- Date range validation (30-day maximum)
+- Date range validation (31-day maximum)
 - Resource-specific validation of aggregation types
 - **Centralized validation system** (`utilities/chart-validation.ts`) for consistent parameter validation
 - **Channel filtering** for transaction-specific payment channel analysis
