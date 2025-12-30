@@ -18,7 +18,7 @@ import {
   DisputeCategory,
   DisputeResolutionSlug,
 } from '../types/data';
-import { amountInBaseUnitToSubUnit, validateDateRange } from '../utilities/utils';
+import { amountInBaseUnitToSubUnit, normalizeDateRange, validateDateRange } from '../utilities/utils';
 import {
   sanitizeTransactions,
   sanitizeCustomers,
@@ -83,9 +83,10 @@ export function createGetTransactionsTool(
       }
 
       const { perPage, page, from, to, status, channel, customer, amount, currency, subaccountCode } = input;
+      const normalized = normalizeDateRange(from, to);
 
       // Validate date range does not exceed 30 days
-      const dateValidation = validateDateRange(from, to);
+      const dateValidation = validateDateRange(normalized.from, normalized.to);
 
       if (!dateValidation.isValid) {
         return {
@@ -101,8 +102,8 @@ export function createGetTransactionsTool(
           ...(channel && { channel }),
           ...(customer && { customer }),
           ...(status && { status }),
-          ...(from && { from }),
-          ...(to && { to }),
+          ...(normalized.from && { from: normalized.from }),
+          ...(normalized.to && { to: normalized.to }),
           ...(amount && { amount: amountInBaseUnitToSubUnit(amount) }),
           ...(currency && { currency }),
           ...(subaccountCode && { subaccount_code: subaccountCode }),
@@ -224,9 +225,10 @@ export function createGetRefundsTool(
       }
 
       const { status, perPage, page, from, to, amount, amountOperator = 'eq', transaction, search } = input;
+      const normalized = normalizeDateRange(from, to);
 
       // Validate date range does not exceed 30 days
-      const dateValidation = validateDateRange(from, to);
+      const dateValidation = validateDateRange(normalized.from, normalized.to);
 
       if (!dateValidation.isValid) {
         return {
@@ -246,8 +248,8 @@ export function createGetRefundsTool(
           perPage,
           page,
           ...(status && { status }),
-          ...(from && { from }),
-          ...(to && { to }),
+          ...(normalized.from && { from: normalized.from }),
+          ...(normalized.to && { to: normalized.to }),
           ...amountFilter,
           ...(transaction && { transaction }),
           ...(search && { search }),
@@ -307,9 +309,10 @@ export function createGetPayoutsTool(
       }
 
       const { perPage, page, from, to, status, subaccount, payoutId } = input;
+      const normalized = normalizeDateRange(from, to);
 
       // Validate date range does not exceed 30 days
-      const dateValidation = validateDateRange(from, to);
+      const dateValidation = validateDateRange(normalized.from, normalized.to);
 
       if (!dateValidation.isValid) {
         return {
@@ -321,8 +324,8 @@ export function createGetPayoutsTool(
         const params: Record<string, unknown> = {
           perPage,
           page,
-          ...(from && { from }),
-          ...(to && { to }),
+          ...(normalized.from && { from: normalized.from }),
+          ...(normalized.to && { to: normalized.to }),
           ...(status && { status }),
           ...(subaccount && { subaccount }),
           ...(payoutId && { id: payoutId }),
@@ -384,9 +387,10 @@ export function createGetDisputesTool(
       }
 
       const { perPage, page, from, to, status, ignoreResolved, transaction, category, resolution } = input;
+      const normalized = normalizeDateRange(from, to);
 
       // Validate date range does not exceed 30 days
-      const dateValidation = validateDateRange(from, to);
+      const dateValidation = validateDateRange(normalized.from, normalized.to);
 
       if (!dateValidation.isValid) {
         return {
@@ -398,8 +402,8 @@ export function createGetDisputesTool(
         const params: Record<string, unknown> = {
           perPage,
           page,
-          ...(from && { from }),
-          ...(to && { to }),
+          ...(normalized.from && { from: normalized.from }),
+          ...(normalized.to && { to: normalized.to }),
           ...(status && { status }),
           ...(ignoreResolved && { ignore_resolved: ignoreResolved }),
           ...(transaction && { transaction }),

@@ -1,5 +1,5 @@
 import { type UIMessage } from 'ai';
-import { isAfter, isValid, parseISO } from 'date-fns';
+import { addDays, format, isAfter, isValid, parseISO, subDays } from 'date-fns';
 import { MessageResponseDto } from 'src/modules/chat/dto/message-response.dto';
 
 export function getTextFromMessage(message: UIMessage) {
@@ -54,6 +54,50 @@ function differenceInUtcDays(firstDate: Date, secondDate: Date) {
   return Math.abs(toUtcDayNumber(firstDate) - toUtcDayNumber(secondDate));
 }
 
+function formatDateLikeInput(input: string, date: Date) {
+  // Preserve datetime-style inputs to avoid surprising callers.
+  if (input.includes('T')) {
+    return date.toISOString();
+  }
+  return format(date, 'yyyy-MM-dd');
+}
+
+/**
+ * Normalize a partial date range to a 30-day span anchored on the provided date.
+ * - If only `from` is provided, sets `to = from + 30 days`.
+ * - If only `to` is provided, sets `from = to - 30 days`.
+ * - If both are provided, returns them unchanged.
+ */
+export function normalizeDateRange(from?: string, to?: string, maxDays = 30) {
+  if (!from && !to) {
+    return {};
+  }
+
+  if (from && !to) {
+    const fromDate = parseISO(from);
+
+    if (isValid(fromDate)) {
+      const normalizedTo = addDays(fromDate, maxDays);
+      return { from, to: formatDateLikeInput(from, normalizedTo) };
+    }
+
+    return { from };
+  }
+
+  if (!from && to) {
+    const toDate = parseISO(to);
+
+    if (isValid(toDate)) {
+      const normalizedFrom = subDays(toDate, maxDays);
+      return { from: formatDateLikeInput(to, normalizedFrom), to };
+    }
+
+    return { to };
+  }
+
+  return { from, to };
+}
+
 /**
  * Validates that the date range between from and to does not exceed 30 days
  * @param from - Start date (ISO 8601 format, e.g., 2024-01-01)
@@ -65,27 +109,29 @@ export function validateDateRange(
   to?: string,
 ): { isValid: boolean; error?: string; daysDifference?: number } {
   const MAX_DAYS = 30;
-  const today = new Date();
+  const normalized = normalizeDateRange(from, to, MAX_DAYS);
+  const normalizedFrom = normalized.from;
+  const normalizedTo = normalized.to;
 
-  if (!from && !to) {
+  if (!normalizedFrom && !normalizedTo) {
     return { isValid: true };
   }
 
-  const fromDate = from ? parseISO(from) : null;
-  const toDate = to ? parseISO(to) : null;
+  const fromDate = normalizedFrom ? parseISO(normalizedFrom) : null;
+  const toDate = normalizedTo ? parseISO(normalizedTo) : null;
 
   // Validate date formats
   if (fromDate && !isValid(fromDate)) {
     return {
       isValid: false,
-      error: `Invalid 'from' date format: ${from}. Please use ISO 8601 format (e.g., 2024-01-01)`,
+      error: `Invalid 'from' date format: ${normalizedFrom}. Please use ISO 8601 format (e.g., 2024-01-01)`,
     };
   }
 
   if (toDate && !isValid(toDate)) {
     return {
       isValid: false,
-      error: `Invalid 'to' date format: ${to}. Please use ISO 8601 format (e.g., 2024-01-01)`,
+      error: `Invalid 'to' date format: ${normalizedTo}. Please use ISO 8601 format (e.g., 2024-01-01)`,
     };
   }
 
@@ -104,36 +150,6 @@ export function validateDateRange(
       return {
         isValid: false,
         error: `Date range exceeds the maximum allowed period of ${MAX_DAYS} days. The requested range is ${diffInDays} days. Please narrow your date range.`,
-        daysDifference: diffInDays,
-      };
-    }
-
-    return { isValid: true, daysDifference: diffInDays };
-  }
-
-  // Only 'from' date provided (defaults to today as end)
-  if (fromDate && !toDate) {
-    const diffInDays = differenceInUtcDays(today, fromDate);
-
-    if (diffInDays > MAX_DAYS) {
-      return {
-        isValid: false,
-        error: `Date range exceeds the maximum allowed period of ${MAX_DAYS} days when defaulting the end date to today. The requested range is ${diffInDays} days. Please narrow your date range or provide a closer end date.`,
-        daysDifference: diffInDays,
-      };
-    }
-
-    return { isValid: true, daysDifference: diffInDays };
-  }
-
-  // Only 'to' date provided (defaults to today as start)
-  if (!fromDate && toDate) {
-    const diffInDays = differenceInUtcDays(toDate, today);
-
-    if (diffInDays > MAX_DAYS) {
-      return {
-        isValid: false,
-        error: `Date range exceeds the maximum allowed period of ${MAX_DAYS} days when defaulting the start date to today. The requested range is ${diffInDays} days. Please narrow your date range or provide a closer start date.`,
         daysDifference: diffInDays,
       };
     }

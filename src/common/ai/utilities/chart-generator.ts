@@ -12,6 +12,7 @@ import {
 import { generateChartLabel, getChartType, calculateSummary, aggregateRecords, ChartResult } from './aggregation';
 import { PaymentChannel } from '../types/data';
 import { validateChartParams } from './chart-validation';
+import { normalizeDateRange } from './utils';
 
 /**
  * Parameters for generating chart data
@@ -93,6 +94,9 @@ export async function* generateChartData(
   jwtToken: string,
 ): AsyncGenerator<ChartGenerationState, ChartErrorState | ChartSuccessState, unknown> {
   const { resourceType, aggregationType, from, to, status, currency, channel } = params;
+  const normalized = normalizeDateRange(from, to);
+  const normalizedFrom = normalized.from;
+  const normalizedTo = normalized.to;
 
   if (!jwtToken) {
     const errorState: ChartErrorState = {
@@ -102,7 +106,14 @@ export async function* generateChartData(
     return errorState;
   }
 
-  const validation = validateChartParams({ resourceType, aggregationType, status, from, to, channel });
+  const validation = validateChartParams({
+    resourceType,
+    aggregationType,
+    status,
+    from: normalizedFrom,
+    to: normalizedTo,
+    channel,
+  });
 
   if (!validation.isValid) {
     const errorState: ChartErrorState = { error: validation.error };
@@ -111,7 +122,7 @@ export async function* generateChartData(
   }
 
   try {
-    const dateRange = { from, to };
+    const dateRange = { from: normalizedFrom, to: normalizedTo };
     const chartType = getChartType(aggregationType);
     const resourceDisplayName = getResourceDisplayName(resourceType);
     const resourceDisplayNamePlural = `${resourceDisplayName.toLowerCase()}s`;
@@ -138,8 +149,8 @@ export async function* generateChartData(
         use_cursor: false,
         ...(resourceType === ChartResourceType.TRANSACTION && { reduced_fields: true, ...(channel && { channel }) }),
         ...(status && { status }),
-        ...(from && { from }),
-        ...(to && { to }),
+        ...(normalizedFrom && { from: normalizedFrom }),
+        ...(normalizedTo && { to: normalizedTo }),
         ...(currency && { currency }),
       };
 
@@ -175,11 +186,11 @@ export async function* generateChartData(
           totalCount: 0,
           totalVolume: 0,
           overallAverage: 0,
-          ...(from || to
+          ...(normalizedFrom || normalizedTo
             ? {
                 dateRange: {
-                  from: from ? format(parseISO(from), 'MMM d, yyyy') : 'N/A',
-                  to: to ? format(parseISO(to), 'MMM d, yyyy') : 'N/A',
+                  from: normalizedFrom ? format(parseISO(normalizedFrom), 'MMM d, yyyy') : 'N/A',
+                  to: normalizedTo ? format(parseISO(normalizedTo), 'MMM d, yyyy') : 'N/A',
                 },
               }
             : {}),
