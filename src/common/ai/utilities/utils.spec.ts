@@ -19,40 +19,28 @@ describe('validateDateRange', () => {
   });
 
   describe('when only one date is provided', () => {
-    it('should return valid when only from date is provided within 30 days of today', () => {
-      const today = new Date();
-      const tenDaysAgo = new Date(today.getTime() - 10 * 24 * 60 * 60 * 1000);
-      const result = validateDateRange(tenDaysAgo.toISOString().split('T')[0], undefined);
+    it('should return valid when only from date is provided (defaults to a 30-day range from that date)', () => {
+      const result = validateDateRange('2020-01-01', undefined);
 
       expect(result.isValid).toBe(true);
       expect(result.error).toBeUndefined();
+      expect(result.daysDifference).toBe(30);
     });
 
-    it('should return error when only from date exceeds 30 days from today', () => {
-      const today = new Date();
-      const fortyDaysAgo = new Date(today.getTime() - 40 * 24 * 60 * 60 * 1000);
-      const result = validateDateRange(fortyDaysAgo.toISOString().split('T')[0], undefined);
-
-      expect(result.isValid).toBe(false);
-      expect(result.error).toContain('30 days');
-    });
-
-    it('should return valid when only to date is provided within 30 days of today', () => {
-      const today = new Date();
-      const tenDaysAhead = new Date(today.getTime() + 10 * 24 * 60 * 60 * 1000);
-      const result = validateDateRange(undefined, tenDaysAhead.toISOString().split('T')[0]);
+    it('should return valid when only to date is provided (defaults to a 30-day range ending at that date)', () => {
+      const result = validateDateRange(undefined, '2020-01-31');
 
       expect(result.isValid).toBe(true);
       expect(result.error).toBeUndefined();
+      expect(result.daysDifference).toBe(30);
     });
 
-    it('should return error when only to date exceeds 30 days from today', () => {
-      const today = new Date();
-      const fortyDaysAhead = new Date(today.getTime() + 40 * 24 * 60 * 60 * 1000);
-      const result = validateDateRange(undefined, fortyDaysAhead.toISOString().split('T')[0]);
+    it('should preserve time-based ISO inputs when defaulting the missing endpoint', () => {
+      const result = validateDateRange('2024-01-01T00:00:00Z', undefined);
 
-      expect(result.isValid).toBe(false);
-      expect(result.error).toContain('30 days');
+      expect(result.isValid).toBe(true);
+      expect(result.error).toBeUndefined();
+      expect(result.daysDifference).toBe(30);
     });
   });
 
