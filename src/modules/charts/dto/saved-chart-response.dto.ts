@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SavedChart } from '../entities/saved-chart.entity';
-import { ChartResourceType, AggregationType } from '~/common/ai/utilities/chart-config';
-import { PaymentChannel } from '~/common/ai/types/data';
+import { ChartConfigDto } from './chart-config.dto';
 
 export class SavedChartResponseDto {
   @ApiProperty({
@@ -29,51 +28,6 @@ export class SavedChartResponseDto {
   description?: string;
 
   @ApiProperty({
-    description: 'Resource type',
-    enum: ChartResourceType,
-    example: ChartResourceType.TRANSACTION,
-  })
-  resourceType: ChartResourceType;
-
-  @ApiProperty({
-    description: 'Aggregation type',
-    enum: AggregationType,
-    example: AggregationType.BY_DAY,
-  })
-  aggregationType: AggregationType;
-
-  @ApiPropertyOptional({
-    description: 'Start date filter',
-    example: '2024-12-01',
-  })
-  from?: string;
-
-  @ApiPropertyOptional({
-    description: 'End date filter',
-    example: '2024-12-31',
-  })
-  to?: string;
-
-  @ApiPropertyOptional({
-    description: 'Status filter',
-    example: 'success',
-  })
-  status?: string;
-
-  @ApiPropertyOptional({
-    description: 'Currency filter',
-    example: 'NGN',
-  })
-  currency?: string;
-
-  @ApiPropertyOptional({
-    description: 'Payment channel filter (transactions only)',
-    enum: PaymentChannel,
-    example: PaymentChannel.CARD,
-  })
-  channel?: PaymentChannel;
-
-  @ApiProperty({
     description: 'Creation timestamp',
     example: '2024-12-17T12:00:00.000Z',
   })
@@ -85,21 +39,30 @@ export class SavedChartResponseDto {
   })
   updatedAt: Date;
 
+  @ApiProperty({
+    description: 'Chart configuration snapshot',
+    required: false,
+    type: ChartConfigDto,
+  })
+  config?: ChartConfigDto;
+
   static fromEntity(savedChart: SavedChart): SavedChartResponseDto {
     const dto = new SavedChartResponseDto();
     dto.id = savedChart.id;
     dto.createdFromConversationId = savedChart.createdFromConversationId;
     dto.name = savedChart.name;
     dto.description = savedChart.description;
-    dto.resourceType = savedChart.resourceType;
-    dto.aggregationType = savedChart.aggregationType;
-    dto.from = savedChart.from;
-    dto.to = savedChart.to;
-    dto.status = savedChart.status;
-    dto.currency = savedChart.currency;
-    dto.channel = savedChart.channel;
     dto.createdAt = savedChart.createdAt;
     dto.updatedAt = savedChart.updatedAt;
+    dto.config = {
+      resourceType: savedChart.resourceType,
+      aggregationType: savedChart.aggregationType,
+      from: savedChart.from,
+      to: savedChart.to,
+      status: savedChart.status,
+      currency: savedChart.currency,
+      channel: savedChart.channel,
+    };
     return dto;
   }
 

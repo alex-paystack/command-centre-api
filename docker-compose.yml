@@ -20,6 +20,11 @@ services:
       - DATABASE_USERNAME=root
       - DATABASE_PASSWORD=root
       - DATABASE_NAME=command-centre-api
+      - REDIS_READ_URL=redis://redis:6379
+      - REDIS_WRITE_URL=redis://redis:6379
+      - REDIS_DB=0
+      - REDIS_USERNAME=
+      - REDIS_PASSWORD=
       - OTEL_SERVICE_NAME=command-centre-api
       - OTEL_SERVICE_VERSION=dev-local
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://grafana-otel:4318
@@ -32,6 +37,7 @@ services:
       - OTEL_LOG_LEVEL=INFO
     depends_on:
       - mongodb
+      - redis
     develop:
       watch:
         - path: .
@@ -63,6 +69,16 @@ services:
     networks:
       - paystack-net
     restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'no']
+    ports:
+      - '${HOST_REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis_data:/data
+    networks:
+      - paystack-net
+    restart: unless-stopped
   grafana-otel:
     image: grafana/otel-lgtm
     container_name: grafana-otel
@@ -75,6 +91,7 @@ services:
 
 volumes:
   mongodb_data:
+  redis_data:
 
 networks:
   # @TODO: create a network for the project as part of the init script

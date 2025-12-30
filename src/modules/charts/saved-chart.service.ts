@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { SavedChartRepository } from './repositories/saved-chart.repository';
 import { PaystackApiService } from '~/common/services/paystack-api.service';
 import { SaveChartDto } from './dto/save-chart.dto';
@@ -9,12 +9,15 @@ import { SavedChartWithDataResponseDto } from './dto/saved-chart-with-data-respo
 import { validateChartParams } from '~/common/ai/utilities/chart-validation';
 import { generateChartData, ChartGenerationState } from '~/common/ai/utilities/chart-generator';
 import { NotFoundError, ValidationError, ErrorCodes } from '~/common';
+import { ChartCacheService } from './chart-cache.service';
 
 @Injectable()
 export class SavedChartService {
+  private readonly logger = new Logger(SavedChartService.name);
   constructor(
     private readonly savedChartRepository: SavedChartRepository,
     private readonly paystackApiService: PaystackApiService,
+    private readonly chartCacheService: ChartCacheService,
   ) {}
 
   /**
@@ -22,6 +25,12 @@ export class SavedChartService {
    */
   async saveChart(dto: SaveChartDto, userId: string) {
     this.validateChartConfiguration(dto);
+
+    const existingChartByName = await this.savedChartRepository.findByNameForUser(dto.name, userId);
+
+    if (existingChartByName) {
+      throw new ValidationError('A saved chart with this name already exists', ErrorCodes.INVALID_PARAMS);
+    }
 
     const savedChart = await this.savedChartRepository.createSavedChart({
       userId,
@@ -34,6 +43,7 @@ export class SavedChartService {
       to: dto.to,
       status: dto.status,
       currency: dto.currency,
+      channel: dto.channel,
     });
 
     return SavedChartResponseDto.fromEntity(savedChart);
@@ -79,7 +89,16 @@ export class SavedChartService {
       this.validateChartConfiguration(chartConfig as SaveChartDto);
     }
 
-    // TODO: Consider caching the chart data and serving that if the params are the same
+    const cacheKey = this.chartCacheService.buildCacheKey(chartId, userId, chartConfig);
+
+    const cachedChart = await this.chartCacheService.safeGet<SavedChartWithDataResponseDto>(cacheKey);
+
+    if (cachedChart) {
+      this.logger.log(`Cached chart found for key ${cacheKey}`);
+
+      return cachedChart;
+    }
+
     const generator = generateChartData(chartConfig, this.paystackApiService, jwtToken);
 
     // Consume the generator to get the final result
@@ -95,15 +114,22 @@ export class SavedChartService {
     if (finalResult && 'success' in finalResult) {
       // Combine saved chart metadata with fresh data
       const response = SavedChartResponseDto.fromEntity(savedChart) as SavedChartWithDataResponseDto;
+      const updatedResponse: SavedChartWithDataResponseDto = {
+        ...response,
+        generated: {
+          label: finalResult.label,
+          chartType: finalResult.chartType,
+          chartData: finalResult.chartData,
+          chartSeries: finalResult.chartSeries,
+          summary: finalResult.summary,
+          message: finalResult.message,
+        },
+      };
 
-      response.label = finalResult.label;
-      response.chartType = finalResult.chartType;
-      response.chartData = finalResult.chartData;
-      response.chartSeries = finalResult.chartSeries;
-      response.summary = finalResult.summary;
-      response.message = finalResult.message;
+      this.logger.log(`Caching chart for key ${cacheKey}`);
+      await this.chartCacheService.safeSet(cacheKey, updatedResponse);
 
-      return response;
+      return updatedResponse;
     }
 
     throw new ValidationError('Failed to generate chart data', ErrorCodes.INVALID_PARAMS);

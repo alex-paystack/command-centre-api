@@ -26,7 +26,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @ApiTags('charts')
 @ApiBearerAuth()
 @Controller('charts')
-export class ChartsController {
+export class SavedChartsController {
   constructor(private readonly savedChartService: SavedChartService) {}
 
   @Post()
@@ -42,6 +42,7 @@ export class ChartsController {
     type: SavedChartResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Bad request - invalid chart configuration' })
+  @ApiResponse({ status: 400, description: 'Bad request - A saved chart with this name already exists' })
   async createSavedChart(@Body() dto: SaveChartDto, @CurrentUser() userId: string) {
     const savedChart = await this.savedChartService.saveChart(dto, userId);
     return PaystackResponse.success(savedChart, 'Chart saved successfully');

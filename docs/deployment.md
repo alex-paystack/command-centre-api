@@ -9,7 +9,7 @@ This document covers Docker setup, CI/CD pipelines, and production deployment.
 Start supporting services and run the application locally:
 
 ```bash
-# Start supporting services (MongoDB, Grafana OTEL)
+# Start supporting services (MongoDB, Redis, Grafana OTEL)
 docker-compose up -d
 
 # Run the application locally with hot reload
@@ -24,6 +24,7 @@ The `docker-compose.yml` includes:
 | -------------- | ---------------- | ---------------------------------------- |
 | `app`          | 3000             | Main application (development mode)      |
 | `mongodb`      | 27017            | MongoDB database                         |
+| `redis`        | 6379             | Redis cache for chart data               |
 | `grafana-otel` | 3001, 4317, 4318 | Grafana OTEL collector for observability |
 
 ### Production Build
@@ -109,6 +110,7 @@ Before deploying to production, ensure:
 
 - [ ] Set `NODE_ENV=production`
 - [ ] Configure production MongoDB connection
+- [ ] Configure production Redis connection (`REDIS_WRITE_URL`, `REDIS_READ_URL`)
 - [ ] Set secure `JWT_SECRET` (use crypto-generated value)
 - [ ] Set secure `OPENAI_API_KEY`
 - [ ] Configure `PAYSTACK_API_BASE_URL` for production
@@ -134,6 +136,14 @@ Before deploying to production, ensure:
 - [ ] Configure backup strategies
 - [ ] Set up database monitoring
 - [ ] Run pending migrations
+
+### Cache
+
+- [ ] Set up Redis with persistence (AOF or RDB)
+- [ ] Configure Redis password authentication
+- [ ] Set up Redis replica for read scalability (optional)
+- [ ] Configure Redis memory limits and eviction policy
+- [ ] Set up Redis monitoring
 
 ### Infrastructure
 

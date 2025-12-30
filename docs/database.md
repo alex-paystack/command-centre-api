@@ -125,6 +125,7 @@ Stores user-saved chart configurations that can be regenerated with fresh data. 
   to: string | undefined,                // End date (ISO format)
   status: string | undefined,            // Filter by status
   currency: string | undefined,          // Filter by currency
+  channel: string | undefined,           // Payment channel filter (transactions only)
   createdAt: Date,
   updatedAt: Date
 }
@@ -145,6 +146,7 @@ Stores user-saved chart configurations that can be regenerated with fresh data. 
 | `to`                        | string | null    | End date for time-based aggregations         |
 | `status`                    | string | null    | Status filter                                |
 | `currency`                  | string | null    | Currency filter                              |
+| `channel`                   | string | null    | Payment channel filter (transactions only)   |
 | `createdAt`                 | Date   | -       | Creation timestamp                           |
 | `updatedAt`                 | Date   | -       | Last update timestamp                        |
 
@@ -162,8 +164,9 @@ Stores user-saved chart configurations that can be regenerated with fresh data. 
 
 - **Standalone Resource**: Charts are not tied to conversations; optional `createdFromConversationId` tracks source for reference only
 - **Fresh Data**: Charts store configuration but regenerate data on retrieval
+- **Redis Caching**: Regenerated chart data is cached with 24-hour TTL for performance
 - **User Ownership**: All queries filter by `userId` for security
-- **Flexible Filters**: Supports date ranges, status, and currency filtering
+- **Flexible Filters**: Supports date ranges, status, currency, and payment channel filtering
 - **Immutable Configuration**: Only name and description can be updated after creation
 
 ## Data Retention & TTL
@@ -369,6 +372,7 @@ erDiagram
         string to "optional"
         string status "optional"
         string currency "optional"
+        string channel "optional"
         Date createdAt
         Date updatedAt
     }

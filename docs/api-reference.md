@@ -332,8 +332,12 @@ Deletes a conversation and all its messages.
 
 #### Response
 
-```bash
-204 No Content
+```json
+{
+  "status": true,
+  "message": "Conversation deleted successfully",
+  "data": null
+}
 ```
 
 ---
@@ -348,8 +352,14 @@ Deletes every conversation for the authenticated user.
 
 #### Response
 
-```bash
-204 No Content
+```json
+{
+  "status": true,
+  "message": "Conversations deleted successfully",
+  "data": {
+    "deleted": 5
+  }
+}
 ```
 
 ---
@@ -475,18 +485,18 @@ Saves a chart configuration with custom name and description. Charts are standal
 
 #### Parameters
 
-| Parameter                   | Type   | Required | Description                                                                      |
-| --------------------------- | ------ | -------- | -------------------------------------------------------------------------------- |
-| `name`                      | string | Yes      | Chart name (max 200 chars)                                                       |
-| `description`               | string | No       | Chart description (max 500 chars)                                                |
-| `createdFromConversationId` | UUID   | No       | Optional reference to source conversation                                        |
-| `resourceType`              | string | Yes      | One of: `transaction`, `refund`, `payout`, `dispute`                             |
-| `aggregationType`           | string | Yes      | Aggregation type (e.g., `by-day`, `by-week`, `by-status`, `by-channel`)          |
-| `from`                      | string | No       | Start date (ISO format)                                                          |
-| `to`                        | string | No       | End date (ISO format)                                                            |
-| `status`                    | string | No       | Filter by status                                                                 |
-| `currency`                  | string | No       | Filter by currency                                                               |
-| `channel`                   | string | No       | Payment channel filter (transactions only): `card`, `bank`, `mobile_money`, etc. |
+| Parameter                   | Type   | Required | Description                                                                            |
+| --------------------------- | ------ | -------- | -------------------------------------------------------------------------------------- |
+| `name`                      | string | Yes      | Chart name (max 200 chars)                                                             |
+| `description`               | string | No       | Chart description (max 500 chars)                                                      |
+| `createdFromConversationId` | UUID   | No       | Optional reference to source conversation                                              |
+| `resourceType`              | string | Yes      | One of: `transaction`, `refund`, `payout`, `dispute`                                   |
+| `aggregationType`           | string | Yes      | Aggregation type (e.g., `by-day`, `by-week`, `by-status`, `by-channel`)                |
+| `from`                      | string | No       | Start date (ISO format)                                                                |
+| `to`                        | string | No       | End date (ISO format)                                                                  |
+| `status`                    | string | No       | Filter by status                                                                       |
+| `currency`                  | string | No       | Filter by currency                                                                     |
+| `channel`                   | string | No       | Payment channel filter (transactions only): `card`, `bank`, `mobile_money`, `qr`, etc. |
 
 #### Response
 
@@ -505,6 +515,7 @@ Saves a chart configuration with custom name and description. Charts are standal
     "to": "2024-01-31",
     "status": "success",
     "currency": "NGN",
+    "channel": "card",
     "createdAt": "2024-01-01T00:00:00.000Z",
     "updatedAt": "2024-01-01T00:00:00.000Z"
   }
@@ -545,6 +556,7 @@ Retrieves all saved charts for the authenticated user, ordered by creation date 
       "to": "2024-01-31",
       "status": "success",
       "currency": "NGN",
+      "channel": null,
       "createdAt": "2024-01-01T00:00:00.000Z",
       "updatedAt": "2024-01-01T00:00:00.000Z"
     }
@@ -561,6 +573,8 @@ GET /charts/:id
 ```
 
 Retrieves a saved chart and regenerates it with fresh data from the Paystack API using the saved configuration. Query parameters can override filter values for flexible date ranges and filtering.
+
+**Caching**: Chart data is cached in Redis for 24 hours. Subsequent requests with the same parameters return cached data for optimal performance.
 
 #### Path Parameters
 
@@ -588,6 +602,13 @@ GET /charts/chart-123?from=2024-02-01&to=2024-02-29&status=success&currency=USD&
 
 This will regenerate the chart with February 2024 data, success status filter, USD currency, and bank channel filter, while keeping the original resourceType and aggregationType.
 
+**Caching Behavior:**
+
+- Each unique combination of parameters creates a separate cache entry
+- Cached data is valid for 24 hours
+- Changing any parameter (including query overrides) results in a new cache key
+- Cache misses trigger fresh data generation from Paystack API
+
 #### Response
 
 ```json
@@ -605,6 +626,7 @@ This will regenerate the chart with February 2024 data, success status filter, U
     "to": "2024-01-31",
     "status": "success",
     "currency": "NGN",
+    "channel": null,
     "createdAt": "2024-01-01T00:00:00.000Z",
     "updatedAt": "2024-01-01T00:00:00.000Z",
     "label": "Daily Transaction Metrics",

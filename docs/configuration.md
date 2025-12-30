@@ -11,6 +11,7 @@ These variables must be set for the application to run:
 ```env
 # Database Configuration
 DATABASE_HOST=mongodb
+DATABASE_PORT=27017
 DATABASE_USERNAME=root
 DATABASE_PASSWORD=root
 DATABASE_NAME=command-centre-api
@@ -26,6 +27,8 @@ JWT_EXPIRES_IN=24h
 NODE_ENV=development
 APP_NAME=command-centre-api
 APP_VERSION=1.0.0
+PORT=3000
+CORS_ORIGIN=*
 OTEL_SERVICE_NAME=command-centre-api
 OTEL_SERVICE_VERSION=1.0.0
 OTEL_SERVICE_ENV=local
@@ -38,6 +41,14 @@ These variables have sensible defaults but can be customized:
 ```env
 # Paystack API
 PAYSTACK_API_BASE_URL=https://studio-api.paystack.co
+
+# Redis Cache (for chart data caching)
+REDIS_WRITE_URL=redis://localhost:6379    # Redis write connection URL
+REDIS_READ_URL=redis://localhost:6379     # Redis read connection URL (defaults to REDIS_WRITE_URL if not set)
+REDIS_USERNAME=                            # Redis username (optional)
+REDIS_PASSWORD=                            # Redis password (optional)
+REDIS_DB=0                                 # Redis database number (default: 0)
+CACHE_TTL=10800000                         # Cache TTL in milliseconds (default: 3 hours)
 
 # Rate Limiting
 MESSAGE_LIMIT=100              # Maximum messages per user per period (default: 100)
@@ -141,6 +152,7 @@ The parent trace includes:
 | Variable                           | Required | Default                          | Description                               |
 | ---------------------------------- | -------- | -------------------------------- | ----------------------------------------- |
 | `DATABASE_HOST`                    | Yes      | -                                | MongoDB host                              |
+| `DATABASE_PORT`                    | No       | `27017`                          | MongoDB port                              |
 | `DATABASE_USERNAME`                | Yes      | -                                | MongoDB username                          |
 | `DATABASE_PASSWORD`                | Yes      | -                                | MongoDB password                          |
 | `DATABASE_NAME`                    | Yes      | -                                | Database name                             |
@@ -150,7 +162,15 @@ The parent trace includes:
 | `NODE_ENV`                         | No       | `development`                    | Environment mode                          |
 | `APP_NAME`                         | No       | `command-centre-api`             | Application name                          |
 | `APP_VERSION`                      | No       | `1.0.0`                          | Application version                       |
+| `PORT`                             | No       | `3000`                           | Application port                          |
+| `CORS_ORIGIN`                      | No       | `*`                              | CORS allowed origins (comma-separated)    |
 | `PAYSTACK_API_BASE_URL`            | No       | `https://studio-api.paystack.co` | Paystack API base URL                     |
+| `REDIS_WRITE_URL`                  | No       | `redis://localhost:6379`         | Redis write connection URL                |
+| `REDIS_READ_URL`                   | No       | `redis://localhost:6379`         | Redis read connection URL                 |
+| `REDIS_USERNAME`                   | No       | -                                | Redis authentication username             |
+| `REDIS_PASSWORD`                   | No       | -                                | Redis authentication password             |
+| `REDIS_DB`                         | No       | `0`                              | Redis database number                     |
+| `CACHE_TTL`                        | No       | `10800000`                       | Default cache TTL in milliseconds         |
 | `MESSAGE_LIMIT`                    | No       | `100`                            | Rate limit message count                  |
 | `RATE_LIMIT_PERIOD_HOURS`          | No       | `24`                             | Rate limit time window                    |
 | `MESSAGE_HISTORY_LIMIT`            | No       | `40`                             | AI context message limit                  |
@@ -170,6 +190,94 @@ The parent trace includes:
 | `LANGFUSE_FLUSH_AT`                | No       | `15`                             | Flush after N spans                       |
 | `LANGFUSE_FILTER_VERBOSE_METADATA` | No       | `true`                           | Filter verbose OTEL metadata from spans   |
 | `OTEL_SPAN_PROCESSORS_PATH`        | No       | -                                | Path to custom span processors hook file  |
+
+## Redis Cache
+
+The application uses Redis for caching regenerated chart data to improve performance and reduce API calls to Paystack API.
+
+### Configuration
+
+```env
+# Redis Connection
+REDIS_WRITE_URL=redis://localhost:6379    # Primary connection for writes
+REDIS_READ_URL=redis://localhost:6379     # Optional read replica (defaults to WRITE_URL)
+
+# Redis Authentication (if required)
+REDIS_USERNAME=your_redis_user            # Optional username
+REDIS_PASSWORD=your_redis_password        # Optional password
+
+# Redis Settings
+REDIS_DB=0                                # Database number (0-15)
+CACHE_TTL=10800000                        # Default TTL: 3 hours (in milliseconds)
+```
+
+### Cache Behavior
+
+**Saved Charts Caching:**
+
+- **Cache Key Format**: `saved-chart:{userId}:{chartId}:{configHash}`
+- **TTL**: 24 hours (hardcoded in `ChartCacheService`)
+- **Cache Invalidation**: Automatic via configuration hash - different parameters = different cache key
+- **Graceful Degradation**: Cache failures are logged but don't interrupt chart generation
+
+**How It Works:**
+
+1. When a chart is regenerated with `GET /charts/:id`, the service checks Redis first
+2. Cache key includes SHA-256 hash of the chart configuration (resourceType, aggregationType, filters)
+3. If cached data exists and hasn't expired, it's returned immediately
+4. If cache miss or expired, chart is regenerated from Paystack API and cached for 24 hours
+5. Query parameter overrides (from, to, status, currency, channel) create new cache keys automatically
+
+**Benefits:**
+
+- **Performance**: Instant chart retrieval for repeated requests with same parameters
+- **API Efficiency**: Reduces load on Paystack API
+- **User Experience**: Faster chart loading times
+
+**Environment-Specific Defaults:**
+
+```typescript
+// Development/Staging/Production
+REDIS_DB = 0; // Main database
+CACHE_TTL = 10800000; // 3 hours
+
+// Test/E2E
+REDIS_DB = 1; // Separate database
+CACHE_TTL = 3600000; // 1 hour
+```
+
+### Read/Write Split
+
+For production environments with Redis replicas:
+
+```env
+REDIS_WRITE_URL=redis://primary-redis:6379
+REDIS_READ_URL=redis://replica-redis:6379
+```
+
+If `REDIS_READ_URL` is not specified, both reads and writes use `REDIS_WRITE_URL`.
+
+### Redis Connection String Format
+
+```text
+redis://[username][:password]@host:port
+```
+
+**Examples:**
+
+```env
+# No authentication
+REDIS_WRITE_URL=redis://localhost:6379
+
+# With password
+REDIS_WRITE_URL=redis://:mypassword@redis-host:6379
+
+# With username and password
+REDIS_WRITE_URL=redis://myuser:mypassword@redis-host:6379
+
+# With TLS (rediss://)
+REDIS_WRITE_URL=rediss://myuser:mypassword@secure-redis:6380
+```
 
 ## Rate Limiting
 
@@ -274,7 +382,7 @@ The API uses intelligent token-based summarization to manage conversation contex
 - **Reset After Summary**: Token counter resets to 0 after each successful summarization
 - **Conversation Closure**: After `MAX_SUMMARIES` summaries, conversation closes (user can continue via new conversation with carried-over context)
 
-### Configuration
+### Summarization Settings
 
 ```env
 CONTEXT_WINDOW_SIZE=128000          # Model's max context window (gpt-4o-mini: 128k tokens)
@@ -282,7 +390,7 @@ TOKEN_THRESHOLD_PERCENTAGE=0.6      # Trigger at 60% of context window (76,800 t
 MAX_SUMMARIES=2                     # Close conversation after 2 summaries
 ```
 
-### Example Calculation
+### Threshold Calculation Example
 
 For `gpt-4o-mini` with default settings:
 
@@ -311,7 +419,7 @@ CONTEXT_WINDOW_SIZE=200000
 CONTEXT_WINDOW_SIZE=16000
 ```
 
-### Token Lifecycle
+### Token Usage Lifecycle
 
 ```text
 Conversation Start:

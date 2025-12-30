@@ -72,6 +72,18 @@ Manages saved chart configurations and regeneration:
 - Updates chart metadata (name, description)
 - Deletes saved charts with ownership verification
 - Validates chart configurations (aggregation types, date ranges)
+- Integrates with ChartCacheService for performance optimization
+
+### ChartCacheService
+
+Provides Redis-based caching for regenerated chart data:
+
+- **Cache Key Generation**: Creates deterministic cache keys using SHA-256 hash of chart configuration
+- **Configuration-Based Caching**: Cache keys include chart ID, user ID, and all filter parameters
+- **24-Hour TTL**: Cached chart data expires after 24 hours
+- **Graceful Degradation**: Silently falls back to regeneration if cache operations fail
+- **Safe Operations**: All cache operations (get/set) are wrapped with error handling
+- **Cache Invalidation**: Cache is invalidated when chart parameters change (automatic via hash-based keys)
 
 ### Telemetry Module
 
@@ -175,6 +187,7 @@ src/
 │ └── page-context.service.ts # Resource enrichment service
 ├── config/ # Configuration modules
 │ ├── database.config.ts
+│ ├── cache.config.ts # Redis cache configuration
 │ ├── jwt.config.ts
 │ └── helpers.ts
 ├── database/
@@ -200,16 +213,19 @@ src/
 │ │ └── chat.module.ts
 │ ├── charts/ # Saved charts module
 │ │ ├── dto/ # Data transfer objects
-│ │ │ ├── save-chart.dto.ts # Chart creation
-│ │ │ ├── update-chart.dto.ts # Chart metadata updates
+│ │ │ ├── save-chart.dto.ts # Chart creation with channel filter support
+│ │ │ ├── update-chart.dto.ts # Chart metadata updates  
+│ │ │ ├── chart-config.dto.ts # Chart generation config  
+│ │ │ ├── regenerate-chart-query.dto.ts # Query override parameters
 │ │ │ ├── saved-chart-response.dto.ts # Response format
 │ │ │ └── saved-chart-with-data-response.dto.ts # With regenerated data
 │ │ ├── entities/ # TypeORM entities
 │ │ │ └── saved-chart.entity.ts
 │ │ ├── repositories/ # Database repositories
 │ │ │ └── saved-chart.repository.ts
-│ │ ├── charts.controller.ts
+│ │ ├── saved-charts.controller.ts
 │ │ ├── saved-chart.service.ts # Chart CRUD and regeneration
+│ │ ├── chart-cache.service.ts # Redis-based chart caching
 │ │ └── charts.module.ts
 │ └── health/ # Health check endpoints
 ├── app.module.ts # Root module with global auth guard
@@ -222,6 +238,7 @@ src/
 | --------------------- | --------------------------------------- | ------------ |
 | **Framework**         | NestJS                                  | v11          |
 | **Database**          | MongoDB with TypeORM                    | v6.8 / v0.3  |
+| **Cache**             | Redis with @keyv/redis & cache-manager  | v7.2         |
 | **AI SDK**            | Vercel AI SDK with OpenAI               | v5.0.110     |
 | **Language**          | TypeScript                              | v5.7         |
 | **Validation**        | class-validator, class-transformer, Zod | v4.0         |

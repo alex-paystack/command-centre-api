@@ -252,6 +252,31 @@ This filtering ensures the AI only suggests actions that make sense in the curre
 
 The `generateChartData` tool provides powerful analytics capabilities across multiple resource types.
 
+### Chart Data Caching
+
+Chart regeneration from saved charts leverages Redis caching for optimal performance:
+
+- **Cache Duration**: 24 hours
+- **Cache Key**: Based on SHA-256 hash of chart configuration (resourceType, aggregationType, all filters)
+- **Automatic Invalidation**: Different filter values = different cache key
+- **Query Parameter Overrides**: Override `from`, `to`, `status`, `currency`, `channel` parameters dynamically
+- **Graceful Degradation**: Cache failures don't interrupt chart generation
+
+**How It Works:**
+
+1. User requests saved chart with `GET /charts/:id`
+2. System builds cache key from chart ID + user ID + configuration hash
+3. If cached data exists and is fresh (<24 hours), returns immediately
+4. If cache miss, regenerates from Paystack API and caches result
+5. Query parameters create new cache keys for flexible date ranges
+
+**Benefits:**
+
+- Instant chart loading for repeated requests
+- Reduced Paystack API calls
+- Lower infrastructure costs
+- Better user experience with faster responses
+
 ### Supported Resource Types & Aggregations
 
 | Resource        | Available Aggregations                                                            |
@@ -325,6 +350,7 @@ The `generateChartData` tool provides powerful analytics capabilities across mul
 - Resource-specific validation of aggregation types
 - **Centralized validation system** (`utilities/chart-validation.ts`) for consistent parameter validation
 - **Channel filtering** for transaction-specific payment channel analysis
+- **Redis caching** for saved chart regeneration with 24-hour TTL
 
 ## Guardrails & Classification
 

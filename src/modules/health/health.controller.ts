@@ -3,6 +3,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { NoLogClass, NoTraceClass } from '@paystackhq/nestjs-observability';
 import { HealthCheckService, HttpHealthIndicator, TypeOrmHealthIndicator } from '@nestjs/terminus';
 import { PaystackResponse, APIError } from '~/common';
+import { RedisHealthIndicator } from './redis.health';
 
 export type HealthDetails = {
   application: { status: 'up'; message: string };
@@ -18,6 +19,7 @@ export class HealthController {
     private health: HealthCheckService,
     private http: HttpHealthIndicator,
     private db: TypeOrmHealthIndicator,
+    private redis: RedisHealthIndicator,
   ) {}
 
   @Get()
@@ -53,6 +55,25 @@ export class HealthController {
         state.unhealthy = true;
         state.issueCode = state.issueCode ?? 'mongodb_unavailable';
         state.issueMessage = state.issueMessage ?? 'Mongodb is unavailable';
+      }
+    }
+
+    if (this.redis) {
+      const result = await this.redis.isHealthy('redis');
+
+      if (result.redis?.status === 'up') {
+        details['redis'] = {
+          status: 'up',
+          message: 'Redis connectivity is working as expected',
+        };
+      } else {
+        details['redis'] = {
+          status: 'down',
+          message: result.redis?.error ?? result.error ?? 'Redis health check failed',
+        };
+        state.unhealthy = true;
+        state.issueCode = state.issueCode ?? 'redis_unavailable';
+        state.issueMessage = state.issueMessage ?? 'Redis is unavailable';
       }
     }
 
