@@ -43,6 +43,19 @@ export class SavedChartRepository extends MongoRepository<SavedChart> {
   }
 
   /**
+   * Find a chart by name for a specific user (case-insensitive)
+   */
+  async findByNameForUser(name: string, userId: string) {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return this.findOne({
+      where: {
+        userId,
+        name: { $regex: new RegExp(`^${escaped}$`, 'i') },
+      },
+    });
+  }
+
+  /**
    * Update a saved chart's metadata (name and/or description)
    * Only the owner can update
    */

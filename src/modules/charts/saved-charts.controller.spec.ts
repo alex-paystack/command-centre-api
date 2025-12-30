@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { ExecutionContext } from '@nestjs/common';
-import { ChartsController } from './charts.controller';
+import { SavedChartsController } from './saved-charts.controller';
 import { NotFoundError, ValidationError } from '~/common';
 import { SavedChartService } from './saved-chart.service';
 import { SaveChartDto } from './dto/save-chart.dto';
@@ -11,8 +11,8 @@ import { SavedChartWithDataResponseDto } from './dto/saved-chart-with-data-respo
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ChartResourceType, AggregationType } from '~/common/ai/utilities/chart-config';
 
-describe('ChartsController', () => {
-  let controller: ChartsController;
+describe('SavedChartsController', () => {
+  let controller: SavedChartsController;
   let savedChartService: jest.Mocked<SavedChartService>;
 
   const mockUserId = 'user_123';
@@ -23,32 +23,46 @@ describe('ChartsController', () => {
     createdFromConversationId: 'conv_123',
     name: 'Test Chart',
     description: 'Test Description',
-    resourceType: ChartResourceType.TRANSACTION,
-    aggregationType: AggregationType.BY_DAY,
-    from: '2024-01-01',
-    to: '2024-01-31',
-    status: 'success',
-    currency: 'NGN',
+    config: {
+      resourceType: ChartResourceType.TRANSACTION,
+      aggregationType: AggregationType.BY_DAY,
+      from: '2024-01-01',
+      to: '2024-01-31',
+      status: 'success',
+      currency: 'NGN',
+      channel: undefined,
+    },
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
   };
 
   const mockSavedChartWithData: SavedChartWithDataResponseDto = {
     ...mockSavedChartResponse,
-    label: 'Daily Transaction Metrics',
-    chartType: 'area',
-    chartSeries: [
-      {
-        currency: 'NGN',
-        points: [{ name: 'Monday, Jan 1', count: 100, volume: 1000000, average: 10000, currency: 'NGN' }],
-      },
-    ],
-    summary: {
-      totalCount: 100,
-      totalVolume: 1000000,
-      overallAverage: 10000,
+    config: {
+      resourceType: ChartResourceType.TRANSACTION,
+      aggregationType: AggregationType.BY_DAY,
+      from: '2024-01-01',
+      to: '2024-01-31',
+      status: 'success',
+      currency: 'NGN',
+      channel: undefined,
     },
-    message: 'Generated chart data with 31 data points from 100 transactions',
+    generated: {
+      label: 'Daily Transaction Metrics',
+      chartType: 'area',
+      chartSeries: [
+        {
+          currency: 'NGN',
+          points: [{ name: 'Monday, Jan 1', count: 100, volume: 1000000, average: 10000, currency: 'NGN' }],
+        },
+      ],
+      summary: {
+        totalCount: 100,
+        totalVolume: 1000000,
+        overallAverage: 10000,
+      },
+      message: 'Generated chart data with 31 data points from 100 transactions',
+    },
   };
 
   beforeEach(async () => {
@@ -61,7 +75,7 @@ describe('ChartsController', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [ChartsController],
+      controllers: [SavedChartsController],
       providers: [
         {
           provide: SavedChartService,
@@ -79,7 +93,7 @@ describe('ChartsController', () => {
       })
       .compile();
 
-    controller = module.get<ChartsController>(ChartsController);
+    controller = module.get<SavedChartsController>(SavedChartsController);
     savedChartService = module.get(SavedChartService);
   });
 

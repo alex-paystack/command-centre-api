@@ -2,11 +2,8 @@ import { ApiProperty } from '@nestjs/swagger';
 import { SavedChartResponseDto } from './saved-chart-response.dto';
 import { ChartDataPoint, ChartSeries, ChartSummary } from '~/common/ai/utilities/aggregation';
 
-export class SavedChartWithDataResponseDto extends SavedChartResponseDto {
-  @ApiProperty({
-    description: 'Generated chart label',
-    example: 'Daily Transaction Metrics',
-  })
+export class ChartGeneratedDto {
+  @ApiProperty({ description: 'Generated chart label', example: 'Daily Transaction Metrics' })
   label: string;
 
   @ApiProperty({
@@ -54,4 +51,9 @@ export class SavedChartWithDataResponseDto extends SavedChartResponseDto {
     example: 'Generated chart data with 31 data points from 1500 transactions',
   })
   message: string;
+}
+
+export class SavedChartWithDataResponseDto extends SavedChartResponseDto {
+  @ApiProperty({ description: 'Generated chart result', type: ChartGeneratedDto })
+  generated: ChartGeneratedDto;
 }

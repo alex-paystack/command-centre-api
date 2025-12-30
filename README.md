@@ -27,6 +27,7 @@ Command Centre API is a NestJS-based backend service that powers an AI-driven me
 - Node.js v24.5.0
 - pnpm v10.14.0
 - MongoDB instance
+- Redis instance (for chart caching)
 - OpenAI API key
 
 ### Installation
@@ -54,6 +55,7 @@ DATABASE_HOST=mongodb
 DATABASE_USERNAME=root
 DATABASE_PASSWORD=root
 DATABASE_NAME=command-centre-api
+REDIS_WRITE_URL=redis://localhost:6379
 OPENAI_API_KEY=sk-your-openai-api-key
 JWT_SECRET=your-secret-key
 ```
@@ -80,6 +82,7 @@ See [Configuration Guide](./docs/configuration.md) for all options.
 | ----------------- | -------------------------------------------------- |
 | Framework         | NestJS v11                                         |
 | Database          | MongoDB with TypeORM                               |
+| Cache             | Redis with cache-manager v7.2                      |
 | AI                | Vercel AI SDK v5.0.110 with OpenAI                 |
 | Language          | TypeScript v5.7                                    |
 | Validation        | Zod v4.0, class-validator                          |
@@ -132,7 +135,7 @@ See [API Reference](./docs/api-reference.md) for complete documentation.
 
 ```bash
 # Development
-docker-compose up -d    # Start MongoDB & supporting services
+docker-compose up -d    # Start MongoDB, Redis & supporting services
 pnpm run start:dev      # Run app locally
 
 # Production

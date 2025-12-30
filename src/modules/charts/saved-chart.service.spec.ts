@@ -8,6 +8,8 @@ import { SavedChart } from './entities/saved-chart.entity';
 import { SaveChartDto } from './dto/save-chart.dto';
 import { UpdateChartDto } from './dto/update-chart.dto';
 import { ChartResourceType, AggregationType } from '~/common/ai/utilities/chart-config';
+import { ChartCacheService } from './chart-cache.service';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
 jest.mock('~/common/ai/utilities/chart-generator', () => ({
   generateChartData: jest.fn(),
@@ -18,6 +20,10 @@ import { generateChartData } from '~/common/ai/utilities/chart-generator';
 describe('SavedChartService', () => {
   let service: SavedChartService;
   let savedChartRepository: jest.Mocked<SavedChartRepository>;
+  const mockCacheManager = {
+    get: jest.fn(),
+    set: jest.fn(),
+  };
 
   const mockSavedChart: SavedChart = {
     _id: {} as SavedChart['_id'],
@@ -44,6 +50,7 @@ describe('SavedChartService', () => {
       findByIdAndUserId: jest.fn(),
       updateSavedChart: jest.fn(),
       deleteByIdForUser: jest.fn(),
+      findByNameForUser: jest.fn(),
     };
 
     const mockPaystackApiService = {
@@ -53,6 +60,7 @@ describe('SavedChartService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SavedChartService,
+        ChartCacheService,
         {
           provide: SavedChartRepository,
           useValue: mockSavedChartRepository,
@@ -60,6 +68,10 @@ describe('SavedChartService', () => {
         {
           provide: PaystackApiService,
           useValue: mockPaystackApiService,
+        },
+        {
+          provide: CACHE_MANAGER,
+          useValue: mockCacheManager,
         },
       ],
     }).compile();
@@ -86,6 +98,7 @@ describe('SavedChartService', () => {
     };
 
     it('should save a chart successfully', async () => {
+      savedChartRepository.findByNameForUser.mockResolvedValue(null);
       savedChartRepository.createSavedChart.mockResolvedValue(mockSavedChart);
 
       const result = await service.saveChart(saveChartDto, 'user-123');
@@ -105,7 +118,15 @@ describe('SavedChartService', () => {
       expect(result).toEqual(expect.objectContaining({ id: 'chart-123', name: 'Test Chart' }));
     });
 
+    it('should throw ValidationError when name already exists for user', async () => {
+      savedChartRepository.findByNameForUser.mockResolvedValue(mockSavedChart);
+
+      await expect(service.saveChart(saveChartDto, 'user-123')).rejects.toThrow(ValidationError);
+      expect(savedChartRepository.createSavedChart).not.toHaveBeenCalled();
+    });
+
     it('should save a chart without conversation reference', async () => {
+      savedChartRepository.findByNameForUser.mockResolvedValue(null);
       const dtoWithoutConversation = { ...saveChartDto };
       delete dtoWithoutConversation.createdFromConversationId;
 
@@ -128,6 +149,7 @@ describe('SavedChartService', () => {
     });
 
     it('should throw ValidationError for invalid aggregation type', async () => {
+      savedChartRepository.findByNameForUser.mockResolvedValue(null);
       const invalidDto = {
         ...saveChartDto,
         aggregationType: AggregationType.BY_TYPE, // Invalid for transactions
@@ -138,6 +160,7 @@ describe('SavedChartService', () => {
     });
 
     it('should throw ValidationError for invalid status', async () => {
+      savedChartRepository.findByNameForUser.mockResolvedValue(null);
       const invalidDto = {
         ...saveChartDto,
         status: 'invalid-status',
@@ -148,6 +171,7 @@ describe('SavedChartService', () => {
     });
 
     it('should throw ValidationError for date range exceeding 30 days', async () => {
+      savedChartRepository.findByNameForUser.mockResolvedValue(null);
       const invalidDto = {
         ...saveChartDto,
         from: '2024-01-01',
@@ -184,6 +208,7 @@ describe('SavedChartService', () => {
       success: true,
       label: 'Daily Transaction Metrics',
       chartType: 'area',
+      chartData: [],
       chartSeries: [],
       summary: {
         totalCount: 100,
@@ -207,13 +232,11 @@ describe('SavedChartService', () => {
 
       expect(savedChartRepository.findByIdAndUserId).toHaveBeenCalledWith('chart-123', 'user-123');
       expect(generateChartData).toHaveBeenCalled();
-      expect(result).toEqual(
-        expect.objectContaining({
-          id: 'chart-123',
-          label: 'Daily Transaction Metrics',
-          chartType: 'area',
-        }),
-      );
+      expect(result.id).toBe('chart-123');
+      expect(result.config?.resourceType).toBe(mockSavedChart.resourceType);
+      expect(result.config?.aggregationType).toBe(mockSavedChart.aggregationType);
+      expect(result.generated?.label).toBe('Daily Transaction Metrics');
+      expect(result.generated?.chartType).toBe('area');
     });
 
     it('should throw NotFoundError if chart does not exist', async () => {
@@ -255,6 +278,7 @@ describe('SavedChartService', () => {
           to: '2024-02-29',
           status: 'failed',
           currency: 'USD',
+          channel: mockSavedChart.channel,
         },
         expect.anything(),
         'jwt-token',
