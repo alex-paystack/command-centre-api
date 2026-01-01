@@ -60,14 +60,15 @@ The assistant can only operate on merchant data exposed by these tools (all requ
 
 ### Data Retrieval Tools
 
-| Tool                | Description                    | Key Filters                                       |
-| ------------------- | ------------------------------ | ------------------------------------------------- |
-| `getTransactions`   | Fetch payment transactions     | status, channel, customer, date, amount, currency |
-| `getCustomers`      | List/search customers          | email, accountNumber, pagination                  |
-| `getRefunds`        | Fetch refund data              | status, date, amount (with operators: gt, lt, eq) |
-| `getPayouts`        | Fetch payout/settlement data   | status, date, subaccount                          |
-| `getDisputes`       | Fetch dispute data             | status, date, transaction, category               |
-| `generateChartData` | Generate chart-ready analytics | resourceType, aggregationType, date range         |
+| Tool                | Description                            | Key Filters                                       |
+| ------------------- | -------------------------------------- | ------------------------------------------------- |
+| `getTransactions`   | Fetch payment transactions             | status, channel, customer, date, amount, currency |
+| `getCustomers`      | List/search customers                  | email, accountNumber, pagination                  |
+| `getRefunds`        | Fetch refund data                      | status, date, amount (with operators: gt, lt, eq) |
+| `getPayouts`        | Fetch payout/settlement data           | status, date, subaccount                          |
+| `getDisputes`       | Fetch dispute data                     | status, date, transaction, category               |
+| `getFeatureState`   | Query dashboard feature configurations | integrationId, feature name/synonym, includeRag   |
+| `generateChartData` | Generate chart-ready analytics         | resourceType, aggregationType, date range         |
 
 ### Data Export Tools
 
@@ -140,6 +141,163 @@ Filter validation is automatic and internal - no API or configuration changes re
 
 - `src/common/ai/utilities/retreival-filter-validation.ts` - Filter constants and validation functions
 - Applied automatically in all retrieval tool execute functions
+
+### Feature State Inspection
+
+The `getFeatureState` tool provides intelligent feature discovery and configuration inspection for dashboard features. It combines natural language processing, rule-based state evaluation, and integration data caching to help merchants understand their feature configurations.
+
+**How It Works:**
+
+1. **Feature Resolution**: Uses BM25 search algorithm to match natural language queries to specific features
+   - Indexes feature slug, name, synonyms, and dashboard path for comprehensive matching
+   - Supports exact matches, partial matches, and fuzzy matching with confidence scoring
+   - Example: "transfer approval" → `transfer-approval` feature
+
+2. **Integration Data Fetching**: Retrieves merchant integration data from `/integration/:id` endpoint
+   - Caches responses for 24 hours to reduce API calls
+   - Includes data age tracking for freshness awareness
+
+3. **State Evaluation**: Evaluates feature state rules using JSON logic expressions
+   - Rules defined in versioned feature map ontology
+   - Sequential evaluation with first-match-wins strategy
+   - Dynamic detail interpolation with actual data values
+
+4. **Response Generation**: Returns comprehensive feature information
+   - Feature metadata (slug, name, dashboard path)
+   - Current state with details and matched rule ID
+   - RAG-enhanced description (placeholder for future implementation)
+   - Provenance information (ontology version, matched rule)
+
+**Feature Map Structure:**
+
+The feature map is a versioned knowledge base defining dashboard features:
+
+```typescript
+{
+  _meta: {
+    version: "0.1.0",
+    updated_at: "2025-12-26"
+  },
+  features: [
+    {
+      slug: "transfer-approval",
+      name: "Transfer Approval",
+      synonyms: ["approval flow", "payout approvals", "dual approval"],
+      dashboard_path: "/dashboard/transfers/approvals",
+      description_rag_key: "support:transfer-approval",
+      fields: [
+        { path: "transfer_approval.enabled", type: "boolean" },
+        { path: "transfer_approval.level", type: "enum", values: ["single", "dual"] }
+      ],
+      state_rules: [
+        {
+          id: "dual-on",
+          when: 'transfer_approval?.enabled === true && transfer_approval?.level === "dual"',
+          state: "enabled",
+          details: "Dual approval required; min {{transfer_approval.min_amount}}."
+        }
+      ]
+    }
+  ]
+}
+```
+
+**State Rules:**
+
+Rules are evaluated sequentially using JavaScript expression evaluation:
+
+- **`id`**: Unique identifier for the rule
+- **`when`**: Boolean expression evaluated against integration data (supports optional chaining, logical operators)
+- **`state`**: State value returned when rule matches (e.g., "enabled", "disabled", "scheduled")
+- **`details`**: Template string with `{{path}}` interpolation for dynamic values
+
+**BM25 Resolver:**
+
+The resolver uses standard BM25 algorithm (k1=1.5, b=0.75) with guardrails:
+
+- **Exact Match**: Returns immediately with score 1.0 if slug matches exactly
+- **Starts-With Match**: Returns with score 0.95 if slug starts with query
+- **Fuzzy Match**: Runs BM25 scoring across all indexed terms
+- **Minimum Score**: Returns `null` if best match is below threshold (default: 0.1)
+
+**Example Usage:**
+
+```json
+{
+  "integrationId": "int_abc123",
+  "feature": "transfer approval",
+  "includeRag": true
+}
+```
+
+**Example Response:**
+
+```json
+{
+  "success": true,
+  "feature": {
+    "slug": "transfer-approval",
+    "name": "Transfer Approval",
+    "dashboard_path": "/dashboard/transfers/approvals"
+  },
+  "state": {
+    "state": "enabled",
+    "details": "Dual approval required for transfers; min amount 100000.",
+    "ruleId": "dual-on",
+    "dataAgeSeconds": 120
+  },
+  "description": "Description for support:transfer-approval (stub).",
+  "provenance": {
+    "ontologyVersion": "0.1.0",
+    "ruleEngine": "expression",
+    "matchedRule": "dual-on"
+  }
+}
+```
+
+**Current Features:**
+
+| Feature Slug          | Feature Name        | Synonyms                                       |
+| --------------------- | ------------------- | ---------------------------------------------- |
+| `transfer-approval`   | Transfer Approval   | approval flow, payout approvals, dual approval |
+| `settlement-schedule` | Settlement Schedule | payout schedule, settlement timing, frequency  |
+
+**Integration Caching:**
+
+- **Cache Key**: `integration:{integrationId}`
+- **TTL**: 24 hours (via `CacheService.DEFAULT_TTL_MS`)
+- **Cache Structure**: `{ data: Record<string, unknown>, fetchedAt: number }`
+- **Fallback**: If integration API fails, returns description only without state
+
+**Benefits:**
+
+- **Natural Language Queries**: Merchants can ask about features using common terms
+- **State Awareness**: Provides actual configuration state, not just documentation
+- **Navigation Hints**: Includes dashboard path for direct navigation to settings
+- **Data Freshness**: Tracks when integration data was last fetched
+- **Extensible**: Easy to add new features by updating the feature map
+- **Performance**: Caching reduces redundant API calls for integration data
+
+**Adding New Features:**
+
+To add a new feature to the knowledge base:
+
+1. Add feature definition to `src/common/ai/knowledge/feature-map.ts`
+2. Define fields with paths and types from integration payload
+3. Write state rules as JavaScript expressions with optional chaining
+4. Add synonyms for better natural language matching
+5. Specify dashboard path for navigation
+6. Set RAG key for future description enhancement
+
+**Key Implementation Files:**
+
+- `src/common/ai/tools/feature-state.ts` - Feature state AI tool
+- `src/common/ai/knowledge/feature-map.ts` - Feature map ontology
+- `src/common/ai/search/feature-bm25.ts` - BM25 resolver
+- `src/common/ai/logic/json-logic-runner.ts` - Expression evaluator
+- `src/common/ai/utils/interpolate.ts` - Template interpolation
+- `src/common/ai/types/feature.ts` - Type definitions
+- `src/common/services/cache.service.ts` - Caching service
 
 ### Response Sanitization for Token Efficiency
 
@@ -238,15 +396,15 @@ Adding sanitization for new resource types requires:
 
 In page-scoped mode, tools are automatically filtered based on the resource type:
 
-| Resource Type   | Available Tools                                       |
-| --------------- | ----------------------------------------------------- |
-| **Transaction** | `getCustomers`, `getRefunds`, `getDisputes`           |
-| **Customer**    | `getTransactions`, `getRefunds`, `exportTransactions` |
-| **Refund**      | `getTransactions`, `getCustomers`                     |
-| **Payout**      | `getTransactions`                                     |
-| **Dispute**     | `getTransactions`, `getCustomers`, `getRefunds`       |
+| Resource Type   | Available Tools                                                          |
+| --------------- | ------------------------------------------------------------------------ |
+| **Transaction** | `getCustomers`, `getRefunds`, `getDisputes`, `getFeatureState`           |
+| **Customer**    | `getTransactions`, `getRefunds`, `exportTransactions`, `getFeatureState` |
+| **Refund**      | `getTransactions`, `getCustomers`, `getFeatureState`                     |
+| **Payout**      | `getTransactions`, `getFeatureState`                                     |
+| **Dispute**     | `getTransactions`, `getCustomers`, `getRefunds`, `getFeatureState`       |
 
-This filtering ensures the AI only suggests actions that make sense in the current context.
+This filtering ensures the AI only suggests actions that make sense in the current context. The `getFeatureState` tool is available in all page-scoped modes to help merchants understand dashboard feature configurations.
 
 ## Charting & Aggregation
 

@@ -7,9 +7,9 @@ import { PaystackApiService } from '~/common/services/paystack-api.service';
 import { SavedChart } from './entities/saved-chart.entity';
 import { SaveChartDto } from './dto/save-chart.dto';
 import { UpdateChartDto } from './dto/update-chart.dto';
+import { SavedChartWithDataResponseDto } from './dto/saved-chart-with-data-response.dto';
 import { ChartResourceType, AggregationType } from '~/common/ai/utilities/chart-config';
-import { ChartCacheService } from './chart-cache.service';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { CacheService } from '~/common/services/cache.service';
 
 jest.mock('~/common/ai/utilities/chart-generator', () => ({
   generateChartData: jest.fn(),
@@ -20,10 +20,10 @@ import { generateChartData } from '~/common/ai/utilities/chart-generator';
 describe('SavedChartService', () => {
   let service: SavedChartService;
   let savedChartRepository: jest.Mocked<SavedChartRepository>;
-  const mockCacheManager = {
-    get: jest.fn(),
-    set: jest.fn(),
-  };
+  const mockCacheService = {
+    safeGet: jest.fn(),
+    safeSet: jest.fn(),
+  } as unknown as jest.Mocked<CacheService>;
 
   const mockSavedChart: SavedChart = {
     _id: {} as SavedChart['_id'],
@@ -60,7 +60,10 @@ describe('SavedChartService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SavedChartService,
-        ChartCacheService,
+        {
+          provide: CacheService,
+          useValue: mockCacheService,
+        },
         {
           provide: SavedChartRepository,
           useValue: mockSavedChartRepository,
@@ -68,10 +71,6 @@ describe('SavedChartService', () => {
         {
           provide: PaystackApiService,
           useValue: mockPaystackApiService,
-        },
-        {
-          provide: CACHE_MANAGER,
-          useValue: mockCacheManager,
         },
       ],
     }).compile();
@@ -355,6 +354,18 @@ describe('SavedChartService', () => {
       await expect(service.getSavedChartWithData('chart-123', 'user-123', 'jwt-token', queryOverrides)).rejects.toThrow(
         ValidationError,
       );
+    });
+
+    it('should return cached chart when available without regenerating', async () => {
+      savedChartRepository.findByIdAndUserId.mockResolvedValue(mockSavedChart);
+      const cached = { id: 'chart-123', cached: true } as unknown as SavedChartWithDataResponseDto;
+      mockCacheService.safeGet.mockResolvedValueOnce(cached);
+
+      const result = await service.getSavedChartWithData('chart-123', 'user-123', 'jwt-token');
+
+      expect(result).toBe(cached);
+      expect(generateChartData).not.toHaveBeenCalled();
+      expect(mockCacheService.safeSet).not.toHaveBeenCalled();
     });
   });
 

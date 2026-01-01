@@ -62,9 +62,10 @@ AI tools are organized by category in `src/common/ai/tools/`:
 - **`retrieval.ts`** - Data fetching tools (`getTransactions`, `getCustomers`, etc.)
 - **`export.ts`** - Data export tools (`exportTransactions`, `exportRefunds`, etc.)
 - **`visualization.ts`** - Chart generation (`generateChartData`)
+- **`feature-state.ts`** - Feature state inspection (`getFeatureState`)
 - **`index.ts`** - Tool orchestration and page-scoped filtering
 
-Tools are factory functions that receive `PaystackApiService` and `getAuthenticatedUser()` to ensure JWT passthrough authentication.
+Tools are factory functions that receive `PaystackApiService` and `getAuthenticatedUser()` to ensure JWT passthrough authentication. Some tools (like `getFeatureState`) also accept an optional `CacheService` for performance optimization.
 
 ### Dual Chat Mode System
 
@@ -136,6 +137,43 @@ Charts are generated via utilities in `src/common/ai/utilities/`:
 - **Validation**: 30-day max date range, resource-specific aggregation type validation, channel filter validation
 - **Recharts-compatible** output format with comprehensive summary statistics
 
+### Feature State System
+
+The feature state system provides intelligent dashboard feature discovery and configuration inspection:
+
+- **Feature Map**: Versioned knowledge base in `src/common/ai/knowledge/feature-map.ts` defines features, synonyms, dashboard paths, and state rules
+- **BM25 Resolver**: `src/common/ai/search/feature-bm25.ts` matches natural language queries to features using BM25 algorithm with exact/starts-with/fuzzy matching
+- **JSON Logic Runner**: `src/common/ai/logic/json-logic-runner.ts` evaluates JavaScript expressions against integration data to determine feature states
+- **Template Interpolation**: `src/common/ai/utils/interpolate.ts` enables dynamic detail messages with `{{path}}` syntax
+- **Integration Caching**: Uses `CacheService` to cache `/integration/:id` responses for 24 hours
+- **Provenance Tracking**: Returns ontology version, matched rule ID, and data age for transparency
+
+**Current Features:**
+
+- `transfer-approval` - Transfer approval settings (single/dual approval)
+- `settlement-schedule` - Settlement schedule configuration (daily/weekly/monthly/manual)
+
+**Key Components:**
+
+- `src/common/ai/tools/feature-state.ts` - AI tool implementation
+- `src/common/ai/knowledge/feature-map.ts` - Feature ontology
+- `src/common/ai/search/feature-bm25.ts` - Feature matching
+- `src/common/ai/logic/json-logic-runner.ts` - Rule evaluation
+- `src/common/ai/utils/interpolate.ts` - Template interpolation
+- `src/common/ai/types/feature.ts` - Type definitions
+- `src/common/services/cache.service.ts` - Caching service
+
+### CacheService
+
+The `CacheService` is a shared service located in `src/common/services/cache.service.ts` that provides Redis-based caching:
+
+- **Default TTL**: 24 hours for all cached data
+- **Safe Operations**: `safeGet()` and `safeSet()` methods with error handling and graceful degradation
+- **Used By**: SavedChartService (chart data), Feature State tool (integration data)
+- **Error Resilience**: Cache failures are logged but don't interrupt application flow
+
+**Important**: The cache service was moved from the charts module to common services for app-wide usage.
+
 ## Development Patterns
 
 ### Adding a New AI Tool
@@ -190,6 +228,65 @@ export function createMyTool(paystackService: PaystackApiService, getAuthenticat
 3. Add formatting in `PageContextService.formatResourceData()`
 4. Update `RESOURCE_TOOL_MAP` in `tools/index.ts`
 5. Add TypeScript interface in `types/index.ts`
+
+### Adding a Feature to the Feature Map
+
+To add a new dashboard feature to the feature state system:
+
+1. Add feature definition to `featureMap.features` array in `src/common/ai/knowledge/feature-map.ts`
+2. Define feature metadata:
+   - `slug`: URL-safe identifier (e.g., "transfer-approval")
+   - `name`: Display name (e.g., "Transfer Approval")
+   - `synonyms`: Alternative names for natural language matching
+   - `dashboard_path`: Path to feature settings page
+   - `description_rag_key`: Key for RAG description lookup (future use)
+3. Define `fields` with paths from integration payload:
+   - `path`: Dot-notation path (e.g., "transfer_approval.enabled")
+   - `type`: Field type (boolean, enum, number, string, object)
+   - `values`: Optional enum values for validation
+4. Write `state_rules` using JavaScript expressions:
+   - `id`: Unique rule identifier
+   - `when`: Boolean expression evaluated against integration data (use optional chaining for safety)
+   - `state`: State value when rule matches (e.g., "enabled", "disabled")
+   - `details`: Template string with `{{path}}` interpolation for dynamic values
+5. Update `_meta.version` and `_meta.updated_at` when modifying the feature map
+6. Write tests in `src/common/ai/tools/feature-state.spec.ts`
+
+**Example Feature Definition**:
+
+```typescript
+{
+  slug: "settlement-schedule",
+  name: "Settlement Schedule",
+  synonyms: ["payout schedule", "settlement timing"],
+  dashboard_path: "/dashboard/settlements",
+  description_rag_key: "support:settlement-schedule",
+  fields: [
+    { path: "settlement.schedule", type: "enum", values: ["daily", "weekly", "monthly", "manual"] }
+  ],
+  state_rules: [
+    {
+      id: "manual",
+      when: 'settlement?.schedule === "manual"',
+      state: "manual",
+      details: "Settlements are manual. Trigger payouts from the dashboard."
+    },
+    {
+      id: "scheduled",
+      when: '["daily", "weekly", "monthly"].includes(settlement?.schedule)',
+      state: "scheduled",
+      details: "Settlements run on a {{settlement.schedule}} cadence."
+    }
+  ]
+}
+```
+
+**Important Notes**:
+
+- Rules are evaluated sequentially; first match wins
+- Use optional chaining (`?.`) in expressions to handle missing fields safely
+- Template interpolation supports dot-notation paths and handles undefined/null values
+- The feature map is validated against Zod schemas at runtime
 
 ### Using Chart Validation
 

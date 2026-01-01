@@ -72,18 +72,74 @@ Manages saved chart configurations and regeneration:
 - Updates chart metadata (name, description)
 - Deletes saved charts with ownership verification
 - Validates chart configurations (aggregation types, date ranges)
-- Integrates with ChartCacheService for performance optimization
+- Integrates with CacheService for performance optimization
 
-### ChartCacheService
+### CacheService
 
-Provides Redis-based caching for regenerated chart data:
+Provides Redis-based caching for performance optimization across the application:
 
-- **Cache Key Generation**: Creates deterministic cache keys using SHA-256 hash of chart configuration
-- **Configuration-Based Caching**: Cache keys include chart ID, user ID, and all filter parameters
-- **24-Hour TTL**: Cached chart data expires after 24 hours
-- **Graceful Degradation**: Silently falls back to regeneration if cache operations fail
-- **Safe Operations**: All cache operations (get/set) are wrapped with error handling
-- **Cache Invalidation**: Cache is invalidated when chart parameters change (automatic via hash-based keys)
+- **Shared Service**: Located in `src/common/services/cache.service.ts` for app-wide usage
+- **Safe Operations**: All cache operations (get/set) wrapped with error handling and graceful degradation
+- **Default TTL**: 24-hour default TTL for cached data (configurable per operation)
+- **Error Resilience**: Cache failures logged but don't interrupt application flow
+- **Used By**: SavedChartService (chart data caching), Feature State tool (integration data caching)
+- **Cache Key Generation**: Services build deterministic cache keys for consistent lookups
+- **Configuration-Based Caching**: Cache keys include relevant identifiers (user ID, resource ID, config hash)
+
+### Feature State System
+
+Provides intelligent dashboard feature discovery and state inspection via AI tools:
+
+- **Feature Resolution**: BM25-based search resolves natural language queries to specific features (e.g., "transfer approval" → `transfer-approval`)
+- **State Evaluation**: JSON logic runner evaluates feature state rules against merchant integration data
+- **Knowledge Base**: Versioned feature map ontology defines features, fields, and state rules
+- **Template Interpolation**: Dynamic detail messages with data interpolation (e.g., "min amount {{transfer_approval.min_amount}}")
+- **Integration Caching**: Caches integration API responses to reduce redundant calls
+- **RAG Ready**: Placeholder for future RAG integration for feature descriptions
+- **Provenance Tracking**: Returns matched rule ID, ontology version, and data freshness
+
+**Key Components:**
+
+- `src/common/ai/tools/feature-state.ts` - AI tool for querying feature states
+- `src/common/ai/knowledge/feature-map.ts` - Versioned feature ontology with state rules
+- `src/common/ai/search/feature-bm25.ts` - BM25 resolver for feature matching
+- `src/common/ai/logic/json-logic-runner.ts` - Expression evaluator for state rules
+- `src/common/ai/utils/interpolate.ts` - Template interpolation utility
+- `src/common/ai/types/feature.ts` - Type definitions for features and states
+
+**How It Works:**
+
+1. User queries about a feature (e.g., "What's my transfer approval setting?")
+2. BM25 resolver matches query to feature slug using indexed terms (slug, name, synonyms, dashboard_path)
+3. System fetches integration data from Paystack API (cached for 24 hours)
+4. JSON logic runner evaluates state rules against integration payload
+5. Template engine interpolates dynamic values into detail messages
+6. Returns feature state, dashboard path, description (via RAG placeholder), and provenance
+
+**Example Feature State Response:**
+
+```json
+{
+  "success": true,
+  "feature": {
+    "slug": "transfer-approval",
+    "name": "Transfer Approval",
+    "dashboard_path": "/dashboard/transfers/approvals"
+  },
+  "state": {
+    "state": "enabled",
+    "details": "Dual approval required for transfers; min amount 100000.",
+    "ruleId": "dual-on",
+    "dataAgeSeconds": 120
+  },
+  "description": "Description for support:transfer-approval (stub).",
+  "provenance": {
+    "ontologyVersion": "0.1.0",
+    "ruleEngine": "expression",
+    "matchedRule": "dual-on"
+  }
+}
+```
 
 ### Telemetry Module
 
@@ -165,8 +221,10 @@ src/
 │ │ │ ├── retrieval.ts # Data retrieval tools (get*)
 │ │ │ ├── export.ts # Data export tools (export*)
 │ │ │ ├── visualization.ts # Chart generation tools
+│ │ │ ├── feature-state.ts # Feature state inspection tool
 │ │ │ ├── export-tools.spec.ts # Export tools tests
 │ │ │ ├── retrieval-tools.spec.ts # Retrieval tools tests
+│ │ │ ├── feature-state.spec.ts # Feature state tool tests
 │ │ │ └── page-scoped-tools.spec.ts # Page-scoped filtering tests
 │ │ ├── sanitization/ # Response sanitization for token efficiency
 │ │ │ ├── index.ts # Public API exports
@@ -174,9 +232,18 @@ src/
 │ │ │ ├── config.ts # Field configurations per resource type
 │ │ │ ├── sanitizer.ts # Core sanitization engine
 │ │ │ └── sanitizer.spec.ts # Sanitization tests
+│ │ ├── knowledge/ # Feature knowledge base
+│ │ │ └── feature-map.ts # Versioned feature ontology
+│ │ ├── logic/ # Rule evaluation engines
+│ │ │ └── json-logic-runner.ts # Expression evaluator for feature rules
+│ │ ├── search/ # Search and matching algorithms
+│ │ │ └── feature-bm25.ts # BM25 resolver for feature matching
+│ │ ├── utils/ # AI utility functions
+│ │ │ └── interpolate.ts # Template interpolation utility
 │ │ ├── types/ # TypeScript types for Paystack resources
 │ │ │ ├── index.ts # Main type exports
-│ │ │ └── data.ts # Enums and data types
+│ │ │ ├── data.ts # Enums and data types
+│ │ │ └── feature.ts # Feature state types
 │ │ └── index.ts
 │ ├── exceptions/ # Custom exceptions and global filters
 │ ├── helpers/ # Shared utilities
@@ -184,7 +251,8 @@ src/
 │ └── services/
 │ ├── paystack-api.service.ts # Paystack API integration
 │ ├── paystack.module.ts # Shared Paystack module
-│ └── page-context.service.ts # Resource enrichment service
+│ ├── page-context.service.ts # Resource enrichment service
+│ └── cache.service.ts # Redis caching service
 ├── config/ # Configuration modules
 │ ├── database.config.ts
 │ ├── cache.config.ts # Redis cache configuration
@@ -214,8 +282,8 @@ src/
 │ ├── charts/ # Saved charts module
 │ │ ├── dto/ # Data transfer objects
 │ │ │ ├── save-chart.dto.ts # Chart creation with channel filter support
-│ │ │ ├── update-chart.dto.ts # Chart metadata updates  
-│ │ │ ├── chart-config.dto.ts # Chart generation config  
+│ │ │ ├── update-chart.dto.ts # Chart metadata updates
+│ │ │ ├── chart-config.dto.ts # Chart generation config
 │ │ │ ├── regenerate-chart-query.dto.ts # Query override parameters
 │ │ │ ├── saved-chart-response.dto.ts # Response format
 │ │ │ └── saved-chart-with-data-response.dto.ts # With regenerated data
@@ -225,7 +293,6 @@ src/
 │ │ │ └── saved-chart.repository.ts
 │ │ ├── saved-charts.controller.ts
 │ │ ├── saved-chart.service.ts # Chart CRUD and regeneration
-│ │ ├── chart-cache.service.ts # Redis-based chart caching
 │ │ └── charts.module.ts
 │ └── health/ # Health check endpoints
 ├── app.module.ts # Root module with global auth guard

@@ -9,7 +9,9 @@ import { SavedChartWithDataResponseDto } from './dto/saved-chart-with-data-respo
 import { validateChartParams } from '~/common/ai/utilities/chart-validation';
 import { generateChartData, ChartGenerationState } from '~/common/ai/utilities/chart-generator';
 import { NotFoundError, ValidationError, ErrorCodes } from '~/common';
-import { ChartCacheService } from './chart-cache.service';
+import { CacheService } from '~/common/services/cache.service';
+import { ChartConfigDto } from './dto/chart-config.dto';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class SavedChartService {
@@ -17,7 +19,7 @@ export class SavedChartService {
   constructor(
     private readonly savedChartRepository: SavedChartRepository,
     private readonly paystackApiService: PaystackApiService,
-    private readonly chartCacheService: ChartCacheService,
+    private readonly cacheService: CacheService,
   ) {}
 
   /**
@@ -89,9 +91,9 @@ export class SavedChartService {
       this.validateChartConfiguration(chartConfig as SaveChartDto);
     }
 
-    const cacheKey = this.chartCacheService.buildCacheKey(chartId, userId, chartConfig);
+    const cacheKey = this.buildCacheKey(chartId, userId, chartConfig);
 
-    const cachedChart = await this.chartCacheService.safeGet<SavedChartWithDataResponseDto>(cacheKey);
+    const cachedChart = await this.cacheService.safeGet<SavedChartWithDataResponseDto>(cacheKey);
 
     if (cachedChart) {
       this.logger.log(`Cached chart found for key ${cacheKey}`);
@@ -127,7 +129,7 @@ export class SavedChartService {
       };
 
       this.logger.log(`Caching chart for key ${cacheKey}`);
-      await this.chartCacheService.safeSet(cacheKey, updatedResponse);
+      await this.cacheService.safeSet(cacheKey, updatedResponse);
 
       return updatedResponse;
     }
@@ -183,5 +185,20 @@ export class SavedChartService {
 
       throw new ValidationError(error, code);
     }
+  }
+
+  private buildCacheKey(chartId: string, userId: string, chartConfig: ChartConfigDto) {
+    const normalizedConfig = {
+      resourceType: chartConfig.resourceType,
+      aggregationType: chartConfig.aggregationType,
+      from: chartConfig.from ?? null,
+      to: chartConfig.to ?? null,
+      status: chartConfig.status ?? null,
+      currency: chartConfig.currency ?? null,
+      channel: chartConfig.channel ?? null,
+    };
+
+    const hash = createHash('sha256').update(JSON.stringify(normalizedConfig)).digest('hex');
+    return `saved-chart:${userId}:${chartId}:${hash}`;
   }
 }

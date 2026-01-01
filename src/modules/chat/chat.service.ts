@@ -47,6 +47,7 @@ import {
   getTextFromMessage,
 } from '~/common/ai';
 import { PaystackApiService } from '~/common/services/paystack-api.service';
+import { CacheService } from '~/common/services/cache.service';
 import { PageContextService } from '~/common/services/page-context.service';
 import { RateLimitExceededException } from './exceptions/rate-limit-exceeded.exception';
 import { Conversation } from './entities/conversation.entity';
@@ -61,6 +62,7 @@ export class ChatService {
     private readonly configService: ConfigService,
     private readonly paystackApiService: PaystackApiService,
     private readonly pageContextService: PageContextService,
+    private readonly cacheService: CacheService,
   ) {}
 
   async getMessagesByConversationId(conversationId: string, userId: string) {
@@ -360,13 +362,18 @@ export class ChatService {
 
       const enrichedContext = await this.pageContextService.enrichContext(pageContext, jwtToken);
       const systemPrompt = this.buildPageScopedPrompt(enrichedContext);
-      const tools = createPageScopedTools(this.paystackApiService, getAuthenticatedUser, pageContext.type);
+      const tools = createPageScopedTools(
+        this.paystackApiService,
+        getAuthenticatedUser,
+        this.cacheService,
+        pageContext.type,
+      );
 
       return { systemPrompt, tools };
     } else {
       const currentDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
       const systemPrompt = CHAT_AGENT_SYSTEM_PROMPT.replace(/\{\{CURRENT_DATE\}\}/g, currentDate);
-      const tools = createTools(this.paystackApiService, getAuthenticatedUser);
+      const tools = createTools(this.paystackApiService, getAuthenticatedUser, this.cacheService);
 
       return { systemPrompt, tools };
     }

@@ -216,7 +216,7 @@ CACHE_TTL=10800000                        # Default TTL: 3 hours (in millisecond
 **Saved Charts Caching:**
 
 - **Cache Key Format**: `saved-chart:{userId}:{chartId}:{configHash}`
-- **TTL**: 24 hours (hardcoded in `ChartCacheService`)
+- **TTL**: 24 hours (default in `CacheService`, configurable per call)
 - **Cache Invalidation**: Automatic via configuration hash - different parameters = different cache key
 - **Graceful Degradation**: Cache failures are logged but don't interrupt chart generation
 

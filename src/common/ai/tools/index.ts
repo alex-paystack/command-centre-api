@@ -1,6 +1,8 @@
 import { Tool } from 'ai';
 import type { PaystackApiService } from '~/common/services/paystack-api.service';
 import type { AuthenticatedUser, ResourceType } from '../types';
+import type { CacheService } from '~/common/services/cache.service';
+import { createGetFeatureStateTool } from './feature-state';
 import { createGetTransactionsTool } from './retrieval';
 import { createGetCustomersTool } from './retrieval';
 import { createGetRefundsTool } from './retrieval';
@@ -20,8 +22,10 @@ import { createExportDisputesTool } from './export';
 export function createTools(
   paystackService: PaystackApiService,
   getAuthenticatedUser: () => AuthenticatedUser,
+  cacheService?: CacheService,
 ): Record<string, Tool<unknown, unknown>> {
   return {
+    getFeatureState: createGetFeatureStateTool(paystackService, getAuthenticatedUser, cacheService),
     getTransactions: createGetTransactionsTool(paystackService, getAuthenticatedUser),
     getCustomers: createGetCustomersTool(paystackService, getAuthenticatedUser),
     getRefunds: createGetRefundsTool(paystackService, getAuthenticatedUser),
@@ -40,11 +44,11 @@ export function createTools(
  * Maps each resource type to the relevant tools for that context
  */
 const RESOURCE_TOOL_MAP: Record<ResourceType, string[]> = {
-  transaction: ['getCustomers', 'getRefunds', 'getDisputes'],
-  customer: ['getTransactions', 'getRefunds', 'exportTransactions'],
-  refund: ['getTransactions', 'getCustomers'],
-  payout: ['getTransactions'],
-  dispute: ['getTransactions', 'getCustomers', 'getRefunds'],
+  transaction: ['getCustomers', 'getRefunds', 'getDisputes', 'getFeatureState'],
+  customer: ['getTransactions', 'getRefunds', 'exportTransactions', 'getFeatureState'],
+  refund: ['getTransactions', 'getCustomers', 'getFeatureState'],
+  payout: ['getTransactions', 'getFeatureState'],
+  dispute: ['getTransactions', 'getCustomers', 'getRefunds', 'getFeatureState'],
 };
 
 /**
@@ -57,9 +61,10 @@ const RESOURCE_TOOL_MAP: Record<ResourceType, string[]> = {
 export function createPageScopedTools(
   paystackService: PaystackApiService,
   getAuthenticatedUser: () => AuthenticatedUser,
+  cacheService: CacheService | undefined,
   contextType: ResourceType,
 ): Record<string, Tool<unknown, unknown>> {
-  const allTools = createTools(paystackService, getAuthenticatedUser);
+  const allTools = createTools(paystackService, getAuthenticatedUser, cacheService);
   const allowedTools = RESOURCE_TOOL_MAP[contextType];
   return Object.fromEntries(Object.entries(allTools).filter(([name]) => allowedTools.includes(name)));
 }

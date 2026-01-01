@@ -9,10 +9,11 @@ import { ChatService } from './chat.service';
 import { ChatController } from './chat.controller';
 import { PageContextService } from '~/common/services/page-context.service';
 import { PaystackModule } from '~/common/services/paystack.module';
+import { CacheService } from '~/common/services/cache.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Conversation, Message]), ConfigModule, PaystackModule],
-  providers: [ConversationRepository, MessageRepository, PageContextService, ChatService],
+  providers: [ConversationRepository, MessageRepository, PageContextService, CacheService, ChatService],
   controllers: [ChatController],
   exports: [ChatService],
 })

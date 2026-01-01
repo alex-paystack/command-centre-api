@@ -1,21 +1,33 @@
 import { createPageScopedTools } from '.';
 import { ResourceType } from '../types';
 import { PaystackApiService } from '../../services/paystack-api.service';
+import type { CacheService } from '~/common/services/cache.service';
 
 describe('createPageScopedTools', () => {
   let mockPaystackService: jest.Mocked<PaystackApiService>;
   let mockGetAuthenticatedUser: jest.Mock;
+  let mockCacheService: jest.Mocked<CacheService>;
 
   beforeEach(() => {
     mockPaystackService = {
       get: jest.fn(),
     } as unknown as jest.Mocked<PaystackApiService>;
 
+    mockCacheService = {
+      safeGet: jest.fn(),
+      safeSet: jest.fn(),
+    } as unknown as jest.Mocked<CacheService>;
+
     mockGetAuthenticatedUser = jest.fn().mockReturnValue({ userId: 'test-user-id', jwtToken: 'test-token' });
   });
 
   it('should return only customer, dispute and refund tools for transaction context', () => {
-    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, ResourceType.TRANSACTION);
+    const tools = createPageScopedTools(
+      mockPaystackService,
+      mockGetAuthenticatedUser,
+      mockCacheService,
+      ResourceType.TRANSACTION,
+    );
 
     const toolNames = Object.keys(tools);
     expect(toolNames).toContain('getCustomers');
@@ -27,7 +39,12 @@ describe('createPageScopedTools', () => {
   });
 
   it('should return transaction, refund, and export transaction tools for customer context', () => {
-    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, ResourceType.CUSTOMER);
+    const tools = createPageScopedTools(
+      mockPaystackService,
+      mockGetAuthenticatedUser,
+      mockCacheService,
+      ResourceType.CUSTOMER,
+    );
 
     const toolNames = Object.keys(tools);
     expect(toolNames).toContain('getTransactions');
@@ -40,7 +57,12 @@ describe('createPageScopedTools', () => {
   });
 
   it('should return transaction and customer tools for refund context', () => {
-    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, ResourceType.REFUND);
+    const tools = createPageScopedTools(
+      mockPaystackService,
+      mockGetAuthenticatedUser,
+      mockCacheService,
+      ResourceType.REFUND,
+    );
 
     const toolNames = Object.keys(tools);
     expect(toolNames).toContain('getTransactions');
@@ -52,7 +74,12 @@ describe('createPageScopedTools', () => {
   });
 
   it('should return only transaction tools for payout context', () => {
-    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, ResourceType.PAYOUT);
+    const tools = createPageScopedTools(
+      mockPaystackService,
+      mockGetAuthenticatedUser,
+      mockCacheService,
+      ResourceType.PAYOUT,
+    );
 
     const toolNames = Object.keys(tools);
     expect(toolNames).toContain('getTransactions');
@@ -64,7 +91,12 @@ describe('createPageScopedTools', () => {
   });
 
   it('should return transaction, customer, and refund tools for dispute context', () => {
-    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, ResourceType.DISPUTE);
+    const tools = createPageScopedTools(
+      mockPaystackService,
+      mockGetAuthenticatedUser,
+      mockCacheService,
+      ResourceType.DISPUTE,
+    );
 
     const toolNames = Object.keys(tools);
     expect(toolNames).toContain('getTransactions');
@@ -76,7 +108,12 @@ describe('createPageScopedTools', () => {
   });
 
   it('should return valid tool objects with correct structure', () => {
-    const tools = createPageScopedTools(mockPaystackService, mockGetAuthenticatedUser, ResourceType.TRANSACTION);
+    const tools = createPageScopedTools(
+      mockPaystackService,
+      mockGetAuthenticatedUser,
+      mockCacheService,
+      ResourceType.TRANSACTION,
+    );
 
     expect(tools.getCustomers).toBeDefined();
     expect(typeof tools.getCustomers).toBe('object');
